@@ -37,7 +37,9 @@ pub unsafe trait Reclaim<A: Alloc>
 where
     Self: Sized,
 {
-    /// Header that prepends every record.
+    /// Header that prepends every record. For reclamation Schemes that do not
+    /// require any header data for records managed by them, `()` is the best
+    /// choice.
     type RecordHeader: Default + Sized;
 
     /// Reclaims a record and caches it until it is safe to de-allocates it, i.e. when no other
@@ -67,14 +69,19 @@ where
 // Record
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Doc...
+/// Type that is allocated, whenever a new `Owned<T>` or `Atomic<T>` is created.
+///
+/// The header is never exposed and has to be manually accessed if and when needed.
+/// One example use case could be reference-counted records, where the count is stored
+/// in the header and increased or decreased whenever a `Protected` is acquired or goes
+/// out of scope.
 pub struct Record<T, R: Reclaim<A>, A: Alloc> {
     header: R::RecordHeader,
     elem: T,
 }
 
 impl<T, R: Reclaim<A>, A: Alloc> Record<T, R, A> {
-    /// TODO: Doc...
+    /// Creates a new record with the specified `elem` and a default header.
     pub fn new(elem: T) -> Self {
         Self {
             header: Default::default(),
@@ -82,10 +89,27 @@ impl<T, R: Reclaim<A>, A: Alloc> Record<T, R, A> {
         }
     }
 
-    /// TODO: Doc...
+    /// Creates a new record with the specified `header` and `elem`.
+    pub fn with_header(elem: T, header: R::RecordHeader) -> Self {
+        Self { header, elem }
+    }
+
+    /// Returns a reference to header for the record at the pointed-to location of `ptr`.
+    ///
+    /// # Safety
+    ///
+    /// The pointer `elem` must be a valid, non-null and unmarked pointer to a `T`, that was at some
+    /// point constructed as part `Record`.
+    /// Otherwise, the pointer-arithmetic used to access the header will fail and memory-safety
+    /// violated.
     pub unsafe fn get_header<'a>(elem: *mut T) -> &'a R::RecordHeader {
         let header = (elem as usize) - Self::offset_elem() + Self::offset_header();
         &*(header as *mut _)
+    }
+
+    pub unsafe fn get_header_mut<'a>(elem: *mut T) -> &'a mut R::RecordHeader {
+        let header = (elem as usize) - Self::offset_elem() + Self::offset_header();
+        &mut *(header as *mut _)
     }
 
     /// TODO: Doc...
@@ -116,15 +140,23 @@ pub trait Protected<A: Alloc>: Drop + Sized {
     /// TODO: Doc...
     type Reclaimer: Reclaim<A>;
 
-    /// TODO: Doc...
+    /// Creates a new `Protected`.
+    ///
+    /// In case of region-based reclamation schemes (such as EBR), a call to `new` is guaranteed
+    /// to create an active region guard.
     fn new() -> Self;
 
-    /// Returns a `Shared` value wrapped in a `Some` from the protected pointer that is safe
-    /// from reclamation during the lifetime of `&self`, but only if a non-null value was previously
-    /// acquired. Otherwise, `None` is returned.
+    /// Returns a `Shared` value wrapped in a `Some` from the internally protected pointer. If no
+    /// value or a null-pointer has been acquired, `None` is returned.
+    /// The `Shared` that is returned is guaranteed to be protected from reclamation during the
+    /// lifetime of the `Protected`.
     fn shared(&self) -> Option<Shared<Self::Item, Self::Reclaimer, A>>;
 
-    /// TODO: Doc...
+    /// Takes an atomic snapshot of the value stored within `atomic` at the moment of the call's
+    /// invocation and stores it within `self`. The corresponding `Shared` wrapped in a `Some` (or
+    /// `None`) is returned.
+    ///
+    /// The successfully acquired value is guaranteed to be protected from concurrent reclamation.
     fn acquire(
         &mut self,
         atomic: &Atomic<Self::Item, Self::Reclaimer, A>,
