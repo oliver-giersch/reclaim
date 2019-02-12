@@ -1,8 +1,7 @@
 use core::fmt;
-use core::mem;
 use core::ptr::NonNull;
 
-use crate::marked::{self, MarkedNonNull};
+use crate::marked::{self, MarkedNonNull, MarkedPtr};
 
 impl<T> MarkedNonNull<T> {
     pub const MARK_BITS: usize = marked::mark_bits::<T>();
@@ -39,8 +38,8 @@ impl<T> MarkedNonNull<T> {
     ///
     /// `ptr` may be marked, but the tag will be discarded, when `ptr` is null and `None` is
     /// returned.
-    pub fn new(ptr: *mut T) -> Option<Self> {
-        let (raw, tag) = marked::decompose::<T>(ptr as usize);
+    pub fn new(ptr: impl Into<MarkedPtr<T>>) -> Option<Self> {
+        let (raw, tag) = marked::decompose::<T>(ptr.into().inner as usize);
         if raw.is_null() {
             None
         } else {
