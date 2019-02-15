@@ -1,8 +1,7 @@
-use core::alloc::Alloc;
 use core::mem;
 
 use crate::owned::Owned;
-use crate::{Reclaim, Shared, Unlinked};
+use crate::{Reclaim, Shared, StatelessAlloc, Unlinked};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Pointer (trait)
@@ -29,7 +28,7 @@ pub trait Pointer {
 // Owned & Option<Owned>
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: Reclaim<A>, A: Alloc> Pointer for Owned<T, R, A> {
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Pointer for Owned<T, R, A> {
     type Item = T;
 
     fn into_raw(self) -> *mut Self::Item {
@@ -41,7 +40,7 @@ impl<T, R: Reclaim<A>, A: Alloc> Pointer for Owned<T, R, A> {
     }
 }
 
-impl<T, R: Reclaim<A>, A: Alloc> Pointer for Option<Owned<T, R, A>> {
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Pointer for Option<Owned<T, R, A>> {
     type Item = T;
 
     fn into_raw(self) -> *mut Self::Item {
@@ -57,7 +56,7 @@ impl<T, R: Reclaim<A>, A: Alloc> Pointer for Option<Owned<T, R, A>> {
 // Shared & Option<Shared>
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<'g, T, R: Reclaim<A>, A: Alloc> Pointer for Shared<'g, T, R, A> {
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Pointer for Shared<'g, T, R, A> {
     type Item = T;
 
     fn into_raw(self) -> *mut Self::Item {
@@ -69,7 +68,7 @@ impl<'g, T, R: Reclaim<A>, A: Alloc> Pointer for Shared<'g, T, R, A> {
     }
 }
 
-impl<'g, T, R: Reclaim<A>, A: Alloc> Pointer for Option<Shared<'g, T, R, A>> {
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Pointer for Option<Shared<'g, T, R, A>> {
     type Item = T;
 
     fn into_raw(self) -> *mut Self::Item {
@@ -85,7 +84,7 @@ impl<'g, T, R: Reclaim<A>, A: Alloc> Pointer for Option<Shared<'g, T, R, A>> {
 // Unlinked & Option<Unlinked>
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: Reclaim<A>, A: Alloc> Pointer for Unlinked<T, R, A> {
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Pointer for Unlinked<T, R, A> {
     type Item = T;
 
     fn into_raw(self) -> *mut Self::Item {
@@ -97,7 +96,7 @@ impl<T, R: Reclaim<A>, A: Alloc> Pointer for Unlinked<T, R, A> {
     }
 }
 
-impl<T, R: Reclaim<A>, A: Alloc> Pointer for Option<Unlinked<T, R, A>> {
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Pointer for Option<Unlinked<T, R, A>> {
     type Item = T;
 
     fn into_raw(self) -> *mut Self::Item {

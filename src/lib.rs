@@ -1,14 +1,13 @@
-#![feature(allocator_api)]
-#![cfg_attr(feature = "no_std", no_std)]
+#![feature(allocator_api, trait_alias)]
+#![cfg_attr(not(feature = "global_alloc"), no_std)]
 
 use core::alloc::Alloc;
 use core::marker::PhantomData;
 use core::sync::atomic::Ordering;
 
-#[cfg(not(feature = "no_std"))]
+#[cfg(feature = "global_alloc")]
 use std::alloc::Global;
 
-use cfg_if::cfg_if;
 use memoffset::offset_of;
 
 mod atomic;
@@ -16,24 +15,17 @@ mod marked;
 mod owned;
 mod pointer;
 
-pub use crate::atomic::{Compare, CompareExchangeFailure, Store};
+pub use crate::atomic::{Atomic, Compare, CompareExchangeFailure, Store};
 pub use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
+pub use crate::owned::Owned;
 
-cfg_if! {
-    if #[cfg(feature = "no_std")] {
-        pub use crate::atomic::Atomic;
-        pub use crate::owned::Owned;
-    } else {
-        pub type Atomic<T, R, A = Global> = crate::atomic::Atomic<T, R, A>;
-        pub type Owned<T, R, A = Global> = crate::owned::Owned<T, R, A>;
-    }
-}
+pub trait StatelessAlloc = Alloc + Copy + Clone + Default;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Reclaim (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub unsafe trait Reclaim<A: Alloc>
+pub unsafe trait Reclaim<A: StatelessAlloc>
 where
     Self: Sized,
 {
@@ -41,6 +33,11 @@ where
     /// require any header data for records managed by them, `()` is the best
     /// choice.
     type RecordHeader: Default + Sized;
+
+    /// TODO: Doc
+    fn allocator() -> A {
+        A::default()
+    }
 
     /// Reclaims a record and caches it until it is safe to de-allocates it, i.e. when no other
     /// threads can be guaranteed to hold any live references to it.
@@ -75,12 +72,12 @@ where
 /// One example use case could be reference-counted records, where the count is stored
 /// in the header and increased or decreased whenever a `Protected` is acquired or goes
 /// out of scope.
-pub struct Record<T, R: Reclaim<A>, A: Alloc> {
+pub struct Record<T, R: Reclaim<A>, A: StatelessAlloc> {
     header: R::RecordHeader,
     elem: T,
 }
 
-impl<T, R: Reclaim<A>, A: Alloc> Record<T, R, A> {
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Record<T, R, A> {
     /// Creates a new record with the specified `elem` and a default header.
     pub fn new(elem: T) -> Self {
         Self {
@@ -134,7 +131,7 @@ impl<T, R: Reclaim<A>, A: Alloc> Record<T, R, A> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// TODO: Doc...
-pub trait Protected<A: Alloc>: Drop + Sized {
+pub trait Protected<A: StatelessAlloc>: Drop + Sized {
     /// TODO: Doc...
     type Item: Sized;
     /// TODO: Doc...
@@ -182,13 +179,21 @@ pub struct NotEqual;
 // Shared
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg(feature = "global_alloc")]
+/// A `Shared` represents a reference to value stored in a concurrent data structure.
+pub struct Shared<'g, T, R: Reclaim<A>, A: StatelessAlloc = Global> {
+    inner: MarkedNonNull<T>,
+    _marker: PhantomData<(&'g T, R, A)>,
+}
+
+#[cfg(not(feature = "global_alloc"))]
 /// A `Shared` represents a reference to value stored in a concurrent data structure.
 pub struct Shared<'g, T, R: Reclaim<A>, A: Alloc> {
     inner: MarkedNonNull<T>,
-    _marker: PhantomData<(&'g R, A)>,
+    _marker: PhantomData<(&'g T, R, A)>,
 }
 
-impl<'g, T, R: Reclaim<A>, A: Alloc> Clone for Shared<'g, T, R, A> {
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Clone for Shared<'g, T, R, A> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner,
@@ -197,9 +202,9 @@ impl<'g, T, R: Reclaim<A>, A: Alloc> Clone for Shared<'g, T, R, A> {
     }
 }
 
-impl<'g, T, R: Reclaim<A>, A: Alloc> Copy for Shared<'g, T, R, A> {}
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Copy for Shared<'g, T, R, A> {}
 
-impl<'g, T, R: Reclaim<A>, A: Alloc> Shared<'g, T, R, A> {
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Shared<'g, T, R, A> {
     /// # Safety
     ///
     /// The caller must ensure that the provided pointer is both non-null and valid (may be marked)
@@ -250,15 +255,25 @@ impl<'g, T, R: Reclaim<A>, A: Alloc> Shared<'g, T, R, A> {
 // Unlinked
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct Unlinked<T, R: Reclaim<A>, A: Alloc> {
+#[cfg(feature = "global_alloc")]
+pub struct Unlinked<T, R: Reclaim<A>, A: StatelessAlloc = Global> {
     inner: MarkedNonNull<T>,
-    _marker: PhantomData<(R, A)>,
+    _marker: PhantomData<(T, R, A)>,
 }
 
-impl<T, R: Reclaim<A>, A: Alloc> Unlinked<T, R, A> {
+#[cfg(not(feature = "global_alloc"))]
+pub struct Unlinked<T, R: Reclaim<A>, A: Alloc> {
+    inner: MarkedNonNull<T>,
+    _marker: PhantomData<(T, R, A)>,
+}
+
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Unlinked<T, R, A> {
     /// TODO: Doc...
     pub unsafe fn from_raw(raw: *mut T) -> Self {
-        unimplemented!()
+        Self {
+            inner: MarkedNonNull::new_unchecked(raw),
+            _marker: PhantomData,
+        }
     }
 
     /// Consumes the `unlinked` and returns the internal non-null (potentially marked) raw pointer.

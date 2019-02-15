@@ -112,10 +112,16 @@ impl<T> Clone for MarkedNonNull<T> {
 
 impl<T> Copy for MarkedNonNull<T> {}
 
+impl<T> From<NonNull<T>> for MarkedNonNull<T> {
+    fn from(ptr: NonNull<T>) -> Self {
+        Self { inner: ptr }
+    }
+}
+
 impl<'a, T> From<&'a T> for MarkedNonNull<T> {
     fn from(reference: &'a T) -> Self {
         unsafe {
-            MarkedNonNull {
+            Self {
                 inner: NonNull::new_unchecked(reference as *const _ as *mut _),
             }
         }
@@ -125,7 +131,7 @@ impl<'a, T> From<&'a T> for MarkedNonNull<T> {
 impl<'a, T> From<&'a mut T> for MarkedNonNull<T> {
     fn from(reference: &'a mut T) -> Self {
         unsafe {
-            MarkedNonNull {
+            Self {
                 inner: NonNull::new_unchecked(reference as *mut _),
             }
         }

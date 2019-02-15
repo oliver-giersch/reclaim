@@ -1,27 +1,37 @@
-use core::alloc::Alloc;
 use core::marker::PhantomData;
 use core::mem;
 use core::sync::atomic::Ordering;
 
+#[cfg(feature = "global_alloc")]
+use std::alloc::Global;
+
 use crate::marked::{AtomicMarkedPtr, MarkedPtr};
 use crate::owned::Owned;
 use crate::pointer::Pointer;
-use crate::{NotEqual, Protected, Reclaim, Shared, Unlinked};
+use crate::{NotEqual, Protected, Reclaim, Shared, StatelessAlloc, Unlinked};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Atomic
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// TODO: Doc...
-pub struct Atomic<T, R: Reclaim<A>, A: Alloc> {
+#[cfg(feature = "global_alloc")]
+pub struct Atomic<T, R: Reclaim<A>, A: StatelessAlloc = Global> {
     inner: AtomicMarkedPtr<T>,
-    _marker: PhantomData<(R, A)>,
+    _marker: PhantomData<(T, R, A)>,
 }
 
-unsafe impl<T, R: Reclaim<A>, A: Alloc> Send for Atomic<T, R, A> where T: Send + Sync {}
-unsafe impl<T, R: Reclaim<A>, A: Alloc> Sync for Atomic<T, R, A> where T: Send + Sync {}
+/// TODO: Doc...
+#[cfg(not(feature = "global_alloc"))]
+pub struct Atomic<T, R: Reclaim<A>, A: StatelessAlloc> {
+    inner: AtomicMarkedPtr<T>,
+    _marker: PhantomData<(T, R, A)>,
+}
 
-impl<T, R: Reclaim<A>, A: Alloc> Atomic<T, R, A> {
+unsafe impl<T, R: Reclaim<A>, A: StatelessAlloc> Send for Atomic<T, R, A> where T: Send + Sync {}
+unsafe impl<T, R: Reclaim<A>, A: StatelessAlloc> Sync for Atomic<T, R, A> where T: Send + Sync {}
+
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Atomic<T, R, A> {
     /// TODO: Doc...
     pub fn null() -> Self {
         Self {
@@ -133,7 +143,7 @@ impl<T, R: Reclaim<A>, A: Alloc> Atomic<T, R, A> {
     }
 }
 
-impl<T, R: Reclaim<A>, A: Alloc> Drop for Atomic<T, R, A> {
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Drop for Atomic<T, R, A> {
     fn drop(&mut self) {
         let ptr = self.inner.load(Ordering::SeqCst).decompose_ptr();
         if !ptr.is_null() {
@@ -143,7 +153,7 @@ impl<T, R: Reclaim<A>, A: Alloc> Drop for Atomic<T, R, A> {
     }
 }
 
-impl<T, R: Reclaim<A>, A: Alloc> From<Owned<T, R, A>> for Atomic<T, R, A> {
+impl<T, R: Reclaim<A>, A: StatelessAlloc> From<Owned<T, R, A>> for Atomic<T, R, A> {
     fn from(owned: Owned<T, R, A>) -> Self {
         Self {
             inner: AtomicMarkedPtr::from(Owned::into_raw(owned)),
@@ -160,7 +170,7 @@ pub struct CompareExchangeFailure<T, S, R, A>
 where
     S: Store<A, Item = T, Reclaimer = R>,
     R: Reclaim<A>,
-    A: Alloc,
+    A: StatelessAlloc,
 {
     pub loaded: MarkedPtr<T>,
     pub input: S,
@@ -173,31 +183,31 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Trait for pointer types that can be stored in an `AtomicOwned`.
-pub trait Store<A: Alloc>: Pointer + Sized + InternalOnly {
+pub trait Store<A: StatelessAlloc>: Pointer + Sized + InternalOnly {
     type Reclaimer: Reclaim<A>;
 }
 
-impl<T, R: Reclaim<A>, A: Alloc> Store<A> for Owned<T, R, A> {
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Store<A> for Owned<T, R, A> {
     type Reclaimer = R;
 }
 
-impl<T, R: Reclaim<A>, A: Alloc> Store<A> for Option<Owned<T, R, A>> {
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Store<A> for Option<Owned<T, R, A>> {
     type Reclaimer = R;
 }
 
-impl<'g, T, R: Reclaim<A>, A: Alloc> Store<A> for Shared<'g, T, R, A> {
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Store<A> for Shared<'g, T, R, A> {
     type Reclaimer = R;
 }
 
-impl<'g, T, R: Reclaim<A>, A: Alloc> Store<A> for Option<Shared<'g, T, R, A>> {
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Store<A> for Option<Shared<'g, T, R, A>> {
     type Reclaimer = R;
 }
 
-impl<T, R: Reclaim<A>, A: Alloc> Store<A> for Unlinked<T, R, A> {
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Store<A> for Unlinked<T, R, A> {
     type Reclaimer = R;
 }
 
-impl<T, R: Reclaim<A>, A: Alloc> Store<A> for Option<Unlinked<T, R, A>> {
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Store<A> for Option<Unlinked<T, R, A>> {
     type Reclaimer = R;
 }
 
@@ -205,18 +215,18 @@ impl<T, R: Reclaim<A>, A: Alloc> Store<A> for Option<Unlinked<T, R, A>> {
 // Compare (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait Compare<A: Alloc>: Pointer + Sized + InternalOnly {
+pub trait Compare<A: StatelessAlloc>: Pointer + Sized + InternalOnly {
     type Reclaimer: Reclaim<A>;
     // FIXME: maybe add extra trait for Unlinked and Option<Unlinked>
     type Unlinked: Pointer<Item = Self::Item>;
 }
 
-impl<'g, T, R: Reclaim<A>, A: Alloc> Compare<A> for Shared<'g, T, R, A> {
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Compare<A> for Shared<'g, T, R, A> {
     type Reclaimer = R;
     type Unlinked = Unlinked<T, R, A>;
 }
 
-impl<'g, T, R: Reclaim<A>, A: Alloc> Compare<A> for Option<Shared<'g, T, R, A>> {
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Compare<A> for Option<Shared<'g, T, R, A>> {
     type Reclaimer = R;
     type Unlinked = Option<Unlinked<T, R, A>>;
 }
@@ -228,9 +238,9 @@ impl<'g, T, R: Reclaim<A>, A: Alloc> Compare<A> for Option<Shared<'g, T, R, A>> 
 /// Marker trait that is not exported from this crate
 pub trait InternalOnly {}
 
-impl<T, R: Reclaim<A>, A: Alloc> InternalOnly for Owned<T, R, A> {}
-impl<T, R: Reclaim<A>, A: Alloc> InternalOnly for Option<Owned<T, R, A>> {}
-impl<'g, T, R: Reclaim<A>, A: Alloc> InternalOnly for Shared<'g, T, R, A> {}
-impl<'g, T, R: Reclaim<A>, A: Alloc> InternalOnly for Option<Shared<'g, T, R, A>> {}
-impl<T, R: Reclaim<A>, A: Alloc> InternalOnly for Unlinked<T, R, A> {}
-impl<T, R: Reclaim<A>, A: Alloc> InternalOnly for Option<Unlinked<T, R, A>> {}
+impl<T, R: Reclaim<A>, A: StatelessAlloc> InternalOnly for Owned<T, R, A> {}
+impl<T, R: Reclaim<A>, A: StatelessAlloc> InternalOnly for Option<Owned<T, R, A>> {}
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> InternalOnly for Shared<'g, T, R, A> {}
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> InternalOnly for Option<Shared<'g, T, R, A>> {}
+impl<T, R: Reclaim<A>, A: StatelessAlloc> InternalOnly for Unlinked<T, R, A> {}
+impl<T, R: Reclaim<A>, A: StatelessAlloc> InternalOnly for Option<Unlinked<T, R, A>> {}
