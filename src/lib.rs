@@ -1,12 +1,15 @@
 #![feature(allocator_api, trait_alias)]
-#![cfg_attr(not(feature = "global_alloc"), no_std)]
+
+#![no_std]
+
+#[cfg(test)]
+extern crate std;
 
 use core::alloc::Alloc;
+use core::cmp;
 use core::marker::PhantomData;
+use core::mem;
 use core::sync::atomic::Ordering;
-
-#[cfg(feature = "global_alloc")]
-use std::alloc::Global;
 
 use memoffset::offset_of;
 
@@ -14,6 +17,8 @@ mod atomic;
 mod marked;
 mod owned;
 mod pointer;
+#[cfg(test)]
+mod test;
 
 pub use crate::atomic::{Atomic, Compare, CompareExchangeFailure, Store};
 pub use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
@@ -131,7 +136,7 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Record<T, R, A> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// TODO: Doc...
-pub trait Protected<A: StatelessAlloc>: Drop + Sized {
+pub trait Protected<A: StatelessAlloc>: Sized {
     /// TODO: Doc...
     type Item: Sized;
     /// TODO: Doc...
@@ -179,16 +184,8 @@ pub struct NotEqual;
 // Shared
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg(feature = "global_alloc")]
 /// A `Shared` represents a reference to value stored in a concurrent data structure.
-pub struct Shared<'g, T, R: Reclaim<A>, A: StatelessAlloc = Global> {
-    inner: MarkedNonNull<T>,
-    _marker: PhantomData<(&'g T, R, A)>,
-}
-
-#[cfg(not(feature = "global_alloc"))]
-/// A `Shared` represents a reference to value stored in a concurrent data structure.
-pub struct Shared<'g, T, R: Reclaim<A>, A: Alloc> {
+pub struct Shared<'g, T, R: Reclaim<A>, A: StatelessAlloc> {
     inner: MarkedNonNull<T>,
     _marker: PhantomData<(&'g T, R, A)>,
 }
@@ -209,17 +206,32 @@ impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Shared<'g, T, R, A> {
     ///
     /// The caller must ensure that the provided pointer is both non-null and valid (may be marked)
     /// and is guaranteed to not be reclaimed during the lifetime of the shared reference.
-    pub unsafe fn from_raw(raw: *mut T) -> Self {
-        debug_assert!(!raw.is_null());
+    pub unsafe fn from_marked(marked: MarkedPtr<T>) -> Option<Self> {
+        // this is safe because ...
+        mem::transmute(marked)
+    }
+
+    /// TODO: Doc...
+    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T>) -> Self {
         Self {
-            inner: MarkedNonNull::new_unchecked(raw),
+            inner: marked,
             _marker: PhantomData,
         }
     }
 
     /// TODO: Doc...
-    pub fn into_raw(self) -> *mut T {
-        self.inner.into_inner().as_ptr()
+    pub fn as_marked(&self) -> MarkedPtr<T> {
+        self.inner.into_marked()
+    }
+
+    /// TODO: Doc...
+    pub fn into_marked(self) -> MarkedPtr<T> {
+        self.inner.into_marked()
+    }
+
+    /// TODO: Doc...
+    pub fn into_marked_non_null(self) -> MarkedNonNull<T> {
+        self.inner
     }
 
     /// TODO: Doc...
@@ -251,34 +263,50 @@ impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Shared<'g, T, R, A> {
     }
 }
 
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> PartialEq<MarkedPtr<T>> for Shared<'g, T, R, A> {
+    fn eq(&self, other: &MarkedPtr<T>) -> bool {
+        self.inner.into_marked().eq(other)
+    }
+}
+
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> PartialOrd<MarkedPtr<T>> for Shared<'g, T, R, A> {
+    fn partial_cmp(&self, other: &MarkedPtr<T>) -> Option<cmp::Ordering> {
+        self.inner.into_marked().partial_cmp(other)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Unlinked
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg(feature = "global_alloc")]
-pub struct Unlinked<T, R: Reclaim<A>, A: StatelessAlloc = Global> {
-    inner: MarkedNonNull<T>,
-    _marker: PhantomData<(T, R, A)>,
-}
-
-#[cfg(not(feature = "global_alloc"))]
-pub struct Unlinked<T, R: Reclaim<A>, A: Alloc> {
+pub struct Unlinked<T, R: Reclaim<A>, A: StatelessAlloc> {
     inner: MarkedNonNull<T>,
     _marker: PhantomData<(T, R, A)>,
 }
 
 impl<T, R: Reclaim<A>, A: StatelessAlloc> Unlinked<T, R, A> {
-    /// TODO: Doc...
-    pub unsafe fn from_raw(raw: *mut T) -> Self {
-        Self {
-            inner: MarkedNonNull::new_unchecked(raw),
-            _marker: PhantomData,
-        }
+    pub unsafe fn from_marked(marked: MarkedPtr<T>) -> Option<Self> {
+        mem::transmute(marked)
     }
 
-    /// Consumes the `unlinked` and returns the internal non-null (potentially marked) raw pointer.
-    pub fn into_raw(unlinked: Self) -> *mut T {
-        unlinked.inner.into_inner().as_ptr()
+    /// TODO: Doc...
+    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T>) -> Self {
+        unimplemented!()
+    }
+
+    /// TODO: Doc...
+    pub fn as_marked(&self) -> MarkedPtr<T> {
+        self.inner.into_marked()
+    }
+
+    /// TODO: Doc...
+    pub fn into_marked(self) -> MarkedPtr<T> {
+        unimplemented!()
+    }
+
+    /// TODO: Doc...
+    pub fn into_marked_non_null(self) -> MarkedNonNull<T> {
+        unimplemented!()
     }
 
     /// TODO: Doc...

@@ -127,16 +127,15 @@ impl<T> fmt::Pointer for AtomicMarkedPtr<T> {
 
 #[cfg(test)]
 mod test {
-    use std::sync::atomic::Ordering;
-    use std::ptr;
+    use core::sync::atomic::Ordering;
 
     use crate::marked::{AtomicMarkedPtr, MarkedPtr};
 
     #[test]
     fn null() {
         let ptr: AtomicMarkedPtr<i32> = AtomicMarkedPtr::null();
-        assert_eq!(ptr.load(Ordering::Relaxed).into_inner(), ptr::null_mut());
-        assert_eq!(ptr.into_inner().into_inner(), ptr::null_mut());
+        assert_eq!(ptr.load(Ordering::Relaxed).into_usize(), 0);
+        assert_eq!(ptr.into_inner().into_usize(), 0);
     }
 
     #[test]
@@ -144,8 +143,8 @@ mod test {
         let reference = &1;
         let marked = AtomicMarkedPtr::new(MarkedPtr::from(reference));
         let from = AtomicMarkedPtr::from(reference as *const _ as *mut i32);
-        assert_eq!(marked.load(Ordering::Relaxed).into_inner(), reference as *const _ as *mut i32);
-        assert_eq!(from.load(Ordering::Relaxed).into_inner(), reference as *const _ as *mut i32);
+        assert_eq!(marked.load(Ordering::Relaxed).into_usize(), reference as *const _ as usize);
+        assert_eq!(from.load(Ordering::Relaxed).into_usize(), reference as *const _ as usize);
     }
 
     #[test]
@@ -162,7 +161,7 @@ mod test {
         let reference: &i32 = &1;
         let atomic: AtomicMarkedPtr<i32> = AtomicMarkedPtr::from(reference as *const _);
         let swap = atomic.swap(MarkedPtr::null(), Ordering::Relaxed);
-        assert_eq!(swap.into_inner(), reference as *const _ as *mut _);
-        assert_eq!(atomic.load(Ordering::Relaxed).into_inner(), ptr::null_mut());
+        assert_eq!(swap.into_usize(), reference as *const _ as usize);
+        assert_eq!(atomic.load(Ordering::Relaxed).into_usize(), 0);
     }
 }

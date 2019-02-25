@@ -2,10 +2,9 @@ use core::mem;
 use core::ptr::NonNull;
 use core::sync::atomic::AtomicPtr;
 
-// implementation modules
 mod atomic;
-mod non_null;
-mod pointer;
+mod ptr;
+mod raw;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /// AtomicMarkedPtr
@@ -24,7 +23,7 @@ pub struct AtomicMarkedPtr<T> {
 /// MarkedPtr
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Eq, Ord)]
 pub struct MarkedPtr<T> {
     inner: *mut T,
 }
@@ -41,13 +40,6 @@ pub struct MarkedNonNull<T> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /// helper functions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Composes a marked pointer from a raw (i.e. unmarked) pointer and a tag.
-///
-/// If the size of the tag exceeds the markable bits of `T` the tag is truncated.
-fn compose<T>(ptr: *mut T, tag: usize) -> *mut T {
-    ((ptr as usize) | (mark_mask::<T>() & tag)) as *mut _
-}
 
 /// Decomposes the integer representation of a marked pointer into a raw pointer and the tag.
 const fn decompose<T>(marked: usize) -> (*mut T, usize) {
@@ -75,9 +67,17 @@ const fn mark_mask<T>() -> usize {
     mem::align_of::<T>() - 1
 }
 
+/// Composes a marked pointer from a raw (i.e. unmarked) pointer and a tag.
+///
+/// If the size of the tag exceeds the markable bits of `T` the tag is truncated.
+fn compose<T>(ptr: *mut T, tag: usize) -> *mut T {
+    debug_assert_eq!(ptr as usize & mark_mask::<T>(), 0);
+    ((ptr as usize) | (mark_mask::<T>() & tag)) as *mut _
+}
+
 #[cfg(test)]
 mod test {
-    use std::ptr;
+    use core::ptr;
 
     use crate::marked;
 

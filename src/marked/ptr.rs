@@ -1,7 +1,18 @@
+use core::cmp::{self, PartialEq, PartialOrd};
 use core::fmt;
 use core::ptr::NonNull;
 
 use crate::marked::{self, MarkedNonNull, MarkedPtr};
+
+impl<T> Clone for MarkedNonNull<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<T> Copy for MarkedNonNull<T> {}
 
 impl<T> MarkedNonNull<T> {
     pub const MARK_BITS: usize = marked::mark_bits::<T>();
@@ -18,35 +29,33 @@ impl<T> MarkedNonNull<T> {
     /// sentinel value. Types that lazily allocate must track initialization by
     /// some other means.
     pub fn dangling() -> Self {
-        Self {
-            inner: NonNull::dangling(),
-        }
+        Self { inner: NonNull::dangling() }
     }
 
-    /// Creates a new `MarkedNonNull`.
+    /// Creates a new `MarkedNonNull` from e.g. a raw pointer or a marked pointer .
     ///
     /// # Safety
     ///
     /// `ptr` may be marked, but must be non-null.
-    pub const unsafe fn new_unchecked(ptr: *mut T) -> Self {
-        Self {
-            inner: NonNull::new_unchecked(ptr),
-        }
+    pub unsafe fn new_unchecked(ptr: impl Into<MarkedPtr<T>>) -> Self {
+        Self { inner: NonNull::new_unchecked(ptr.into().inner) }
     }
 
     /// Creates a new `MarkedNonNull` if `ptr` is non-null.
     ///
-    /// `ptr` may be marked, but the tag will be discarded, when `ptr` is null and `None` is
+    /// `ptr` may be marked, but the tag will be discarded, when `ptr` is null and only `None` is
     /// returned.
     pub fn new(ptr: impl Into<MarkedPtr<T>>) -> Option<Self> {
-        let (raw, tag) = marked::decompose::<T>(ptr.into().inner as usize);
-        if raw.is_null() {
-            None
-        } else {
-            Some(MarkedNonNull::compose(unsafe { NonNull::new_unchecked(raw) }, tag))
+        match marked::decompose::<T>(ptr.into().into_usize()) {
+            (raw, _) if raw.is_null() => None,
+            (raw, tag) => Some(MarkedNonNull::compose(
+                unsafe { NonNull::new_unchecked(raw) },
+                tag
+            ))
         }
     }
 
+    /// TODO: Doc...
     pub fn compose(ptr: NonNull<T>, tag: usize) -> Self {
         debug_assert_eq!(
             ptr.as_ptr() as usize & Self::MARK_MASK,
@@ -58,59 +67,54 @@ impl<T> MarkedNonNull<T> {
         }
     }
 
-    pub fn into_inner(self) -> NonNull<T> {
-        self.inner
+    /// TODO: Doc...
+    pub fn into_marked(self) -> MarkedPtr<T> {
+        MarkedPtr::new(self.inner.as_ptr())
     }
 
-    pub fn into_inner_raw(self) -> *mut T {
-        self.inner.as_ptr()
-    }
-
+    /// TODO: Doc...
     pub fn decompose(&self) -> (NonNull<T>, usize) {
         let (ptr, tag) = marked::decompose(self.inner.as_ptr() as usize);
         (unsafe { NonNull::new_unchecked(ptr) }, tag)
     }
 
+    /// TODO: Doc...
     pub fn decompose_ptr(&self) -> *mut T {
         marked::decompose_ptr(self.inner.as_ptr() as usize)
     }
 
+    /// TODO: Doc...
     pub fn decompose_non_null(&self) -> NonNull<T> {
         unsafe { NonNull::new_unchecked(marked::decompose_ptr(self.inner.as_ptr() as usize)) }
     }
 
+    /// TODO: Doc...
     pub fn decompose_tag(&self) -> usize {
         marked::decompose_tag::<T>(self.inner.as_ptr() as usize)
     }
 
+    /// TODO: Doc...
     pub unsafe fn decompose_ref<'a>(&self) -> (&'a T, usize) {
         let (ptr, tag) = self.decompose();
         (&*ptr.as_ptr(), tag)
     }
 
+    /// TODO: Doc...
     pub unsafe fn decompose_mut<'a>(&mut self) -> (&'a mut T, usize) {
         let (ptr, tag) = self.decompose();
         (&mut *ptr.as_ptr(), tag)
     }
 
+    /// TODO: Doc...
     pub unsafe fn as_ref<'a>(&self) -> &'a T {
         &*self.decompose_non_null().as_ptr()
     }
 
+    /// TODO: Doc...
     pub unsafe fn as_mut<'a>(&mut self) -> &'a mut T {
         &mut *self.decompose_non_null().as_ptr()
     }
 }
-
-impl<T> Clone for MarkedNonNull<T> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
-    }
-}
-
-impl<T> Copy for MarkedNonNull<T> {}
 
 impl<T> From<NonNull<T>> for MarkedNonNull<T> {
     fn from(ptr: NonNull<T>) -> Self {
@@ -151,5 +155,17 @@ impl<T> fmt::Debug for MarkedNonNull<T> {
 impl<T> fmt::Pointer for MarkedNonNull<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.decompose_non_null(), f)
+    }
+}
+
+impl<T> PartialEq<MarkedPtr<T>> for MarkedNonNull<T> {
+    fn eq(&self, other: &MarkedPtr<T>) -> bool {
+        self.inner.as_ptr() == other.inner
+    }
+}
+
+impl<T> PartialOrd<MarkedPtr<T>> for MarkedNonNull<T> {
+    fn partial_cmp(&self, other: &MarkedPtr<T>) -> Option<cmp::Ordering> {
+        self.inner.as_ptr().partial_cmp(&other.inner)
     }
 }

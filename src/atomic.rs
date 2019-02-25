@@ -2,27 +2,17 @@ use core::marker::PhantomData;
 use core::mem;
 use core::sync::atomic::Ordering;
 
-#[cfg(feature = "global_alloc")]
-use std::alloc::Global;
-
 use crate::marked::{AtomicMarkedPtr, MarkedPtr};
 use crate::owned::Owned;
-use crate::pointer::Pointer;
+use crate::pointer::MarkedPointer;
 use crate::{NotEqual, Protected, Reclaim, Shared, StatelessAlloc, Unlinked};
+use crate::MarkedNonNull;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Atomic
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// TODO: Doc...
-#[cfg(feature = "global_alloc")]
-pub struct Atomic<T, R: Reclaim<A>, A: StatelessAlloc = Global> {
-    inner: AtomicMarkedPtr<T>,
-    _marker: PhantomData<(T, R, A)>,
-}
-
-/// TODO: Doc...
-#[cfg(not(feature = "global_alloc"))]
 pub struct Atomic<T, R: Reclaim<A>, A: StatelessAlloc> {
     inner: AtomicMarkedPtr<T>,
     _marker: PhantomData<(T, R, A)>,
@@ -47,12 +37,8 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Atomic<T, R, A> {
 
     /// TODO: Doc...
     pub unsafe fn load_unprotected<'a>(&self, order: Ordering) -> Option<Shared<'a, T, R, A>> {
-        let raw = self.inner.load(order);
-        if raw.is_null() {
-            None
-        } else {
-            Some(Shared::from_raw(raw.into_inner()))
-        }
+        MarkedNonNull::new(self.inner.load(order))
+            .map(|ptr| Shared::from_marked_non_null(ptr))
     }
 
     /// TODO: Doc...
@@ -74,11 +60,14 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Atomic<T, R, A> {
         guard.acquire_if_equal(self, compare, order)
     }
 
+    pub fn load_raw(&self, order: Ordering) -> MarkedPtr<T> {
+        self.inner.load(order)
+    }
+
     // allow for Owned, Unlinked, Leaked, Shared or Options<_> thereof
     /// TODO: Doc...
     pub fn store(&self, ptr: impl Store<A, Item = T, Reclaimer = R>, order: Ordering) {
-        let ptr = ptr.into_raw();
-        self.inner.store(MarkedPtr::from(ptr), order);
+        self.inner.store(ptr.into_marked(), order);
     }
 
     /// TODO: Doc...
@@ -87,9 +76,10 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Atomic<T, R, A> {
         ptr: impl Store<A, Item = T, Reclaimer = R>,
         order: Ordering,
     ) -> Option<Unlinked<T, R, A>> {
-        let marked = MarkedPtr::from(ptr.into_raw());
-        // this is safe because `Option<Unlinked>` has same representation as a raw pointer
-        unsafe { mem::transmute(self.inner.swap(marked, order).into_inner()) }
+        let res = self.inner.swap(ptr.into_marked(), order);
+        // this is safe because the pointer is no longer accessible by other threads
+        // (there can still be outstanding references that were loaded before the swap)
+        unsafe { Unlinked::from_marked(res) }
     }
 
     /// TODO: Doc...
@@ -104,15 +94,15 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Atomic<T, R, A> {
         C: Compare<A, Item = T, Reclaimer = R>,
         S: Store<A, Item = T, Reclaimer = R>,
     {
-        let current = MarkedPtr::from(current.into_raw());
-        let new = MarkedPtr::from(new.into_raw());
+        let current = current.into_marked();
+        let new = new.into_marked();
 
         self.inner
             .compare_exchange(current, new, success, failure)
-            .map(|ptr| unsafe { C::Unlinked::from_raw(ptr.into_inner()) })
+            .map(|ptr| unsafe { C::Unlinked::from_marked(ptr) })
             .map_err(|ptr| CompareExchangeFailure {
                 loaded: ptr,
-                input: unsafe { S::from_raw(new.into_inner()) },
+                input: unsafe { S::from_marked(new) },
                 _marker: PhantomData,
             })
     }
@@ -129,15 +119,15 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Atomic<T, R, A> {
         C: Compare<A, Item = T, Reclaimer = R>,
         S: Store<A, Item = T, Reclaimer = R>,
     {
-        let current = MarkedPtr::from(current.into_raw());
-        let new = MarkedPtr::from(new.into_raw());
+        let current = current.into_marked();
+        let new = new.into_marked();
 
         self.inner
             .compare_exchange_weak(current, new, success, failure)
-            .map(|ptr| unsafe { C::Unlinked::from_raw(ptr.into_inner()) })
+            .map(|ptr| unsafe { C::Unlinked::from_marked(ptr) })
             .map_err(|ptr| CompareExchangeFailure {
                 loaded: ptr,
-                input: unsafe { S::from_raw(new.into_inner()) },
+                input: unsafe { S::from_marked(new) },
                 _marker: PhantomData,
             })
     }
@@ -145,10 +135,9 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Atomic<T, R, A> {
 
 impl<T, R: Reclaim<A>, A: StatelessAlloc> Drop for Atomic<T, R, A> {
     fn drop(&mut self) {
-        let ptr = self.inner.load(Ordering::SeqCst).decompose_ptr();
+        let ptr = self.inner.load(Ordering::Relaxed);
         if !ptr.is_null() {
-            // the tag doesn't matter anymore at this point
-            mem::drop(unsafe { Owned::<T, R, A>::from_raw(ptr) });
+            mem::drop(unsafe { Owned::<T, R, A>::from_marked(ptr) });
         }
     }
 }
@@ -156,7 +145,7 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Drop for Atomic<T, R, A> {
 impl<T, R: Reclaim<A>, A: StatelessAlloc> From<Owned<T, R, A>> for Atomic<T, R, A> {
     fn from(owned: Owned<T, R, A>) -> Self {
         Self {
-            inner: AtomicMarkedPtr::from(Owned::into_raw(owned)),
+            inner: AtomicMarkedPtr::from(Owned::into_marked(owned)),
             _marker: PhantomData,
         }
     }
@@ -183,7 +172,7 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Trait for pointer types that can be stored in an `AtomicOwned`.
-pub trait Store<A: StatelessAlloc>: Pointer + Sized + InternalOnly {
+pub trait Store<A: StatelessAlloc>: MarkedPointer + Sized + Internal {
     type Reclaimer: Reclaim<A>;
 }
 
@@ -215,10 +204,10 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Store<A> for Option<Unlinked<T, R, A>>
 // Compare (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait Compare<A: StatelessAlloc>: Pointer + Sized + InternalOnly {
+pub trait Compare<A: StatelessAlloc>: MarkedPointer + Sized + Internal {
     type Reclaimer: Reclaim<A>;
     // FIXME: maybe add extra trait for Unlinked and Option<Unlinked>
-    type Unlinked: Pointer<Item = Self::Item>;
+    type Unlinked: MarkedPointer<Item = Self::Item>;
 }
 
 impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Compare<A> for Shared<'g, T, R, A> {
@@ -236,11 +225,11 @@ impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Compare<A> for Option<Shared<'g, T
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Marker trait that is not exported from this crate
-pub trait InternalOnly {}
+pub trait Internal {}
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> InternalOnly for Owned<T, R, A> {}
-impl<T, R: Reclaim<A>, A: StatelessAlloc> InternalOnly for Option<Owned<T, R, A>> {}
-impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> InternalOnly for Shared<'g, T, R, A> {}
-impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> InternalOnly for Option<Shared<'g, T, R, A>> {}
-impl<T, R: Reclaim<A>, A: StatelessAlloc> InternalOnly for Unlinked<T, R, A> {}
-impl<T, R: Reclaim<A>, A: StatelessAlloc> InternalOnly for Option<Unlinked<T, R, A>> {}
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Internal for Owned<T, R, A> {}
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Internal for Option<Owned<T, R, A>> {}
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Internal for Shared<'g, T, R, A> {}
+impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Internal for Option<Shared<'g, T, R, A>> {}
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Internal for Unlinked<T, R, A> {}
+impl<T, R: Reclaim<A>, A: StatelessAlloc> Internal for Option<Unlinked<T, R, A>> {}
