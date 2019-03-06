@@ -1,4 +1,4 @@
-use core::alloc::Layout;
+use core::alloc::{Alloc, Layout};
 use core::borrow::{Borrow, BorrowMut};
 use core::fmt;
 use core::marker::PhantomData;
@@ -6,21 +6,23 @@ use core::mem;
 use core::ops::{Deref, DerefMut};
 use core::ptr::{self, NonNull};
 
+use typenum::Unsigned;
+
 use crate::marked::MarkedNonNull;
-use crate::{Reclaim, Record, StatelessAlloc};
 use crate::MarkedPtr;
+use crate::{Reclaim, Record};
 
 /// TODO: Docs...
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
-pub struct Owned<T, R: Reclaim<A>, A: StatelessAlloc> {
-    inner: MarkedNonNull<T>,
-    _marker: PhantomData<(T, R, A)>,
+pub struct Owned<T, N: Unsigned, R: Reclaim> {
+    inner: MarkedNonNull<T, N>,
+    _marker: PhantomData<(T, R)>,
 }
 
-unsafe impl<T: Send, R: Reclaim<A>, A: StatelessAlloc> Send for Owned<T, R, A> {}
-unsafe impl<T: Sync, R: Reclaim<A>, A: StatelessAlloc> Sync for Owned<T, R, A> {}
+unsafe impl<T, N: Unsigned, R: Reclaim> Send for Owned<T, N, R> where T: Send {}
+unsafe impl<T, N: Unsigned, R: Reclaim> Sync for Owned<T, N, R> where T: Sync {}
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     /// TODO: Doc...
     pub fn new(owned: T) -> Self {
         Self {
@@ -30,7 +32,7 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Owned<T, R, A> {
     }
 
     /// TODO: Doc...
-    pub fn with_tag(owned: T, tag: usize) -> Owned<T, R, A> {
+    pub fn with_tag(owned: T, tag: usize) -> Self {
         Self {
             inner: MarkedNonNull::compose(Self::allocate_record(owned), tag),
             _marker: PhantomData,
@@ -38,12 +40,12 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Owned<T, R, A> {
     }
 
     /// TODO: Doc...
-    pub unsafe fn from_marked(marked: MarkedPtr<T>) -> Option<Self> {
+    pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
         mem::transmute(marked)
     }
 
     /// TODO: Doc...
-    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T>) -> Self {
+    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T, N>) -> Self {
         Self {
             inner: marked,
             _marker: PhantomData,
@@ -69,12 +71,12 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Owned<T, R, A> {
 
     /// TODO: Doc...
     pub fn header(&self) -> &R::RecordHeader {
-        unsafe { Record::<T, R, A>::get_header(self.inner.decompose_ptr()) }
+        unsafe { Record::<T, R>::get_header(self.inner.decompose_ptr()) }
     }
 
     /// TODO: Doc...
     pub fn header_mut(&mut self) -> &mut R::RecordHeader {
-        unsafe { Record::<T, R, A>::get_header_mut(self.inner.decompose_ptr()) }
+        unsafe { Record::<T, R>::get_header_mut(self.inner.decompose_ptr()) }
     }
 
     pub fn set_tag(&mut self, tag: usize) {
@@ -82,19 +84,19 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Owned<T, R, A> {
     }
 
     /// TODO: Doc...
-    pub fn as_marked(&self) -> MarkedPtr<T> {
+    pub fn as_marked(&self) -> MarkedPtr<T, N> {
         self.inner.into_marked()
     }
 
     /// TODO: Doc...
-    pub fn into_marked(owned: Self) -> MarkedPtr<T> {
+    pub fn into_marked(owned: Self) -> MarkedPtr<T, N> {
         let marked = owned.inner.into_marked();
         mem::forget(owned);
         marked
     }
 
     /// TODO: Doc...
-    pub fn into_marked_non_null(owned: Self) -> MarkedNonNull<T> {
+    pub fn into_marked_non_null(owned: Self) -> MarkedNonNull<T, N> {
         let marked = owned.inner;
         mem::forget(owned);
         marked
@@ -111,7 +113,7 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Owned<T, R, A> {
     }
 
     fn allocate_record(owned: T) -> NonNull<T> {
-        let record = Record::<T, R, A>::new(owned);
+        let record = Record::<_, R>::new(owned);
 
         let mut alloc = R::allocator();
         let layout = Layout::for_value(&record);
@@ -120,12 +122,7 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Owned<T, R, A> {
         let ptr = if size == 0 {
             NonNull::dangling()
         } else {
-            unsafe {
-                alloc
-                    .alloc(layout)
-                    .expect("oom")
-                    .cast()
-            }
+            unsafe { alloc.alloc(layout).expect("oom").cast() }
         };
 
         unsafe {
@@ -135,31 +132,31 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Owned<T, R, A> {
     }
 }
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> AsRef<T> for Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> AsRef<T> for Owned<T, N, R> {
     fn as_ref(&self) -> &T {
         &**self
     }
 }
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> AsMut<T> for Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> AsMut<T> for Owned<T, N, R> {
     fn as_mut(&mut self) -> &mut T {
         &mut **self
     }
 }
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> Borrow<T> for Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> Borrow<T> for Owned<T, N, R> {
     fn borrow(&self) -> &T {
         &**self
     }
 }
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> BorrowMut<T> for Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> BorrowMut<T> for Owned<T, N, R> {
     fn borrow_mut(&mut self) -> &mut T {
         &mut **self
     }
 }
 
-impl<T: Clone, R: Reclaim<A>, A: StatelessAlloc> Clone for Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> Clone for Owned<T, N, R> where T: Clone {
     fn clone(&self) -> Self {
         let (ptr, tag) = self.inner.decompose();
         let reference = unsafe { ptr.as_ref() };
@@ -167,7 +164,7 @@ impl<T: Clone, R: Reclaim<A>, A: StatelessAlloc> Clone for Owned<T, R, A> {
     }
 }
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> Deref for Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> Deref for Owned<T, N, R> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -175,17 +172,17 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Deref for Owned<T, R, A> {
     }
 }
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> DerefMut for Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> DerefMut for Owned<T, N, R> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.inner.decompose_ptr() }
     }
 }
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> Drop for Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> Drop for Owned<T, N, R> {
     fn drop(&mut self) {
         unsafe {
             let elem = self.inner.as_mut();
-            let record = &mut *Record::<T, R, A>::get_record(elem as *mut _);
+            let record = &mut *Record::<T, R>::get_record(elem as *mut _);
             ptr::drop_in_place(record as *mut _);
 
             let layout = Layout::for_value(record);
@@ -197,19 +194,19 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Drop for Owned<T, R, A> {
     }
 }
 
-impl<T: Default, R: Reclaim<A>, A: StatelessAlloc> Default for Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> Default for Owned<T, N, R> where T: Default {
     fn default() -> Self {
         Owned::new(T::default())
     }
 }
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> From<T> for Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> From<T> for Owned<T, N, R> {
     fn from(owned: T) -> Self {
         Owned::new(owned)
     }
 }
 
-impl<T: fmt::Debug, R: Reclaim<A>, A: StatelessAlloc> fmt::Debug for Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> fmt::Debug for Owned<T, N, R> where T: fmt::Debug {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (reference, tag) = unsafe { self.inner.decompose_ref() };
         f.debug_struct("Owned")
@@ -219,7 +216,7 @@ impl<T: fmt::Debug, R: Reclaim<A>, A: StatelessAlloc> fmt::Debug for Owned<T, R,
     }
 }
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> fmt::Pointer for Owned<T, R, A> {
+impl<T, N: Unsigned, R: Reclaim> fmt::Pointer for Owned<T, N, R> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)
     }
@@ -229,9 +226,11 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> fmt::Pointer for Owned<T, R, A> {
 mod test {
     use std::alloc::Global;
 
-    use crate::test::Leaking;
+    use typenum::U2;
 
-    type Owned<T> = super::Owned<T, Leaking, Global>;
+    use crate::tests::Leaking;
+
+    type Owned<T> = super::Owned<T, U2, Leaking<Global>>;
 
     #[test]
     fn new() {
@@ -256,7 +255,9 @@ mod test {
     #[test]
     fn with_tag() {
         let owned = Owned::with_tag(1, 0b11);
-        assert_eq!((Some(&1), 0b11), unsafe { owned.as_marked().decompose_ref() });
+        assert_eq!((Some(&1), 0b11), unsafe {
+            owned.as_marked().decompose_ref()
+        });
         let owned = Owned::with_tag(2, 0);
         assert_eq!((Some(&2), 0), unsafe { owned.as_marked().decompose_ref() });
     }
@@ -279,8 +280,12 @@ mod test {
         owned.set_tag(0);
         assert_eq!((Some(&1), 0), unsafe { owned.as_marked().decompose_ref() });
         owned.set_tag(0b1);
-        assert_eq!((Some(&1), 0b1), unsafe { owned.as_marked().decompose_ref() });
+        assert_eq!((Some(&1), 0b1), unsafe {
+            owned.as_marked().decompose_ref()
+        });
         owned.set_tag(0b11);
-        assert_eq!((Some(&1), 0b11), unsafe { owned.as_marked().decompose_ref() });
+        assert_eq!((Some(&1), 0b11), unsafe {
+            owned.as_marked().decompose_ref()
+        });
     }
 }

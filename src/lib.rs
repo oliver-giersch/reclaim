@@ -1,5 +1,4 @@
-#![feature(allocator_api, trait_alias)]
-
+#![feature(allocator_api, const_fn, trait_alias)]
 #![no_std]
 
 #[cfg(test)]
@@ -11,14 +10,21 @@ use core::marker::PhantomData;
 use core::mem;
 use core::sync::atomic::Ordering;
 
+pub use typenum::{
+    Unsigned, U0, U1, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U2, U20, U21, U22, U23,
+    U24, U25, U26, U27, U28, U29, U3, U4, U5, U6, U7, U8, U9,
+};
+
 use memoffset::offset_of;
+
+pub mod align;
 
 mod atomic;
 mod marked;
 mod owned;
 mod pointer;
 #[cfg(test)]
-mod test;
+mod tests;
 
 pub use crate::atomic::{Atomic, Compare, CompareExchangeFailure, Store};
 pub use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
@@ -30,18 +36,18 @@ pub trait StatelessAlloc = Alloc + Copy + Clone + Default;
 // Reclaim (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub unsafe trait Reclaim<A: StatelessAlloc>
-where
-    Self: Sized,
-{
+// TODO: Alloc Associated?
+pub unsafe trait Reclaim where Self: Sized {
+    /// TODO: Doc...
+    type Allocator: StatelessAlloc;
     /// Header that prepends every record. For reclamation Schemes that do not
     /// require any header data for records managed by them, `()` is the best
     /// choice.
     type RecordHeader: Default + Sized;
 
     /// TODO: Doc
-    fn allocator() -> A {
-        A::default()
+    fn allocator() -> Self::Allocator {
+        Default::default()
     }
 
     /// Reclaims a record and caches it until it is safe to de-allocates it, i.e. when no other
@@ -53,7 +59,7 @@ where
     /// While an `Unlinked` can only be safely obtained by atomic operations that actually extract
     /// a value, but it is still possible to enter the same record twice into the same data
     /// structure, although this is not advisable generally.
-    unsafe fn reclaim<T>(unlinked: Unlinked<T, Self, A>)
+    unsafe fn reclaim<T, N: Unsigned>(unlinked: Unlinked<T, N, Self>)
     where
         T: 'static;
 
@@ -64,7 +70,7 @@ where
     /// The reclamation scheme ensures to only call a type's `Drop` implementation after its
     /// reclamation. The caller has to ensure that the `drop` method does not use any non-static
     /// references contained in the type.
-    unsafe fn reclaim_unchecked<T>(unlinked: Unlinked<T, Self, A>);
+    unsafe fn reclaim_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, N, Self>);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,12 +83,12 @@ where
 /// One example use case could be reference-counted records, where the count is stored
 /// in the header and increased or decreased whenever a `Protected` is acquired or goes
 /// out of scope.
-pub struct Record<T, R: Reclaim<A>, A: StatelessAlloc> {
+pub struct Record<T, R: Reclaim> {
     header: R::RecordHeader,
     elem: T,
 }
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> Record<T, R, A> {
+impl<T, R: Reclaim> Record<T, R> {
     /// Creates a new record with the specified `elem` and a default header.
     pub fn new(elem: T) -> Self {
         Self {
@@ -136,11 +142,13 @@ impl<T, R: Reclaim<A>, A: StatelessAlloc> Record<T, R, A> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// TODO: Doc...
-pub trait Protected<A: StatelessAlloc>: Sized {
-    /// TODO: Doc...
+pub trait Protected<A: StatelessAlloc> where Self: Sized {
+    /// Generic type that is protected from reclamation
     type Item: Sized;
+    /// Number of markable bits
+    type MarkBits: Unsigned;
     /// TODO: Doc...
-    type Reclaimer: Reclaim<A>;
+    type Reclaimer: Reclaim<Allocator = A>;
 
     /// Creates a new `Protected`.
     ///
@@ -152,7 +160,7 @@ pub trait Protected<A: StatelessAlloc>: Sized {
     /// value or a null-pointer has been acquired, `None` is returned.
     /// The `Shared` that is returned is guaranteed to be protected from reclamation during the
     /// lifetime of the `Protected`.
-    fn shared(&self) -> Option<Shared<Self::Item, Self::Reclaimer, A>>;
+    fn shared(&self) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>;
 
     /// Takes an atomic snapshot of the value stored within `atomic` at the moment of the call's
     /// invocation and stores it within `self`. The corresponding `Shared` wrapped in a `Some` (or
@@ -161,17 +169,17 @@ pub trait Protected<A: StatelessAlloc>: Sized {
     /// The successfully acquired value is guaranteed to be protected from concurrent reclamation.
     fn acquire(
         &mut self,
-        atomic: &Atomic<Self::Item, Self::Reclaimer, A>,
+        atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
         order: Ordering,
-    ) -> Option<Shared<Self::Item, Self::Reclaimer, A>>;
+    ) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>;
 
     /// TODO: Doc...
     fn acquire_if_equal(
         &mut self,
-        atomic: &Atomic<Self::Item, Self::Reclaimer, A>,
-        compare: MarkedPtr<Self::Item>,
+        atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
+        compare: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
-    ) -> Result<Option<Shared<Self::Item, Self::Reclaimer, A>>, NotEqual>;
+    ) -> Result<Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>, NotEqual>;
 
     /// TODO: Doc...
     fn release(&mut self);
@@ -185,12 +193,12 @@ pub struct NotEqual;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A `Shared` represents a reference to value stored in a concurrent data structure.
-pub struct Shared<'g, T, R: Reclaim<A>, A: StatelessAlloc> {
-    inner: MarkedNonNull<T>,
-    _marker: PhantomData<(&'g T, R, A)>,
+pub struct Shared<'g, T, N: Unsigned, R: Reclaim> {
+    inner: MarkedNonNull<T, N>,
+    _marker: PhantomData<(&'g T, R)>,
 }
 
-impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Clone for Shared<'g, T, R, A> {
+impl<'g, T, N: Unsigned, R: Reclaim> Clone for Shared<'g, T, N, R> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner,
@@ -199,20 +207,20 @@ impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Clone for Shared<'g, T, R, A> {
     }
 }
 
-impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Copy for Shared<'g, T, R, A> {}
+impl<'g, T, N: Unsigned, R: Reclaim> Copy for Shared<'g, T, N, R> {}
 
-impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Shared<'g, T, R, A> {
+impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
     /// # Safety
     ///
     /// The caller must ensure that the provided pointer is both non-null and valid (may be marked)
     /// and is guaranteed to not be reclaimed during the lifetime of the shared reference.
-    pub unsafe fn from_marked(marked: MarkedPtr<T>) -> Option<Self> {
+    pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
         // this is safe because ...
         mem::transmute(marked)
     }
 
     /// TODO: Doc...
-    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T>) -> Self {
+    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T, N>) -> Self {
         Self {
             inner: marked,
             _marker: PhantomData,
@@ -220,17 +228,17 @@ impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Shared<'g, T, R, A> {
     }
 
     /// TODO: Doc...
-    pub fn as_marked(&self) -> MarkedPtr<T> {
+    pub fn as_marked(&self) -> MarkedPtr<T, N> {
         self.inner.into_marked()
     }
 
     /// TODO: Doc...
-    pub fn into_marked(self) -> MarkedPtr<T> {
+    pub fn into_marked(self) -> MarkedPtr<T, N> {
         self.inner.into_marked()
     }
 
     /// TODO: Doc...
-    pub fn into_marked_non_null(self) -> MarkedNonNull<T> {
+    pub fn into_marked_non_null(self) -> MarkedNonNull<T, N> {
         self.inner
     }
 
@@ -263,14 +271,14 @@ impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> Shared<'g, T, R, A> {
     }
 }
 
-impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> PartialEq<MarkedPtr<T>> for Shared<'g, T, R, A> {
-    fn eq(&self, other: &MarkedPtr<T>) -> bool {
+impl<'g, T, N: Unsigned, R: Reclaim> PartialEq<MarkedPtr<T, N>> for Shared<'g, T, N, R> {
+    fn eq(&self, other: &MarkedPtr<T, N>) -> bool {
         self.inner.into_marked().eq(other)
     }
 }
 
-impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> PartialOrd<MarkedPtr<T>> for Shared<'g, T, R, A> {
-    fn partial_cmp(&self, other: &MarkedPtr<T>) -> Option<cmp::Ordering> {
+impl<'g, T, N: Unsigned, R: Reclaim> PartialOrd<MarkedPtr<T, N>> for Shared<'g, T, N, R> {
+    fn partial_cmp(&self, other: &MarkedPtr<T, N>) -> Option<cmp::Ordering> {
         self.inner.into_marked().partial_cmp(other)
     }
 }
@@ -279,34 +287,37 @@ impl<'g, T, R: Reclaim<A>, A: StatelessAlloc> PartialOrd<MarkedPtr<T>> for Share
 // Unlinked
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct Unlinked<T, R: Reclaim<A>, A: StatelessAlloc> {
-    inner: MarkedNonNull<T>,
-    _marker: PhantomData<(T, R, A)>,
+pub struct Unlinked<T, N: Unsigned, R: Reclaim> {
+    inner: MarkedNonNull<T, N>,
+    _marker: PhantomData<(T, R)>,
 }
 
-impl<T, R: Reclaim<A>, A: StatelessAlloc> Unlinked<T, R, A> {
-    pub unsafe fn from_marked(marked: MarkedPtr<T>) -> Option<Self> {
+impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
+    pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
         mem::transmute(marked)
     }
 
     /// TODO: Doc...
-    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T>) -> Self {
-        unimplemented!()
+    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T, N>) -> Self {
+        Self {
+            inner: marked,
+            _marker: PhantomData,
+        }
     }
 
     /// TODO: Doc...
-    pub fn as_marked(&self) -> MarkedPtr<T> {
+    pub fn as_marked(&self) -> MarkedPtr<T, N> {
         self.inner.into_marked()
     }
 
     /// TODO: Doc...
-    pub fn into_marked(self) -> MarkedPtr<T> {
-        unimplemented!()
+    pub fn into_marked(self) -> MarkedPtr<T, N> {
+        self.inner.into_marked()
     }
 
     /// TODO: Doc...
-    pub fn into_marked_non_null(self) -> MarkedNonNull<T> {
-        unimplemented!()
+    pub fn into_marked_non_null(self) -> MarkedNonNull<T, N> {
+        self.inner
     }
 
     /// TODO: Doc...

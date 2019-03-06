@@ -1,69 +1,70 @@
 use core::fmt;
-use core::ptr;
+use core::marker::PhantomData;
 use core::sync::atomic::{AtomicPtr, Ordering};
+
+use typenum::Unsigned;
 
 use crate::marked::{self, AtomicMarkedPtr, MarkedPtr};
 
-unsafe impl<T> Send for AtomicMarkedPtr<T> {}
-unsafe impl<T> Sync for AtomicMarkedPtr<T> {}
+unsafe impl<T, N: Unsigned> Send for AtomicMarkedPtr<T, N> {}
+unsafe impl<T, N: Unsigned> Sync for AtomicMarkedPtr<T, N> {}
 
-impl<T> AtomicMarkedPtr<T> {
-    pub const MARK_BITS: usize = marked::mark_bits::<T>();
-    pub const MARK_MASK: usize = marked::mark_mask::<T>();
+impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
+    pub const MARK_BITS: usize = N::USIZE;
+    pub const MARK_MASK: usize = marked::mark_mask::<T, N>();
     pub const POINTER_MASK: usize = !Self::MARK_MASK;
 
     /// TODO: Doc...
-    pub const fn null() -> Self {
-        Self {
-            inner: AtomicPtr::new(ptr::null_mut()),
-        }
-    }
-
-    /// TODO: Doc...
-    pub fn new(ptr: MarkedPtr<T>) -> Self {
+    pub const fn new(ptr: MarkedPtr<T, N>) -> Self {
         Self {
             inner: AtomicPtr::new(ptr.inner),
+            _marker: PhantomData,
         }
     }
 
     /// TODO: Doc...
-    pub fn into_inner(self) -> MarkedPtr<T> {
+    pub const fn null() -> Self {
+        Self::new(MarkedPtr::null())
+    }
+
+    /// TODO: Doc...
+    pub fn into_inner(self) -> MarkedPtr<T, N> {
         MarkedPtr::new(self.inner.into_inner())
     }
 
     /// TODO: Doc...
-    pub fn load(&self, order: Ordering) -> MarkedPtr<T> {
+    pub fn load(&self, order: Ordering) -> MarkedPtr<T, N> {
         MarkedPtr::new(self.inner.load(order))
     }
 
     /// TODO: Doc...
-    pub fn store(&self, ptr: MarkedPtr<T>, order: Ordering) {
+    pub fn store(&self, ptr: MarkedPtr<T, N>, order: Ordering) {
         self.inner.store(ptr.inner, order);
     }
 
     /// TODO: Doc...
-    pub fn swap(&self, ptr: MarkedPtr<T>, order: Ordering) -> MarkedPtr<T> {
+    pub fn swap(&self, ptr: MarkedPtr<T, N>, order: Ordering) -> MarkedPtr<T, N> {
         MarkedPtr::new(self.inner.swap(ptr.inner, order))
     }
 
     /// TODO: Doc...
     pub fn compare_and_swap(
         &self,
-        current: MarkedPtr<T>,
-        new: MarkedPtr<T>,
+        current: MarkedPtr<T, N>,
+        new: MarkedPtr<T, N>,
         order: Ordering,
-    ) -> MarkedPtr<T> {
+    ) -> MarkedPtr<T, N> {
         MarkedPtr::new(self.inner.compare_and_swap(current.inner, new.inner, order))
     }
 
     /// TODO: Doc...
     pub fn compare_exchange(
         &self,
-        current: MarkedPtr<T>,
-        new: MarkedPtr<T>,
+        current: MarkedPtr<T, N>,
+        new: MarkedPtr<T, N>,
         success: Ordering,
         failure: Ordering,
-    ) -> Result<MarkedPtr<T>, MarkedPtr<T>> {
+    ) -> Result<MarkedPtr<T, N>, MarkedPtr<T, N>> {
         self.inner
             .compare_exchange(current.inner, new.inner, success, failure)
             .map(MarkedPtr::new)
@@ -73,11 +74,11 @@ impl<T> AtomicMarkedPtr<T> {
     /// TODO: Doc...
     pub fn compare_exchange_weak(
         &self,
-        current: MarkedPtr<T>,
-        new: MarkedPtr<T>,
+        current: MarkedPtr<T, N>,
+        new: MarkedPtr<T, N>,
         success: Ordering,
         failure: Ordering,
-    ) -> Result<MarkedPtr<T>, MarkedPtr<T>> {
+    ) -> Result<MarkedPtr<T, N>, MarkedPtr<T, N>> {
         self.inner
             .compare_exchange_weak(current.inner, new.inner, success, failure)
             .map(MarkedPtr::new)
@@ -85,7 +86,7 @@ impl<T> AtomicMarkedPtr<T> {
     }
 }
 
-impl<T> fmt::Debug for AtomicMarkedPtr<T> {
+impl<T, N: Unsigned> fmt::Debug for AtomicMarkedPtr<T, N> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (ptr, tag) = self.load(Ordering::SeqCst).decompose();
         f.debug_struct("AtomicMarkedPtr")
@@ -95,65 +96,76 @@ impl<T> fmt::Debug for AtomicMarkedPtr<T> {
     }
 }
 
-impl<T> Default for AtomicMarkedPtr<T> {
+impl<T, N: Unsigned> Default for AtomicMarkedPtr<T, N> {
     fn default() -> Self {
         AtomicMarkedPtr::null()
     }
 }
 
-impl<T> From<*const T> for AtomicMarkedPtr<T> {
+impl<T, N: Unsigned> From<*const T> for AtomicMarkedPtr<T, N> {
     fn from(ptr: *const T) -> Self {
         AtomicMarkedPtr::new(MarkedPtr::from(ptr))
     }
 }
 
-impl<T> From<*mut T> for AtomicMarkedPtr<T> {
+impl<T, N: Unsigned> From<*mut T> for AtomicMarkedPtr<T, N> {
     fn from(ptr: *mut T) -> Self {
         AtomicMarkedPtr::new(MarkedPtr::from(ptr))
     }
 }
 
-impl<T> From<MarkedPtr<T>> for AtomicMarkedPtr<T> {
-    fn from(ptr: MarkedPtr<T>) -> Self {
+impl<T, N: Unsigned> From<MarkedPtr<T, N>> for AtomicMarkedPtr<T, N> {
+    fn from(ptr: MarkedPtr<T, N>) -> Self {
         AtomicMarkedPtr::new(ptr)
     }
 }
 
-impl<T> fmt::Pointer for AtomicMarkedPtr<T> {
+impl<T, N: Unsigned> fmt::Pointer for AtomicMarkedPtr<T, N> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.load(Ordering::SeqCst).decompose_ptr(), f)
     }
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use core::sync::atomic::Ordering;
 
-    use crate::marked::{AtomicMarkedPtr, MarkedPtr};
+    use typenum::U3;
+
+    use crate::align::Aligned8;
+
+    type AtomicMarkedPtr<T> = crate::marked::AtomicMarkedPtr<T, U3>;
+    type MarkedPtr<T> = crate::marked::MarkedPtr<T, U3>;
 
     #[test]
     fn null() {
-        let ptr: AtomicMarkedPtr<i32> = AtomicMarkedPtr::null();
+        let ptr: AtomicMarkedPtr<usize> = AtomicMarkedPtr::null();
         assert_eq!(ptr.load(Ordering::Relaxed).into_usize(), 0);
         assert_eq!(ptr.into_inner().into_usize(), 0);
     }
 
     #[test]
     fn new() {
-        let reference = &1;
+        let reference = &Aligned8::new(1usize);
         let marked = AtomicMarkedPtr::new(MarkedPtr::from(reference));
-        let from = AtomicMarkedPtr::from(reference as *const _ as *mut i32);
-        assert_eq!(marked.load(Ordering::Relaxed).into_usize(), reference as *const _ as usize);
-        assert_eq!(from.load(Ordering::Relaxed).into_usize(), reference as *const _ as usize);
+        let from = AtomicMarkedPtr::from(reference as *const _ as *mut Aligned8<usize>);
+        assert_eq!(
+            marked.load(Ordering::Relaxed).into_usize(),
+            reference as *const _ as usize
+        );
+        assert_eq!(
+            from.load(Ordering::Relaxed).into_usize(),
+            reference as *const _ as usize
+        );
     }
 
     #[test]
     fn store() {
-        let raw: MarkedPtr<i32> = MarkedPtr::from(&1);
+        let raw = MarkedPtr::from(&Aligned8::new(1usize));
         let atomic = AtomicMarkedPtr::null();
+
         atomic.store(raw, Ordering::Relaxed);
-        let load = atomic.load(Ordering::Relaxed);
-        assert_eq!(load, raw);
+        assert_eq!(atomic.load(Ordering::Relaxed), raw);
     }
 
     #[test]
