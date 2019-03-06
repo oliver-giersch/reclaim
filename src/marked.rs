@@ -159,6 +159,14 @@ mod test {
 
         let composed = marked::compose::<_, U3>(&mut aligned, 0b0);
         assert_eq!(marked::decompose::<_, U3>(composed as usize), (&mut aligned as *mut _, 0b0));
+        let composed = marked::compose::<_, U3>(&mut aligned, 0b1);
+        assert_eq!(marked::decompose::<_, U3>(composed as usize), (&mut aligned as *mut _, 0b1));
+        let composed = marked::compose::<_, U3>(&mut aligned, 0b10);
+        assert_eq!(marked::decompose::<_, U3>(composed as usize), (&mut aligned as *mut _, 0b10));
+        let composed = marked::compose::<_, U3>(&mut aligned, 0b100);
+        assert_eq!(marked::decompose::<_, U3>(composed as usize), (&mut aligned as *mut _, 0b100));
+        let composed = marked::compose::<_, U3>(&mut aligned, 0b1000);
+        assert_eq!(marked::decompose::<_, U3>(composed as usize), (&mut aligned as *mut _, 0b0));
     }
 
     /*#[test]

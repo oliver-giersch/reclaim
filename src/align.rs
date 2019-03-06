@@ -109,5 +109,8 @@ mod tests {
         assert_eq!(mem::align_of::<Aligned128<u8>>(), 128);
         assert_eq!(mem::align_of::<Aligned256<u8>>(), 256);
         assert_eq!(mem::align_of::<Aligned512<u8>>(), 512);
+        assert_eq!(mem::align_of::<Aligned1024<u8>>(), 1024);
+        assert_eq!(mem::align_of::<Aligned2048<u8>>(), 2048);
+        assert_eq!(mem::align_of::<Aligned4096<u8>>(), 4096);
     }
 }

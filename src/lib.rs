@@ -287,12 +287,20 @@ impl<'g, T, N: Unsigned, R: Reclaim> PartialOrd<MarkedPtr<T, N>> for Shared<'g, 
 // Unlinked
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Non-nullable Pointer type that has been successfully unlinked from a concurrent data structure
+/// by a swap or compare-and-swap operation.
+///
+/// This implies that no threads can acquire any new references to this value anymore, but there may
+/// still be live references to it that have acquired before the unlink operation has been made.
+/// As long as the invariant that no unique value is inserted more than once in the same data
+/// structure, it is safe to reclaim `Unlinked` types.
 pub struct Unlinked<T, N: Unsigned, R: Reclaim> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<(T, R)>,
 }
 
 impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
+    /// TODO: Doc...
     pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
         mem::transmute(marked)
     }
