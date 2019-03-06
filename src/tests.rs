@@ -11,7 +11,7 @@ use crate::{Protected, Reclaim, Shared, StatelessAlloc, Unlinked};
 pub struct Leaking<A: StatelessAlloc = Global>(A);
 
 #[derive(Default)]
-pub struct LeakingGuard<T, N: Unsigned>(MarkedPtr<T, N>);
+pub struct LeakingGuard<T, N: Unsigned, A: StatelessAlloc = Global>(MarkedPtr<T, N>, A);
 
 pub struct Header {
     pub checksum: usize,
@@ -19,7 +19,9 @@ pub struct Header {
 
 impl Default for Header {
     fn default() -> Self {
-        Self { checksum: 0xDEADBEEF }
+        Self {
+            checksum: 0xDEADBEEF,
+        }
     }
 }
 
@@ -27,17 +29,21 @@ unsafe impl<A: StatelessAlloc> Reclaim for Leaking<A> {
     type Allocator = A;
     type RecordHeader = Header;
 
-    unsafe fn reclaim<T, N: Unsigned>(_: Unlinked<T, N, Self>) where T: 'static {}
+    unsafe fn reclaim<T, N: Unsigned>(_: Unlinked<T, N, Self>)
+    where
+        T: 'static,
+    {
+    }
     unsafe fn reclaim_unchecked<T, N: Unsigned>(_: Unlinked<T, N, Self>) {}
 }
 
-impl<T, N: Unsigned, A: StatelessAlloc> Protected<A> for LeakingGuard<T, N> {
+impl<T, N: Unsigned, A: StatelessAlloc> Protected for LeakingGuard<T, N, A> {
     type Item = T;
     type MarkBits = N;
     type Reclaimer = Leaking<A>;
 
     fn new() -> Self {
-        Self(MarkedPtr::null())
+        Self(MarkedPtr::null(), Default::default())
     }
 
     fn shared(&self) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>> {

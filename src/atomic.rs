@@ -46,13 +46,16 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     pub fn load<'g>(
         &self,
         order: Ordering,
-        guard: &'g mut impl Protected<R::Allocator, Item = T, MarkBits = N, Reclaimer = R>,
+        guard: &'g mut impl Protected<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Option<Shared<'g, T, N, R>> {
         guard.acquire(&self, order)
     }
 
     /// TODO: Doc...
-    pub fn load_if_equal<'g, Guard: Protected<R::Allocator, Item = T, MarkBits = N, Reclaimer = R>>(
+    pub fn load_if_equal<
+        'g,
+        Guard: Protected<Item = T, MarkBits = N, Reclaimer = R>,
+    >(
         &self,
         compare: MarkedPtr<T, N>,
         order: Ordering,

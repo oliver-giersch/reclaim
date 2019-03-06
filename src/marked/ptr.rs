@@ -36,7 +36,7 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// TODO: Doc...
     pub fn convert<M: Unsigned>(other: MarkedNonNull<T, M>) -> Self
     where
-        N: IsGreaterOrEqual<M, Output = True>
+        N: IsGreaterOrEqual<M, Output = True>,
     {
         Self::from(other.inner)
     }

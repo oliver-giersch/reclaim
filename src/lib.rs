@@ -1,4 +1,5 @@
 #![feature(allocator_api, const_fn, trait_alias)]
+
 #![no_std]
 
 #[cfg(test)]
@@ -37,7 +38,10 @@ pub trait StatelessAlloc = Alloc + Copy + Clone + Default;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Alloc Associated?
-pub unsafe trait Reclaim where Self: Sized {
+pub unsafe trait Reclaim
+where
+    Self: Sized,
+{
     /// TODO: Doc...
     type Allocator: StatelessAlloc;
     /// Header that prepends every record. For reclamation Schemes that do not
@@ -90,6 +94,7 @@ pub struct Record<T, R: Reclaim> {
 
 impl<T, R: Reclaim> Record<T, R> {
     /// Creates a new record with the specified `elem` and a default header.
+    #[inline]
     pub fn new(elem: T) -> Self {
         Self {
             header: Default::default(),
@@ -98,6 +103,7 @@ impl<T, R: Reclaim> Record<T, R> {
     }
 
     /// Creates a new record with the specified `header` and `elem`.
+    #[inline]
     pub fn with_header(elem: T, header: R::RecordHeader) -> Self {
         Self { header, elem }
     }
@@ -110,28 +116,33 @@ impl<T, R: Reclaim> Record<T, R> {
     /// point constructed as part `Record`.
     /// Otherwise, the pointer-arithmetic used to access the header will fail and memory-safety
     /// violated.
+    #[inline]
     pub unsafe fn get_header<'a>(elem: *mut T) -> &'a R::RecordHeader {
         let header = (elem as usize) - Self::offset_elem() + Self::offset_header();
         &*(header as *mut _)
     }
 
+    #[inline]
     pub unsafe fn get_header_mut<'a>(elem: *mut T) -> &'a mut R::RecordHeader {
         let header = (elem as usize) - Self::offset_elem() + Self::offset_header();
         &mut *(header as *mut _)
     }
 
     /// TODO: Doc...
+    #[inline]
     pub unsafe fn get_record(elem: *mut T) -> *mut Self {
         let record = (elem as usize) - Self::offset_elem();
         record as *mut _
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn offset_header() -> usize {
         offset_of!(Self, header)
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn offset_elem() -> usize {
         offset_of!(Self, elem)
     }
@@ -142,13 +153,16 @@ impl<T, R: Reclaim> Record<T, R> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// TODO: Doc...
-pub trait Protected<A: StatelessAlloc> where Self: Sized {
+pub trait Protected
+where
+    Self: Sized,
+{
     /// Generic type that is protected from reclamation
     type Item: Sized;
-    /// Number of markable bits
+    /// The number of markable bits
     type MarkBits: Unsigned;
     /// TODO: Doc...
-    type Reclaimer: Reclaim<Allocator = A>;
+    type Reclaimer: Reclaim;
 
     /// Creates a new `Protected`.
     ///
@@ -199,6 +213,7 @@ pub struct Shared<'g, T, N: Unsigned, R: Reclaim> {
 }
 
 impl<'g, T, N: Unsigned, R: Reclaim> Clone for Shared<'g, T, N, R> {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             inner: self.inner,
@@ -214,12 +229,14 @@ impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
     ///
     /// The caller must ensure that the provided pointer is both non-null and valid (may be marked)
     /// and is guaranteed to not be reclaimed during the lifetime of the shared reference.
+    #[inline]
     pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
         // this is safe because ...
         mem::transmute(marked)
     }
 
     /// TODO: Doc...
+    #[inline]
     pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T, N>) -> Self {
         Self {
             inner: marked,
@@ -228,21 +245,25 @@ impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn as_marked(&self) -> MarkedPtr<T, N> {
         self.inner.into_marked()
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn into_marked(self) -> MarkedPtr<T, N> {
         self.inner.into_marked()
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn into_marked_non_null(self) -> MarkedNonNull<T, N> {
         self.inner
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn with_tag(shared: Self, tag: usize) -> Self {
         Self {
             inner: MarkedNonNull::compose(shared.inner.decompose_non_null(), tag),
@@ -251,33 +272,39 @@ impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn wrapping_add_tag(shared: Self, add: usize) -> Self {
         Self::with_tag(shared, shared.tag().wrapping_add(add))
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn wrapping_sub_tag(shared: Self, sub: usize) -> Self {
         Self::with_tag(shared, shared.tag().wrapping_sub(sub))
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn tag(&self) -> usize {
         self.inner.decompose_tag()
     }
 
     /// TODO: Doc...
+    #[inline]
     pub unsafe fn deref(&self) -> &T {
         &*self.inner.decompose_ptr()
     }
 }
 
 impl<'g, T, N: Unsigned, R: Reclaim> PartialEq<MarkedPtr<T, N>> for Shared<'g, T, N, R> {
+    #[inline]
     fn eq(&self, other: &MarkedPtr<T, N>) -> bool {
         self.inner.into_marked().eq(other)
     }
 }
 
 impl<'g, T, N: Unsigned, R: Reclaim> PartialOrd<MarkedPtr<T, N>> for Shared<'g, T, N, R> {
+    #[inline]
     fn partial_cmp(&self, other: &MarkedPtr<T, N>) -> Option<cmp::Ordering> {
         self.inner.into_marked().partial_cmp(other)
     }
@@ -301,11 +328,13 @@ pub struct Unlinked<T, N: Unsigned, R: Reclaim> {
 
 impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
     /// TODO: Doc...
+    #[inline]
     pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
         mem::transmute(marked)
     }
 
     /// TODO: Doc...
+    #[inline]
     pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T, N>) -> Self {
         Self {
             inner: marked,
@@ -314,21 +343,25 @@ impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn as_marked(&self) -> MarkedPtr<T, N> {
         self.inner.into_marked()
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn into_marked(self) -> MarkedPtr<T, N> {
         self.inner.into_marked()
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn into_marked_non_null(self) -> MarkedNonNull<T, N> {
         self.inner
     }
 
     /// TODO: Doc...
+    #[inline]
     pub unsafe fn deref(&self) -> &T {
         self.inner.as_ref()
     }

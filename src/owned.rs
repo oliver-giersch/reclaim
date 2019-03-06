@@ -156,7 +156,10 @@ impl<T, N: Unsigned, R: Reclaim> BorrowMut<T> for Owned<T, N, R> {
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> Clone for Owned<T, N, R> where T: Clone {
+impl<T, N: Unsigned, R: Reclaim> Clone for Owned<T, N, R>
+where
+    T: Clone,
+{
     fn clone(&self) -> Self {
         let (ptr, tag) = self.inner.decompose();
         let reference = unsafe { ptr.as_ref() };
@@ -194,7 +197,10 @@ impl<T, N: Unsigned, R: Reclaim> Drop for Owned<T, N, R> {
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> Default for Owned<T, N, R> where T: Default {
+impl<T, N: Unsigned, R: Reclaim> Default for Owned<T, N, R>
+where
+    T: Default,
+{
     fn default() -> Self {
         Owned::new(T::default())
     }
@@ -206,7 +212,10 @@ impl<T, N: Unsigned, R: Reclaim> From<T> for Owned<T, N, R> {
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> fmt::Debug for Owned<T, N, R> where T: fmt::Debug {
+impl<T, N: Unsigned, R: Reclaim> fmt::Debug for Owned<T, N, R>
+where
+    T: fmt::Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (reference, tag) = unsafe { self.inner.decompose_ref() };
         f.debug_struct("Owned")

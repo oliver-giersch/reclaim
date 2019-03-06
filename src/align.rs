@@ -48,7 +48,10 @@ impl<T, A: Alignment> DerefMut for Aligned<T, A> {
 }
 
 /// TODO: Doc...
-pub trait Alignment: Copy + Clone + Default + fmt::Debug + Eq + Ord + PartialEq + PartialOrd {}
+pub trait Alignment:
+    Copy + Clone + Default + fmt::Debug + Eq + Ord + PartialEq + PartialOrd
+{
+}
 
 macro_rules! impl_alignment {
     ( $( $id:ident => $align:expr ),+ ) => {

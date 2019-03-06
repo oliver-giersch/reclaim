@@ -36,7 +36,7 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     /// TODO: Doc...
     pub const fn convert<M: Unsigned>(other: MarkedPtr<T, M>) -> Self
     where
-        N: IsGreaterOrEqual<M, Output = True>
+        N: IsGreaterOrEqual<M, Output = True>,
     {
         Self::new(other.inner)
     }
@@ -271,8 +271,10 @@ mod test {
         assert_eq!(null, null);
 
         let reference = &Aligned8::new(1);
-        let marked1: MarkedPtr<Aligned8<i32>, U3> = MarkedPtr::compose(reference as *const _ as *mut _, 1);
-        let marked2: MarkedPtr<Aligned8<i32>, U3> = MarkedPtr::compose(reference as *const _ as *mut _, 2);
+        let marked1: MarkedPtr<Aligned8<i32>, U3> =
+            MarkedPtr::compose(reference as *const _ as *mut _, 1);
+        let marked2: MarkedPtr<Aligned8<i32>, U3> =
+            MarkedPtr::compose(reference as *const _ as *mut _, 2);
         assert_ne!(marked1, marked2);
         assert!(marked1 < marked2);
     }
