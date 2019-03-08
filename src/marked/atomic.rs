@@ -15,6 +15,7 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     pub const POINTER_MASK: usize = !Self::MARK_MASK;
 
     /// TODO: Doc...
+    #[inline]
     pub const fn new(ptr: MarkedPtr<T, N>) -> Self {
         Self {
             inner: AtomicPtr::new(ptr.inner),
@@ -23,31 +24,37 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub const fn null() -> Self {
         Self::new(MarkedPtr::null())
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn into_inner(self) -> MarkedPtr<T, N> {
         MarkedPtr::new(self.inner.into_inner())
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn load(&self, order: Ordering) -> MarkedPtr<T, N> {
         MarkedPtr::new(self.inner.load(order))
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn store(&self, ptr: MarkedPtr<T, N>, order: Ordering) {
         self.inner.store(ptr.inner, order);
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn swap(&self, ptr: MarkedPtr<T, N>, order: Ordering) -> MarkedPtr<T, N> {
         MarkedPtr::new(self.inner.swap(ptr.inner, order))
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn compare_and_swap(
         &self,
         current: MarkedPtr<T, N>,
@@ -58,6 +65,7 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn compare_exchange(
         &self,
         current: MarkedPtr<T, N>,
@@ -72,6 +80,7 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn compare_exchange_weak(
         &self,
         current: MarkedPtr<T, N>,
@@ -87,6 +96,7 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
 }
 
 impl<T, N: Unsigned> fmt::Debug for AtomicMarkedPtr<T, N> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (ptr, tag) = self.load(Ordering::SeqCst).decompose();
         f.debug_struct("AtomicMarkedPtr")
@@ -97,30 +107,35 @@ impl<T, N: Unsigned> fmt::Debug for AtomicMarkedPtr<T, N> {
 }
 
 impl<T, N: Unsigned> Default for AtomicMarkedPtr<T, N> {
+    #[inline]
     fn default() -> Self {
         AtomicMarkedPtr::null()
     }
 }
 
 impl<T, N: Unsigned> From<*const T> for AtomicMarkedPtr<T, N> {
+    #[inline]
     fn from(ptr: *const T) -> Self {
         AtomicMarkedPtr::new(MarkedPtr::from(ptr))
     }
 }
 
 impl<T, N: Unsigned> From<*mut T> for AtomicMarkedPtr<T, N> {
+    #[inline]
     fn from(ptr: *mut T) -> Self {
         AtomicMarkedPtr::new(MarkedPtr::from(ptr))
     }
 }
 
 impl<T, N: Unsigned> From<MarkedPtr<T, N>> for AtomicMarkedPtr<T, N> {
+    #[inline]
     fn from(ptr: MarkedPtr<T, N>) -> Self {
         AtomicMarkedPtr::new(ptr)
     }
 }
 
 impl<T, N: Unsigned> fmt::Pointer for AtomicMarkedPtr<T, N> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.load(Ordering::SeqCst).decompose_ptr(), f)
     }

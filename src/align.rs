@@ -21,6 +21,7 @@ pub struct Aligned<T, A: Alignment> {
 }
 
 impl<T, A: Alignment> Aligned<T, A> {
+    #[inline]
     pub fn new(inner: T) -> Self {
         Self {
             inner,
@@ -28,6 +29,7 @@ impl<T, A: Alignment> Aligned<T, A> {
         }
     }
 
+    #[inline]
     pub fn into_inner(self) -> T {
         self.inner
     }
@@ -36,12 +38,14 @@ impl<T, A: Alignment> Aligned<T, A> {
 impl<T, A: Alignment> Deref for Aligned<T, A> {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
 impl<T, A: Alignment> DerefMut for Aligned<T, A> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }

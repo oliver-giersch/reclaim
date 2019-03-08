@@ -24,6 +24,7 @@ unsafe impl<T, N: Unsigned, R: Reclaim> Sync for Owned<T, N, R> where T: Sync {}
 
 impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     /// TODO: Doc...
+    #[inline]
     pub fn new(owned: T) -> Self {
         Self {
             inner: MarkedNonNull::from(Self::allocate_record(owned)),
@@ -32,6 +33,7 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn with_tag(owned: T, tag: usize) -> Self {
         Self {
             inner: MarkedNonNull::compose(Self::allocate_record(owned), tag),
@@ -40,11 +42,13 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
         mem::transmute(marked)
     }
 
     /// TODO: Doc...
+    #[inline]
     pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T, N>) -> Self {
         Self {
             inner: marked,
@@ -53,42 +57,51 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn decompose_ref(&self) -> (&T, usize) {
         // this is safe because is `inner` is guaranteed to be backed by a valid allocation
         unsafe { self.inner.decompose_ref() }
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn decompose_mut(&mut self) -> (&mut T, usize) {
         // this is safe because is `inner` is guaranteed to be backed by a valid allocation
         unsafe { self.inner.decompose_mut() }
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn tag(&self) -> usize {
         self.inner.decompose_tag()
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn header(&self) -> &R::RecordHeader {
         unsafe { Record::<T, R>::get_header(self.inner.decompose_ptr()) }
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn header_mut(&mut self) -> &mut R::RecordHeader {
         unsafe { Record::<T, R>::get_header_mut(self.inner.decompose_ptr()) }
     }
 
+    /// TODO: Doc...
+    #[inline]
     pub fn set_tag(&mut self, tag: usize) {
         self.inner = MarkedNonNull::compose(self.inner.decompose_non_null(), tag);
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn as_marked(&self) -> MarkedPtr<T, N> {
         self.inner.into_marked()
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn into_marked(owned: Self) -> MarkedPtr<T, N> {
         let marked = owned.inner.into_marked();
         mem::forget(owned);
@@ -96,6 +109,7 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn into_marked_non_null(owned: Self) -> MarkedNonNull<T, N> {
         let marked = owned.inner;
         mem::forget(owned);
@@ -103,6 +117,7 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn leak<'a>(owned: Self) -> &'a mut T
     where
         T: 'a,
@@ -133,24 +148,28 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
 }
 
 impl<T, N: Unsigned, R: Reclaim> AsRef<T> for Owned<T, N, R> {
+    #[inline]
     fn as_ref(&self) -> &T {
         &**self
     }
 }
 
 impl<T, N: Unsigned, R: Reclaim> AsMut<T> for Owned<T, N, R> {
+    #[inline]
     fn as_mut(&mut self) -> &mut T {
         &mut **self
     }
 }
 
 impl<T, N: Unsigned, R: Reclaim> Borrow<T> for Owned<T, N, R> {
+    #[inline]
     fn borrow(&self) -> &T {
         &**self
     }
 }
 
 impl<T, N: Unsigned, R: Reclaim> BorrowMut<T> for Owned<T, N, R> {
+    #[inline]
     fn borrow_mut(&mut self) -> &mut T {
         &mut **self
     }
@@ -160,6 +179,7 @@ impl<T, N: Unsigned, R: Reclaim> Clone for Owned<T, N, R>
 where
     T: Clone,
 {
+    #[inline]
     fn clone(&self) -> Self {
         let (ptr, tag) = self.inner.decompose();
         let reference = unsafe { ptr.as_ref() };
@@ -170,12 +190,14 @@ where
 impl<T, N: Unsigned, R: Reclaim> Deref for Owned<T, N, R> {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         unsafe { &*self.inner.decompose_ptr() }
     }
 }
 
 impl<T, N: Unsigned, R: Reclaim> DerefMut for Owned<T, N, R> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.inner.decompose_ptr() }
     }
@@ -201,12 +223,14 @@ impl<T, N: Unsigned, R: Reclaim> Default for Owned<T, N, R>
 where
     T: Default,
 {
+    #[inline]
     fn default() -> Self {
         Owned::new(T::default())
     }
 }
 
 impl<T, N: Unsigned, R: Reclaim> From<T> for Owned<T, N, R> {
+    #[inline]
     fn from(owned: T) -> Self {
         Owned::new(owned)
     }

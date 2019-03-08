@@ -77,6 +77,7 @@ const fn mark_mask<T, N: Unsigned>() -> usize {
 /// Composes a marked pointer from a raw (i.e. unmarked) pointer and a tag.
 ///
 /// If the size of the tag exceeds the markable bits of `T` the tag is truncated.
+#[inline]
 fn compose<T, N: Unsigned>(ptr: *mut T, tag: usize) -> *mut T {
     debug_assert_eq!(ptr as usize & mark_mask::<T, N>(), 0);
     ((ptr as usize) | (mark_mask::<T, N>() & tag)) as *mut _

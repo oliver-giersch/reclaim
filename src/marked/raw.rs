@@ -8,6 +8,7 @@ use typenum::{IsGreaterOrEqual, True, Unsigned};
 use crate::marked::{self, MarkedNonNull, MarkedPtr};
 
 impl<T, N: Unsigned> Clone for MarkedPtr<T, N> {
+    #[inline]
     fn clone(&self) -> Self {
         Self::new(self.inner)
     }
@@ -21,6 +22,7 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     pub const POINTER_MASK: usize = !Self::MARK_MASK;
 
     /// Creates an unmarked pointer.
+    #[inline]
     pub const fn new(ptr: *mut T) -> Self {
         Self {
             inner: ptr,
@@ -29,11 +31,13 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     }
 
     /// Creates an unmarked null pointer.
+    #[inline]
     pub const fn null() -> Self {
         Self::new(ptr::null_mut())
     }
 
     /// TODO: Doc...
+    #[inline]
     pub const fn convert<M: Unsigned>(other: MarkedPtr<T, M>) -> Self
     where
         N: IsGreaterOrEqual<M, Output = True>,
@@ -42,16 +46,19 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     }
 
     /// Creates a marked pointer from the numeric representation of a potentially marked pointer.
+    #[inline]
     pub const fn from_usize(val: usize) -> Self {
         Self::new(val as *mut _)
     }
 
     /// Gets the numeric inner representation of the pointer with its tag.
+    #[inline]
     pub fn into_usize(self) -> usize {
         self.inner as usize
     }
 
     /// Composes a new marked pointer from a raw pointer and a tag value.
+    #[inline]
     pub fn compose(ptr: *mut T, tag: usize) -> Self {
         debug_assert_eq!(
             ptr as usize & Self::MARK_MASK,
@@ -62,21 +69,25 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     }
 
     /// Decomposes the marked pointer and returns the separated raw pointer and its tag.
+    #[inline]
     pub fn decompose(&self) -> (*mut T, usize) {
         marked::decompose::<_, N>(self.into_usize())
     }
 
     /// Decomposes the marked pointer and returns only the separated raw pointer.
+    #[inline]
     pub fn decompose_ptr(&self) -> *mut T {
         marked::decompose_ptr::<_, N>(self.into_usize())
     }
 
     /// Decomposes the marked pointer and returns only the separated tag.
+    #[inline]
     pub fn decompose_tag(&self) -> usize {
         marked::decompose_tag::<T, N>(self.into_usize())
     }
 
     /// Returns true if the pointer is null.
+    #[inline]
     pub fn is_null(&self) -> bool {
         self.decompose_ptr().is_null()
     }
@@ -94,6 +105,7 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     ///
     /// Additionally, the lifetime 'a returned is arbitrarily chosen and does not necessarily
     /// reflect the actual lifetime of the data.
+    #[inline]
     pub unsafe fn decompose_ref<'a>(&self) -> (Option<&'a T>, usize) {
         let (ptr, tag) = self.decompose();
         (ptr.as_ref(), tag)
@@ -112,6 +124,7 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     ///
     /// Additionally, the lifetime 'a returned is arbitrarily chosen and does not necessarily
     /// reflect the actual lifetime of the data.
+    #[inline]
     pub unsafe fn decompose_mut<'a>(&mut self) -> (Option<&'a mut T>, usize) {
         let (ptr, tag) = self.decompose();
         (ptr.as_mut(), tag)
@@ -120,6 +133,7 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     /// Decomposes the marked pointer returning an optional reference.
     ///
     /// The tag is stripped and discarded.
+    #[inline]
     pub unsafe fn as_ref<'a>(&self) -> Option<&'a T> {
         self.decompose_ptr().as_ref()
     }
@@ -127,12 +141,14 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     /// Decomposes the marked pointer returning an optional mutable reference.
     ///
     /// The tag is stripped and discarded.
+    #[inline]
     pub unsafe fn as_mut<'a>(&mut self) -> Option<&'a mut T> {
         self.decompose_ptr().as_mut()
     }
 }
 
 impl<T, N: Unsigned> fmt::Debug for MarkedPtr<T, N> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (ptr, tag) = self.decompose();
         f.debug_struct("MarkedPtr")
@@ -143,12 +159,14 @@ impl<T, N: Unsigned> fmt::Debug for MarkedPtr<T, N> {
 }
 
 impl<T, N: Unsigned> Default for MarkedPtr<T, N> {
+    #[inline]
     fn default() -> Self {
         MarkedPtr::null()
     }
 }
 
 impl<T, N: Unsigned> From<*const T> for MarkedPtr<T, N> {
+    #[inline]
     fn from(ptr: *const T) -> Self {
         Self::new(ptr as *mut _)
     }
@@ -161,48 +179,56 @@ impl<T, N: Unsigned> From<*mut T> for MarkedPtr<T, N> {
 }
 
 impl<'a, T, N: Unsigned> From<&'a T> for MarkedPtr<T, N> {
+    #[inline]
     fn from(reference: &'a T) -> Self {
         Self::new(reference as *const _ as *mut _)
     }
 }
 
 impl<'a, T, N: Unsigned> From<&'a mut T> for MarkedPtr<T, N> {
+    #[inline]
     fn from(reference: &'a mut T) -> Self {
         Self::new(reference)
     }
 }
 
 impl<T, N: Unsigned> From<NonNull<T>> for MarkedPtr<T, N> {
+    #[inline]
     fn from(ptr: NonNull<T>) -> Self {
         Self::new(ptr.as_ptr())
     }
 }
 
 impl<T, N: Unsigned> fmt::Pointer for MarkedPtr<T, N> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.decompose_ptr(), f)
     }
 }
 
 impl<T, N: Unsigned> PartialEq for MarkedPtr<T, N> {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.inner == other.inner
     }
 }
 
 impl<T, N: Unsigned> PartialOrd for MarkedPtr<T, N> {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         self.inner.partial_cmp(&other.inner)
     }
 }
 
 impl<T, N: Unsigned> PartialEq<MarkedNonNull<T, N>> for MarkedPtr<T, N> {
+    #[inline]
     fn eq(&self, other: &MarkedNonNull<T, N>) -> bool {
         self.inner == other.inner.as_ptr()
     }
 }
 
 impl<T, N: Unsigned> PartialOrd<MarkedNonNull<T, N>> for MarkedPtr<T, N> {
+    #[inline]
     fn partial_cmp(&self, other: &MarkedNonNull<T, N>) -> Option<cmp::Ordering> {
         self.inner.partial_cmp(&other.inner.as_ptr())
     }

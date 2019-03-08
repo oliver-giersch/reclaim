@@ -78,6 +78,60 @@ where
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// Protect (trait)
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO: Doc...
+pub trait Protected
+where
+    Self: Sized,
+{
+    /// Generic type that is protected from reclamation
+    type Item: Sized;
+    /// The number of markable bits
+    type MarkBits: Unsigned;
+    /// TODO: Doc...
+    type Reclaimer: Reclaim;
+
+    /// Creates a new `Protected`.
+    ///
+    /// In case of region-based reclamation schemes (such as EBR), a call to `new` is guaranteed
+    /// to create an active region guard.
+    fn new() -> Self;
+
+    /// Returns a `Shared` value wrapped in a `Some` from the internally protected pointer. If no
+    /// value or a null-pointer has been acquired, `None` is returned.
+    /// The `Shared` that is returned is guaranteed to be protected from reclamation during the
+    /// lifetime of the `Protected`.
+    fn shared(&self) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>;
+
+    /// Takes an atomic snapshot of the value stored within `atomic` at the moment of the call's
+    /// invocation and stores it within `self`. The corresponding `Shared` wrapped in a `Some` (or
+    /// `None`) is returned.
+    ///
+    /// The successfully acquired value is guaranteed to be protected from concurrent reclamation.
+    fn acquire(
+        &mut self,
+        atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
+        order: Ordering,
+    ) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>;
+
+    /// TODO: Doc...
+    fn acquire_if_equal(
+        &mut self,
+        atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
+        compare: MarkedPtr<Self::Item, Self::MarkBits>,
+        order: Ordering,
+    ) -> Result<Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>, NotEqual>;
+
+    /// TODO: Doc...
+    fn release(&mut self);
+}
+
+/// A ZST struct that represents the failure state of an `acquire_if_equal` operation.
+pub struct NotEqual;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Record
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -147,60 +201,6 @@ impl<T, R: Reclaim> Record<T, R> {
         offset_of!(Self, elem)
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Protect (trait)
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// TODO: Doc...
-pub trait Protected
-where
-    Self: Sized,
-{
-    /// Generic type that is protected from reclamation
-    type Item: Sized;
-    /// The number of markable bits
-    type MarkBits: Unsigned;
-    /// TODO: Doc...
-    type Reclaimer: Reclaim;
-
-    /// Creates a new `Protected`.
-    ///
-    /// In case of region-based reclamation schemes (such as EBR), a call to `new` is guaranteed
-    /// to create an active region guard.
-    fn new() -> Self;
-
-    /// Returns a `Shared` value wrapped in a `Some` from the internally protected pointer. If no
-    /// value or a null-pointer has been acquired, `None` is returned.
-    /// The `Shared` that is returned is guaranteed to be protected from reclamation during the
-    /// lifetime of the `Protected`.
-    fn shared(&self) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>;
-
-    /// Takes an atomic snapshot of the value stored within `atomic` at the moment of the call's
-    /// invocation and stores it within `self`. The corresponding `Shared` wrapped in a `Some` (or
-    /// `None`) is returned.
-    ///
-    /// The successfully acquired value is guaranteed to be protected from concurrent reclamation.
-    fn acquire(
-        &mut self,
-        atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
-        order: Ordering,
-    ) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>;
-
-    /// TODO: Doc...
-    fn acquire_if_equal(
-        &mut self,
-        atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
-        compare: MarkedPtr<Self::Item, Self::MarkBits>,
-        order: Ordering,
-    ) -> Result<Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>, NotEqual>;
-
-    /// TODO: Doc...
-    fn release(&mut self);
-}
-
-/// A ZST struct that represents the failure state of an `acquire_if_equal` operation.
-pub struct NotEqual;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Shared

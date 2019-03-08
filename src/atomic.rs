@@ -25,6 +25,7 @@ unsafe impl<T, N: Unsigned, R: Reclaim> Sync for Atomic<T, N, R> where T: Send +
 
 impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     /// TODO: Doc...
+    #[inline]
     pub const fn null() -> Self {
         Self {
             inner: AtomicMarkedPtr::null(),
@@ -33,16 +34,19 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn as_raw(&self) -> &AtomicMarkedPtr<T, N> {
         &self.inner
     }
 
     /// TODO: Doc...
+    #[inline]
     pub unsafe fn load_unprotected<'a>(&self, order: Ordering) -> Option<Shared<'a, T, N, R>> {
         MarkedNonNull::new(self.inner.load(order)).map(|ptr| Shared::from_marked_non_null(ptr))
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn load<'g>(
         &self,
         order: Ordering,
@@ -52,10 +56,8 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     }
 
     /// TODO: Doc...
-    pub fn load_if_equal<
-        'g,
-        Guard: Protected<Item = T, MarkBits = N, Reclaimer = R>,
-    >(
+    #[inline]
+    pub fn load_if_equal<'g, Guard: Protected<Item = T, MarkBits = N, Reclaimer = R>>(
         &self,
         compare: MarkedPtr<T, N>,
         order: Ordering,
@@ -65,16 +67,19 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn load_raw(&self, order: Ordering) -> MarkedPtr<T, N> {
         self.inner.load(order)
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn store(&self, ptr: impl Store<Item = T, MarkBits = N, Reclaimer = R>, order: Ordering) {
         self.inner.store(ptr.into_marked(), order);
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn swap(
         &self,
         ptr: impl Store<Item = T, MarkBits = N, Reclaimer = R>,
@@ -87,6 +92,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn compare_exchange<C, S>(
         &self,
         current: C,
@@ -112,6 +118,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     }
 
     /// TODO: Doc...
+    #[inline]
     pub fn compare_exchange_weak<C, S>(
         &self,
         current: C,
@@ -138,6 +145,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
 }
 
 impl<T, N: Unsigned, R: Reclaim> Drop for Atomic<T, N, R> {
+    #[inline]
     fn drop(&mut self) {
         let ptr = self.inner.load(Ordering::Relaxed);
         if !ptr.is_null() {
@@ -147,6 +155,7 @@ impl<T, N: Unsigned, R: Reclaim> Drop for Atomic<T, N, R> {
 }
 
 impl<T, N: Unsigned, R: Reclaim> From<Owned<T, N, R>> for Atomic<T, N, R> {
+    #[inline]
     fn from(owned: Owned<T, N, R>) -> Self {
         Self {
             inner: AtomicMarkedPtr::from(Owned::into_marked(owned)),
