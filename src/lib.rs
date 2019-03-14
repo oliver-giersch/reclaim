@@ -1,11 +1,9 @@
-#![feature(allocator_api, const_fn, trait_alias)]
+#![feature(alloc, const_fn)]
 
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
-#[cfg(test)]
-extern crate std;
+extern crate alloc;
 
-use core::alloc::Alloc;
 use core::cmp;
 use core::marker::PhantomData;
 use core::mem;
@@ -31,28 +29,19 @@ pub use crate::atomic::{Atomic, Compare, CompareExchangeFailure, Store};
 pub use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
 pub use crate::owned::Owned;
 
-pub trait StatelessAlloc = Alloc + Copy + Clone + Default;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Reclaim (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Alloc Associated?
+/// TODO: Doc...
 pub unsafe trait Reclaim
 where
     Self: Sized,
 {
-    /// TODO: Doc...
-    type Allocator: StatelessAlloc;
     /// Header that prepends every record. For reclamation Schemes that do not
     /// require any header data for records managed by them, `()` is the best
     /// choice.
     type RecordHeader: Default + Sized;
-
-    /// TODO: Doc
-    fn allocator() -> Self::Allocator {
-        Default::default()
-    }
 
     /// Reclaims a record and caches it until it is safe to de-allocates it, i.e. when no other
     /// threads can be guaranteed to hold any live references to it.
@@ -364,5 +353,17 @@ impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
     #[inline]
     pub unsafe fn deref(&self) -> &T {
         self.inner.as_ref()
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub unsafe fn reclaim(self) where T: 'static {
+        R::reclaim(self)
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub unsafe fn reclaim_unchecked(self) {
+        R::reclaim_unchecked(self)
     }
 }

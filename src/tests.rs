@@ -1,17 +1,16 @@
-use std::alloc::Global;
 use std::sync::atomic::Ordering;
 
 use typenum::Unsigned;
 
 use crate::atomic::Atomic;
 use crate::marked::MarkedPtr;
-use crate::{Protected, Reclaim, Shared, StatelessAlloc, Unlinked};
+use crate::{Protected, Reclaim, Shared, Unlinked};
 
 #[derive(Default)]
-pub struct Leaking<A: StatelessAlloc = Global>(A);
+pub struct Leaking;
 
 #[derive(Default)]
-pub struct LeakingGuard<T, N: Unsigned, A: StatelessAlloc = Global>(MarkedPtr<T, N>, A);
+pub struct LeakingGuard<T, N: Unsigned>(MarkedPtr<T, N>);
 
 pub struct Header {
     pub checksum: usize,
@@ -25,8 +24,7 @@ impl Default for Header {
     }
 }
 
-unsafe impl<A: StatelessAlloc> Reclaim for Leaking<A> {
-    type Allocator = A;
+unsafe impl Reclaim for Leaking {
     type RecordHeader = Header;
 
     unsafe fn reclaim<T, N: Unsigned>(_: Unlinked<T, N, Self>)
@@ -37,13 +35,13 @@ unsafe impl<A: StatelessAlloc> Reclaim for Leaking<A> {
     unsafe fn reclaim_unchecked<T, N: Unsigned>(_: Unlinked<T, N, Self>) {}
 }
 
-impl<T, N: Unsigned, A: StatelessAlloc> Protected for LeakingGuard<T, N, A> {
+impl<T, N: Unsigned> Protected for LeakingGuard<T, N> {
     type Item = T;
     type MarkBits = N;
-    type Reclaimer = Leaking<A>;
+    type Reclaimer = Leaking;
 
     fn new() -> Self {
-        Self(MarkedPtr::null(), Default::default())
+        Self(MarkedPtr::null())
     }
 
     fn shared(&self) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>> {

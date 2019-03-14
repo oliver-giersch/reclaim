@@ -1,4 +1,5 @@
-use core::alloc::{Alloc, Layout};
+use alloc::boxed::Box;
+
 use core::borrow::{Borrow, BorrowMut};
 use core::fmt;
 use core::marker::PhantomData;
@@ -27,7 +28,7 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     #[inline]
     pub fn new(owned: T) -> Self {
         Self {
-            inner: MarkedNonNull::from(Self::allocate_record(owned)),
+            inner: MarkedNonNull::from(Self::alloc_record(owned)),
             _marker: PhantomData,
         }
     }
@@ -36,7 +37,7 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     #[inline]
     pub fn with_tag(owned: T, tag: usize) -> Self {
         Self {
-            inner: MarkedNonNull::compose(Self::allocate_record(owned), tag),
+            inner: MarkedNonNull::compose(Self::alloc_record(owned), tag),
             _marker: PhantomData,
         }
     }
@@ -127,23 +128,9 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
         leaked
     }
 
-    fn allocate_record(owned: T) -> NonNull<T> {
-        let record = Record::<_, R>::new(owned);
-
-        let mut alloc = R::allocator();
-        let layout = Layout::for_value(&record);
-        let size = layout.size();
-
-        let ptr = if size == 0 {
-            NonNull::dangling()
-        } else {
-            unsafe { alloc.alloc(layout).expect("oom").cast() }
-        };
-
-        unsafe {
-            ptr::write(ptr.as_ptr(), record);
-            NonNull::from(&ptr.as_ref().elem)
-        }
+    fn alloc_record(owned: T) -> NonNull<T> {
+        let record = Box::leak(Box::new(Record::<_, R>::new(owned)));
+        NonNull::from(&record.elem)
     }
 }
 
@@ -206,15 +193,10 @@ impl<T, N: Unsigned, R: Reclaim> DerefMut for Owned<T, N, R> {
 impl<T, N: Unsigned, R: Reclaim> Drop for Owned<T, N, R> {
     fn drop(&mut self) {
         unsafe {
-            let elem = self.inner.as_mut();
-            let record = &mut *Record::<T, R>::get_record(elem as *mut _);
-            ptr::drop_in_place(record as *mut _);
+            let elem = self.inner.decompose_ptr();
+            let record = Record::<_, R>::get_record(elem);
 
-            let layout = Layout::for_value(record);
-            if layout.size() != 0 {
-                let mut alloc = R::allocator();
-                alloc.dealloc(NonNull::from(record).cast(), layout);
-            }
+            mem::drop(Box::from_raw(record));
         }
     }
 }
@@ -257,13 +239,11 @@ impl<T, N: Unsigned, R: Reclaim> fmt::Pointer for Owned<T, N, R> {
 
 #[cfg(test)]
 mod test {
-    use std::alloc::Global;
-
     use typenum::U2;
 
     use crate::tests::Leaking;
 
-    type Owned<T> = super::Owned<T, U2, Leaking<Global>>;
+    type Owned<T> = super::Owned<T, U2, Leaking>;
 
     #[test]
     fn new() {
