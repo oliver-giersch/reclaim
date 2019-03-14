@@ -128,6 +128,8 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
         leaked
     }
 
+    /// TODO: Doc...
+    #[inline]
     fn alloc_record(owned: T) -> NonNull<T> {
         let record = Box::leak(Box::new(Record::<_, R>::new(owned)));
         NonNull::from(&record.elem)
