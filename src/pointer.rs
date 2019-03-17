@@ -5,7 +5,7 @@ use typenum::Unsigned;
 
 use crate::owned::Owned;
 use crate::{MarkedNonNull, MarkedPtr};
-use crate::{Reclaim, Shared, Unlinked};
+use crate::{Reclaim, Shared, Unlinked, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Pointer (trait)
@@ -133,6 +133,45 @@ impl<T, N: Unsigned, R: Reclaim> MarkedPointer for Unlinked<T, N, R> {
 }
 
 impl<T, N: Unsigned, R: Reclaim> MarkedPointer for Option<Unlinked<T, N, R>> {
+    type Item = T;
+    type MarkBits = N;
+
+    fn as_marked(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        unsafe { mem::transmute_copy(self) }
+    }
+
+    fn into_marked(self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        unsafe { mem::transmute(self) }
+    }
+
+    unsafe fn from_marked(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
+        mem::transmute(marked)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Unprotected & Option<Unlinked>
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, N: Unsigned, R: Reclaim> MarkedPointer for Unprotected<T, N, R> {
+    type Item = T;
+    type MarkBits = N;
+
+    fn as_marked(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        self.as_marked()
+    }
+
+    fn into_marked(self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        Unprotected::into_marked(self)
+    }
+
+    unsafe fn from_marked(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
+        debug_assert!(!marked.is_null());
+        Unprotected::from_marked_non_null(MarkedNonNull::new_unchecked(marked))
+    }
+}
+
+impl<T, N: Unsigned, R: Reclaim> MarkedPointer for Option<Unprotected<T, N, R>> {
     type Item = T;
     type MarkBits = N;
 

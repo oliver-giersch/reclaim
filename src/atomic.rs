@@ -8,7 +8,7 @@ use crate::marked::{AtomicMarkedPtr, MarkedPtr};
 use crate::owned::Owned;
 use crate::pointer::MarkedPointer;
 use crate::MarkedNonNull;
-use crate::{NotEqual, Protected, Reclaim, Shared, Unlinked};
+use crate::{NotEqual, Protected, Reclaim, Shared, Unlinked, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Atomic
@@ -41,12 +41,6 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
 
     /// TODO: Doc...
     #[inline]
-    pub unsafe fn load_unprotected<'a>(&self, order: Ordering) -> Option<Shared<'a, T, N, R>> {
-        MarkedNonNull::new(self.inner.load(order)).map(|ptr| Shared::from_marked_non_null(ptr))
-    }
-
-    /// TODO: Doc...
-    #[inline]
     pub fn load<'g>(
         &self,
         order: Ordering,
@@ -57,13 +51,20 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
 
     /// TODO: Doc...
     #[inline]
-    pub fn load_if_equal<'g, Guard: Protected<Item = T, MarkBits = N, Reclaimer = R>>(
+    pub fn load_if_equal<'g>(
         &self,
         compare: MarkedPtr<T, N>,
         order: Ordering,
-        guard: &'g mut Guard,
-    ) -> Result<Option<Shared<'g, T, N, Guard::Reclaimer>>, NotEqual> {
+        guard: &'g mut impl Protected<Item = T, MarkBits = N, Reclaimer = R>,
+    ) -> Result<Option<Shared<'g, T, N, R>>, NotEqual> {
         guard.acquire_if_equal(self, compare, order)
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub fn load_unprotected<'a>(&self, order: Ordering) -> Option<Unprotected<T, N, R>> {
+        MarkedNonNull::new(self.inner.load(order))
+            .map(|ptr| unsafe { Unprotected::from_marked_non_null(ptr) })
     }
 
     /// TODO: Doc...
@@ -213,6 +214,14 @@ impl<T, N: Unsigned, R: Reclaim> Store for Option<Unlinked<T, N, R>> {
     type Reclaimer = R;
 }
 
+impl<T, N: Unsigned, R: Reclaim> Store for Unprotected<T, N, R> {
+    type Reclaimer = R;
+}
+
+impl<T, N: Unsigned, R: Reclaim> Store for Option<Unprotected<T, N, R>> {
+    type Reclaimer = R;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Compare (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -245,3 +254,5 @@ impl<'g, T, N: Unsigned, R: Reclaim> Internal for Shared<'g, T, N, R> {}
 impl<'g, T, N: Unsigned, R: Reclaim> Internal for Option<Shared<'g, T, N, R>> {}
 impl<T, N: Unsigned, R: Reclaim> Internal for Unlinked<T, N, R> {}
 impl<T, N: Unsigned, R: Reclaim> Internal for Option<Unlinked<T, N, R>> {}
+impl<T, N: Unsigned, R: Reclaim> Internal for Unprotected<T, N, R> {}
+impl<T, N: Unsigned, R: Reclaim> Internal for Option<Unprotected<T, N, R>> {}

@@ -367,3 +367,47 @@ impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
         R::reclaim_unchecked(self)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Unprotected
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct Unprotected<T, N: Unsigned, R: Reclaim> {
+    inner: MarkedNonNull<T, N>,
+    _marker: PhantomData<(T, R)>,
+}
+
+impl<T, N: Unsigned, R: Reclaim> Unprotected<T, N, R> {
+    /// TODO: Doc...
+    #[inline]
+    pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
+        mem::transmute(marked)
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T, N>) -> Self {
+        Self {
+            inner: marked,
+            _marker: PhantomData,
+        }
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub fn as_marked(&self) -> MarkedPtr<T, N> {
+        self.inner.into_marked()
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub fn into_marked(self) -> MarkedPtr<T, N> {
+        self.inner.into_marked()
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub fn into_marked_non_null(self) -> MarkedNonNull<T, N> {
+        self.inner
+    }
+}

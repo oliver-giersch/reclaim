@@ -11,7 +11,7 @@ use typenum::Unsigned;
 
 use crate::marked::MarkedNonNull;
 use crate::MarkedPtr;
-use crate::{Reclaim, Record};
+use crate::{Reclaim, Record, Shared};
 
 /// TODO: Docs...
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
@@ -126,6 +126,14 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
         let leaked = unsafe { &mut *owned.inner.decompose_non_null().as_ptr() };
         mem::forget(owned);
         leaked
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub fn leak_shared<'a>(owned: Self) -> Shared<'a, T, N, R> {
+        let shared = unsafe { Shared::from_marked_non_null(owned.inner) };
+        mem::forget(owned);
+        shared
     }
 
     /// TODO: Doc...
