@@ -1,3 +1,4 @@
+use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
 use core::sync::atomic::Ordering;
@@ -35,8 +36,14 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
 
     /// TODO: Doc...
     #[inline]
-    pub fn as_raw(&self) -> &AtomicMarkedPtr<T, N> {
+    pub const fn as_raw(&self) -> &AtomicMarkedPtr<T, N> {
         &self.inner
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub fn load_raw(&self, order: Ordering) -> MarkedPtr<T, N> {
+        self.inner.load(order)
     }
 
     /// TODO: Doc...
@@ -64,13 +71,10 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     #[inline]
     pub fn load_unprotected<'a>(&self, order: Ordering) -> Option<Unprotected<T, N, R>> {
         MarkedNonNull::new(self.inner.load(order))
-            .map(|ptr| unsafe { Unprotected::from_marked_non_null(ptr) })
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn load_raw(&self, order: Ordering) -> MarkedPtr<T, N> {
-        self.inner.load(order)
+            .map(|ptr| Unprotected {
+                inner: ptr,
+                _marker: PhantomData,
+            })
     }
 
     /// TODO: Doc...
@@ -145,6 +149,13 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     }
 }
 
+impl<T, N: Unsigned, R: Reclaim> Default for Atomic<T, N, R> {
+    #[inline]
+    fn default() -> Self {
+        Self::null()
+    }
+}
+
 impl<T, N: Unsigned, R: Reclaim> Drop for Atomic<T, N, R> {
     #[inline]
     fn drop(&mut self) {
@@ -155,6 +166,17 @@ impl<T, N: Unsigned, R: Reclaim> Drop for Atomic<T, N, R> {
     }
 }
 
+impl<T, N: Unsigned, R: Reclaim> fmt::Debug for Atomic<T, N, R> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let (ptr, tag) = self.inner.load(Ordering::SeqCst).decompose();
+        f.debug_struct("Atomic")
+            .field("ptr", &ptr)
+            .field("tag", &tag)
+            .finish()
+    }
+}
+
 impl<T, N: Unsigned, R: Reclaim> From<Owned<T, N, R>> for Atomic<T, N, R> {
     #[inline]
     fn from(owned: Owned<T, N, R>) -> Self {
@@ -162,6 +184,12 @@ impl<T, N: Unsigned, R: Reclaim> From<Owned<T, N, R>> for Atomic<T, N, R> {
             inner: AtomicMarkedPtr::from(Owned::into_marked(owned)),
             _marker: PhantomData,
         }
+    }
+}
+
+impl<T, N: Unsigned, R: Reclaim> fmt::Pointer for Atomic<T, N, R> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Pointer::fmt(&self.inner.load(Ordering::SeqCst), f)
     }
 }
 

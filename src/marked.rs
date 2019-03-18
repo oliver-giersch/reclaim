@@ -37,7 +37,7 @@ pub struct MarkedPtr<T, N: Unsigned> {
 /// MarkedNonNull
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Eq, Ord)]
 pub struct MarkedNonNull<T, N: Unsigned> {
     inner: NonNull<T>,
     _marker: PhantomData<N>,

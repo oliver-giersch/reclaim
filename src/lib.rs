@@ -4,7 +4,6 @@
 
 extern crate alloc;
 
-use core::cmp;
 use core::marker::PhantomData;
 use core::mem;
 use core::sync::atomic::Ordering;
@@ -24,6 +23,7 @@ mod owned;
 mod pointer;
 #[cfg(test)]
 mod tests;
+mod traits;
 
 pub use crate::atomic::{Atomic, Compare, CompareExchangeFailure, Store};
 pub use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
@@ -33,18 +33,19 @@ pub use crate::owned::Owned;
 // Reclaim (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+///
 /// TODO: Doc...
 pub unsafe trait Reclaim
 where
     Self: Sized,
 {
-    /// Header that prepends every record. For reclamation Schemes that do not
-    /// require any header data for records managed by them, `()` is the best
+    /// Header that is allocated together with every reclaimable record. For reclamation Schemes
+    /// that do not require any header data for records managed by them, `()` is the recommended
     /// choice.
     type RecordHeader: Default + Sized;
 
-    /// Reclaims a record and caches it until it is safe to de-allocates it, i.e. when no other
-    /// threads can be guaranteed to hold any live references to it.
+    /// Reclaims a record and caches it until it is safe to deallocate it, i.e. when no other
+    /// threads can possibly have any live references to it.
     ///
     /// # Safety
     ///
@@ -56,13 +57,17 @@ where
     where
         T: 'static;
 
-    /// Reclaims a record and de-allocates it when no other threads hold any references to it.
+    /// Reclaims a record and caches it until it is safe to deallocate it, i.e. when no other
+    /// threads can possibly have any live references to it.
     ///
     /// # Safety
     ///
-    /// The reclamation scheme ensures to only call a type's `Drop` implementation after its
-    /// reclamation. The caller has to ensure that the `drop` method does not use any non-static
-    /// references contained in the type.
+    /// All limitations applying to `reclaim` apply to this method as well. Additionally, the caller
+    /// has to ensure that the `Drop` implementation of `T` (if any) does not access any non-static
+    /// references in `T`. The reclamation scheme ensures to only call a type's `Drop`
+    /// implementation after its reclamation and not touch the reclaimed record in any other way.
+    /// However, there is no guarantee about when reclamation occurs, so it is impossible to make
+    /// any assumption about the liveness of any references in `T`.
     unsafe fn reclaim_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, N, Self>);
 }
 
@@ -79,7 +84,7 @@ where
     type Item: Sized;
     /// The number of markable bits
     type MarkBits: Unsigned;
-    /// TODO: Doc...
+    /// The reclamation scheme associated with this type of guard.
     type Reclaimer: Reclaim;
 
     /// Creates a new `Protected`.
@@ -89,9 +94,9 @@ where
     fn new() -> Self;
 
     /// Returns a `Shared` value wrapped in a `Some` from the internally protected pointer. If no
-    /// value or a null-pointer has been acquired, `None` is returned.
+    /// value or a null-pointer has previously been acquired, `None` is returned.
     /// The `Shared` that is returned is guaranteed to be protected from reclamation during the
-    /// lifetime of the `Protected`.
+    /// lifetime of `self`.
     fn shared(&self) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>;
 
     /// Takes an atomic snapshot of the value stored within `atomic` at the moment of the call's
@@ -196,6 +201,7 @@ impl<T, R: Reclaim> Record<T, R> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A `Shared` represents a reference to value stored in a concurrent data structure.
+#[derive(Eq, Ord)]
 pub struct Shared<'g, T, N: Unsigned, R: Reclaim> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<(&'g T, R)>,
@@ -285,20 +291,6 @@ impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
     }
 }
 
-impl<'g, T, N: Unsigned, R: Reclaim> PartialEq<MarkedPtr<T, N>> for Shared<'g, T, N, R> {
-    #[inline]
-    fn eq(&self, other: &MarkedPtr<T, N>) -> bool {
-        self.inner.into_marked().eq(other)
-    }
-}
-
-impl<'g, T, N: Unsigned, R: Reclaim> PartialOrd<MarkedPtr<T, N>> for Shared<'g, T, N, R> {
-    #[inline]
-    fn partial_cmp(&self, other: &MarkedPtr<T, N>) -> Option<cmp::Ordering> {
-        self.inner.into_marked().partial_cmp(other)
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Unlinked
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -310,6 +302,7 @@ impl<'g, T, N: Unsigned, R: Reclaim> PartialOrd<MarkedPtr<T, N>> for Shared<'g, 
 /// still be live references to it that have acquired before the unlink operation has been made.
 /// As long as the invariant that no unique value is inserted more than once in the same data
 /// structure, it is safe to reclaim `Unlinked` types.
+#[derive(Eq, Ord)]
 pub struct Unlinked<T, N: Unsigned, R: Reclaim> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<(T, R)>,
@@ -372,10 +365,23 @@ impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
 // Unprotected
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Eq, Ord)]
 pub struct Unprotected<T, N: Unsigned, R: Reclaim> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<(T, R)>,
 }
+
+impl<T, N: Unsigned, R: Reclaim> Clone for Unprotected<T, N, R> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T, N: Unsigned, R: Reclaim> Copy for Unprotected<T, N, R> {}
 
 impl<T, N: Unsigned, R: Reclaim> Unprotected<T, N, R> {
     /// TODO: Doc...
@@ -409,5 +415,18 @@ impl<T, N: Unsigned, R: Reclaim> Unprotected<T, N, R> {
     #[inline]
     pub fn into_marked_non_null(self) -> MarkedNonNull<T, N> {
         self.inner
+    }
+
+    /// TODO: Doc...
+    ///
+    /// # Safety
+    ///
+    /// This is generally unsound to call. Only when the caller is able to ensure no memory
+    /// reclamation is happening concurrently can it be considered to be safe to dereference an
+    /// unprotected pointer loaded from a concurrent data structure. This is e.g. the case when
+    /// there are mutable references involved (e.g. during `drop`).
+    #[inline]
+    pub unsafe fn deref_unprotected(&self) -> &T {
+        self.inner.as_ref()
     }
 }

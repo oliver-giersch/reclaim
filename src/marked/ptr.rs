@@ -187,6 +187,20 @@ impl<T, N: Unsigned> fmt::Pointer for MarkedNonNull<T, N> {
     }
 }
 
+impl<T, N: Unsigned> PartialEq for MarkedNonNull<T, N> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<T, N: Unsigned> PartialOrd for MarkedNonNull<T, N> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.inner.partial_cmp(&other.inner)
+    }
+}
+
 impl<T, N: Unsigned> PartialEq<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
     #[inline]
     fn eq(&self, other: &MarkedPtr<T, N>) -> bool {

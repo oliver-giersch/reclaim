@@ -131,9 +131,13 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     /// TODO: Doc...
     #[inline]
     pub fn leak_shared<'a>(owned: Self) -> Shared<'a, T, N, R> {
-        let shared = unsafe { Shared::from_marked_non_null(owned.inner) };
+        let inner = owned.inner;
         mem::forget(owned);
-        shared
+
+        Shared {
+            inner,
+            _marker: PhantomData,
+        }
     }
 
     /// TODO: Doc...
