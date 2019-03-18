@@ -166,6 +166,16 @@ impl<T, N: Unsigned, R: Reclaim> Drop for Atomic<T, N, R> {
     }
 }
 
+impl<T, N: Unsigned, R: Reclaim> From<Owned<T, N, R>> for Atomic<T, N, R> {
+    #[inline]
+    fn from(owned: Owned<T, N, R>) -> Self {
+        Self {
+            inner: AtomicMarkedPtr::from(Owned::into_marked(owned)),
+            _marker: PhantomData,
+        }
+    }
+}
+
 impl<T, N: Unsigned, R: Reclaim> fmt::Debug for Atomic<T, N, R> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -174,16 +184,6 @@ impl<T, N: Unsigned, R: Reclaim> fmt::Debug for Atomic<T, N, R> {
             .field("ptr", &ptr)
             .field("tag", &tag)
             .finish()
-    }
-}
-
-impl<T, N: Unsigned, R: Reclaim> From<Owned<T, N, R>> for Atomic<T, N, R> {
-    #[inline]
-    fn from(owned: Owned<T, N, R>) -> Self {
-        Self {
-            inner: AtomicMarkedPtr::from(Owned::into_marked(owned)),
-            _marker: PhantomData,
-        }
     }
 }
 

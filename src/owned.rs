@@ -123,9 +123,9 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     where
         T: 'a,
     {
-        let leaked = unsafe { &mut *owned.inner.decompose_non_null().as_ptr() };
+        let mut inner = owned.inner;
         mem::forget(owned);
-        leaked
+        unsafe { inner.as_mut() }
     }
 
     /// TODO: Doc...
@@ -182,8 +182,7 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        let (ptr, tag) = self.inner.decompose();
-        let reference = unsafe { ptr.as_ref() };
+        let (reference, tag) = unsafe { self.inner.decompose_ref() };
         Self::with_tag(reference.clone(), tag)
     }
 }
@@ -193,14 +192,14 @@ impl<T, N: Unsigned, R: Reclaim> Deref for Owned<T, N, R> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        unsafe { &*self.inner.decompose_ptr() }
+        unsafe { self.inner.as_ref() }
     }
 }
 
 impl<T, N: Unsigned, R: Reclaim> DerefMut for Owned<T, N, R> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *self.inner.decompose_ptr() }
+        unsafe { self.inner.as_mut() }
     }
 }
 

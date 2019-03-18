@@ -287,7 +287,7 @@ impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
     /// TODO: Doc...
     #[inline]
     pub unsafe fn deref(&self) -> &T {
-        &*self.inner.decompose_ptr()
+        self.inner.as_ref()
     }
 }
 
@@ -368,7 +368,7 @@ impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
 #[derive(Eq, Ord)]
 pub struct Unprotected<T, N: Unsigned, R: Reclaim> {
     inner: MarkedNonNull<T, N>,
-    _marker: PhantomData<(T, R)>,
+    _marker: PhantomData<(R)>,
 }
 
 impl<T, N: Unsigned, R: Reclaim> Clone for Unprotected<T, N, R> {
