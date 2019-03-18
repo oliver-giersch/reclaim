@@ -220,6 +220,12 @@ impl<'g, T, N: Unsigned, R: Reclaim> Clone for Shared<'g, T, N, R> {
 impl<'g, T, N: Unsigned, R: Reclaim> Copy for Shared<'g, T, N, R> {}
 
 impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
+    /// TODO: Doc...
+    #[inline]
+    pub fn none() -> Option<Self> {
+        None
+    }
+
     /// # Safety
     ///
     /// The caller must ensure that the provided pointer is both non-null and valid (may be marked)
@@ -311,6 +317,12 @@ pub struct Unlinked<T, N: Unsigned, R: Reclaim> {
 impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
     /// TODO: Doc...
     #[inline]
+    pub fn none() -> Option<Self> {
+        None
+    }
+
+    /// TODO: Doc...
+    #[inline]
     pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
         mem::transmute(marked)
     }
@@ -384,6 +396,12 @@ impl<T, N: Unsigned, R: Reclaim> Clone for Unprotected<T, N, R> {
 impl<T, N: Unsigned, R: Reclaim> Copy for Unprotected<T, N, R> {}
 
 impl<T, N: Unsigned, R: Reclaim> Unprotected<T, N, R> {
+    /// TODO: Doc...
+    #[inline]
+    pub fn none() -> Option<Self> {
+        None
+    }
+
     /// TODO: Doc...
     #[inline]
     pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {

@@ -147,6 +147,14 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
                 _marker: PhantomData,
             })
     }
+
+    /// TODO: Doc...
+    #[inline]
+    pub fn take(&mut self) -> Option<Owned<T, N, R>> {
+        // TODO: this is safe because
+        MarkedNonNull::new(self.inner.swap(MarkedPtr::null(), Ordering::Relaxed))
+            .map(|ptr| unsafe { Owned::from_marked_non_null(ptr) })
+    }
 }
 
 impl<T, N: Unsigned, R: Reclaim> Default for Atomic<T, N, R> {

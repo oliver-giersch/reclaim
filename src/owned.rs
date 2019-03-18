@@ -26,6 +26,12 @@ unsafe impl<T, N: Unsigned, R: Reclaim> Sync for Owned<T, N, R> where T: Sync {}
 impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     /// TODO: Doc...
     #[inline]
+    pub fn none() -> Option<Self> {
+        None
+    }
+
+    /// TODO: Doc...
+    #[inline]
     pub fn new(owned: T) -> Self {
         Self {
             inner: MarkedNonNull::from(Self::alloc_record(owned)),
