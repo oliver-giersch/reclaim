@@ -168,16 +168,6 @@ impl<T, N: Unsigned, R: Reclaim> Default for Atomic<T, N, R> {
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> Drop for Atomic<T, N, R> {
-    #[inline]
-    fn drop(&mut self) {
-        let ptr = self.inner.load(Ordering::Relaxed);
-        if !ptr.is_null() {
-            mem::drop(unsafe { Owned::<T, N, R>::from_marked(ptr) });
-        }
-    }
-}
-
 impl<T, N: Unsigned, R: Reclaim> From<T> for Atomic<T, N, R> {
     #[inline]
     fn from(val: T) -> Self {
@@ -286,6 +276,16 @@ impl<'g, T, N: Unsigned, R: Reclaim> Compare for Shared<'g, T, N, R> {
 }
 
 impl<'g, T, N: Unsigned, R: Reclaim> Compare for Option<Shared<'g, T, N, R>> {
+    type Reclaimer = R;
+    type Unlinked = Option<Unlinked<T, N, R>>;
+}
+
+impl<T, N: Unsigned, R: Reclaim> Compare for Unprotected<T, N, R> {
+    type Reclaimer = R;
+    type Unlinked = Unlinked<T, N, R>;
+}
+
+impl<T, N: Unsigned, R: Reclaim> Compare for Option<Unprotected<T, N, R>> {
     type Reclaimer = R;
     type Unlinked = Option<Unlinked<T, N, R>>;
 }

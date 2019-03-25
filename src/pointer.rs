@@ -157,8 +157,7 @@ macro_rules! impl_for_non_nullable {
             /// let swap = atomic.swap(Owned::none(), Ordering::Relaxed).unwrap();
             ///
             /// assert_eq!(&1, unsafe { swap.deref() });
-            /// // prevent leaking of `swap`
-            /// atomic.store(swap, Ordering::Relaxed);
+            /// unsafe { swap.reclaim() }; // leaks memory
             /// ```
             #[inline]
             pub fn none() -> Option<Self> {
