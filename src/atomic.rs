@@ -235,7 +235,7 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Trait for pointer types that can be stored in an `AtomicOwned`.
-pub trait Store: MarkedPointer + Sized + Internal {
+pub trait Store: MarkedPointer + Sized {
     type Reclaimer: Reclaim;
 }
 
@@ -275,7 +275,7 @@ impl<T, N: Unsigned, R: Reclaim> Store for Option<Unprotected<T, N, R>> {
 // Compare (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait Compare: MarkedPointer + Sized + Internal {
+pub trait Compare: MarkedPointer + Sized {
     type Reclaimer: Reclaim;
     type Unlinked: MarkedPointer<Item = Self::Item, MarkBits = Self::MarkBits>;
 }
@@ -289,19 +289,3 @@ impl<'g, T, N: Unsigned, R: Reclaim> Compare for Option<Shared<'g, T, N, R>> {
     type Reclaimer = R;
     type Unlinked = Option<Unlinked<T, N, R>>;
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// InternalOnly (trait)
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Marker trait that is not exported from this crate
-pub trait Internal {}
-
-impl<T, N: Unsigned, R: Reclaim> Internal for Owned<T, N, R> {}
-impl<T, N: Unsigned, R: Reclaim> Internal for Option<Owned<T, N, R>> {}
-impl<'g, T, N: Unsigned, R: Reclaim> Internal for Shared<'g, T, N, R> {}
-impl<'g, T, N: Unsigned, R: Reclaim> Internal for Option<Shared<'g, T, N, R>> {}
-impl<T, N: Unsigned, R: Reclaim> Internal for Unlinked<T, N, R> {}
-impl<T, N: Unsigned, R: Reclaim> Internal for Option<Unlinked<T, N, R>> {}
-impl<T, N: Unsigned, R: Reclaim> Internal for Unprotected<T, N, R> {}
-impl<T, N: Unsigned, R: Reclaim> Internal for Option<Unprotected<T, N, R>> {}
