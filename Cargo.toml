@@ -4,6 +4,11 @@ version = "0.1.0"
 authors = ["oliver <oliver.giersch@googlemail.com>"]
 edition = "2018"
 
+[features]
+default = ["with_std"]
+# For use in std environments, must be disabled for use in no_std crates
+with_std = []
+
 [dependencies]
 memoffset = "0.2.1"
 typenum = "1.10.0"

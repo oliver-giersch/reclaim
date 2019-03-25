@@ -1,7 +1,9 @@
-#![feature(alloc, const_fn)]
+#![feature(const_fn)]
+#![cfg_attr(not(feature = "with_std"), feature(alloc))]
 
-#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(any(test, feature = "with_std")), no_std)]
 
+#[cfg(not(feature = "with_std"))]
 extern crate alloc;
 
 use core::marker::PhantomData;
@@ -16,16 +18,14 @@ pub use typenum::{
 use memoffset::offset_of;
 
 pub mod align;
+pub mod leak;
 
 mod atomic;
 mod marked;
 mod owned;
 mod pointer;
-#[cfg(test)]
-mod tests;
-mod traits;
 
-pub use crate::atomic::{Atomic, Compare, CompareExchangeFailure, Store};
+pub use crate::atomic::{Atomic, CompareExchangeFailure};
 pub use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
 pub use crate::owned::Owned;
 
@@ -222,49 +222,6 @@ impl<'g, T, N: Unsigned, R: Reclaim> Copy for Shared<'g, T, N, R> {}
 impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
     /// TODO: Doc...
     #[inline]
-    pub fn none() -> Option<Self> {
-        None
-    }
-
-    /// # Safety
-    ///
-    /// The caller must ensure that the provided pointer is both non-null and valid (may be marked)
-    /// and is guaranteed to not be reclaimed during the lifetime of the shared reference.
-    #[inline]
-    pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
-        // this is safe because ...
-        mem::transmute(marked)
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T, N>) -> Self {
-        Self {
-            inner: marked,
-            _marker: PhantomData,
-        }
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn as_marked(&self) -> MarkedPtr<T, N> {
-        self.inner.into_marked()
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn into_marked(self) -> MarkedPtr<T, N> {
-        self.inner.into_marked()
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn into_marked_non_null(self) -> MarkedNonNull<T, N> {
-        self.inner
-    }
-
-    /// TODO: Doc...
-    #[inline]
     pub fn with_tag(shared: Self, tag: usize) -> Self {
         Self {
             inner: MarkedNonNull::compose(shared.inner.decompose_non_null(), tag),
@@ -272,13 +229,13 @@ impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
         }
     }
 
-    /// TODO: Doc...
+    /// TODO: Doc + Test...
     #[inline]
     pub fn wrapping_add_tag(shared: Self, add: usize) -> Self {
         Self::with_tag(shared, shared.tag().wrapping_add(add))
     }
 
-    /// TODO: Doc...
+    /// TODO: Doc + Test...
     #[inline]
     pub fn wrapping_sub_tag(shared: Self, sub: usize) -> Self {
         Self::with_tag(shared, shared.tag().wrapping_sub(sub))
@@ -315,45 +272,6 @@ pub struct Unlinked<T, N: Unsigned, R: Reclaim> {
 }
 
 impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
-    /// TODO: Doc...
-    #[inline]
-    pub fn none() -> Option<Self> {
-        None
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
-        mem::transmute(marked)
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T, N>) -> Self {
-        Self {
-            inner: marked,
-            _marker: PhantomData,
-        }
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn as_marked(&self) -> MarkedPtr<T, N> {
-        self.inner.into_marked()
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn into_marked(self) -> MarkedPtr<T, N> {
-        self.inner.into_marked()
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn into_marked_non_null(self) -> MarkedNonNull<T, N> {
-        self.inner
-    }
-
     /// TODO: Doc...
     #[inline]
     pub unsafe fn deref(&self) -> &T {
@@ -396,45 +314,6 @@ impl<T, N: Unsigned, R: Reclaim> Clone for Unprotected<T, N, R> {
 impl<T, N: Unsigned, R: Reclaim> Copy for Unprotected<T, N, R> {}
 
 impl<T, N: Unsigned, R: Reclaim> Unprotected<T, N, R> {
-    /// TODO: Doc...
-    #[inline]
-    pub fn none() -> Option<Self> {
-        None
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
-        mem::transmute(marked)
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T, N>) -> Self {
-        Self {
-            inner: marked,
-            _marker: PhantomData,
-        }
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn as_marked(&self) -> MarkedPtr<T, N> {
-        self.inner.into_marked()
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn into_marked(self) -> MarkedPtr<T, N> {
-        self.inner.into_marked()
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn into_marked_non_null(self) -> MarkedNonNull<T, N> {
-        self.inner
-    }
-
     /// TODO: Doc...
     ///
     /// # Safety

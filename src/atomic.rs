@@ -5,10 +5,9 @@ use core::sync::atomic::Ordering;
 
 use typenum::Unsigned;
 
-use crate::marked::{AtomicMarkedPtr, MarkedPtr};
+use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
 use crate::owned::Owned;
 use crate::pointer::MarkedPointer;
-use crate::MarkedNonNull;
 use crate::{NotEqual, Protected, Reclaim, Shared, Unlinked, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,6 +37,11 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     #[inline]
     pub const fn as_raw(&self) -> &AtomicMarkedPtr<T, N> {
         &self.inner
+    }
+
+    #[inline]
+    pub fn new(val: T) -> Self {
+        Self::from(Owned::from(val))
     }
 
     /// TODO: Doc...
@@ -174,6 +178,13 @@ impl<T, N: Unsigned, R: Reclaim> Drop for Atomic<T, N, R> {
     }
 }
 
+impl<T, N: Unsigned, R: Reclaim> From<T> for Atomic<T, N, R> {
+    #[inline]
+    fn from(val: T) -> Self {
+        Self::new(val)
+    }
+}
+
 impl<T, N: Unsigned, R: Reclaim> From<Owned<T, N, R>> for Atomic<T, N, R> {
     #[inline]
     fn from(owned: Owned<T, N, R>) -> Self {
@@ -196,6 +207,7 @@ impl<T, N: Unsigned, R: Reclaim> fmt::Debug for Atomic<T, N, R> {
 }
 
 impl<T, N: Unsigned, R: Reclaim> fmt::Pointer for Atomic<T, N, R> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.load(Ordering::SeqCst), f)
     }
@@ -205,6 +217,7 @@ impl<T, N: Unsigned, R: Reclaim> fmt::Pointer for Atomic<T, N, R> {
 // CompareExchangeFailure
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct CompareExchangeFailure<T, N, R, S>
 where
     N: Unsigned,

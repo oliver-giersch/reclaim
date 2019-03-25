@@ -1,3 +1,4 @@
+#[cfg(not(feature = "with_std"))]
 use alloc::boxed::Box;
 
 use core::borrow::{Borrow, BorrowMut};
@@ -5,12 +6,11 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
 use core::ops::{Deref, DerefMut};
-use core::ptr::{self, NonNull};
+use core::ptr::NonNull;
 
 use typenum::Unsigned;
 
-use crate::marked::MarkedNonNull;
-use crate::MarkedPtr;
+use crate::marked::{MarkedNonNull, MarkedPtr};
 use crate::{Reclaim, Record, Shared};
 
 /// TODO: Docs...
@@ -79,12 +79,6 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
 
     /// TODO: Doc...
     #[inline]
-    pub fn tag(&self) -> usize {
-        self.inner.decompose_tag()
-    }
-
-    /// TODO: Doc...
-    #[inline]
     pub fn header(&self) -> &R::RecordHeader {
         unsafe { Record::<T, R>::get_header(self.inner.decompose_ptr()) }
     }
@@ -93,6 +87,12 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     #[inline]
     pub fn header_mut(&mut self) -> &mut R::RecordHeader {
         unsafe { Record::<T, R>::get_header_mut(self.inner.decompose_ptr()) }
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub fn tag(&self) -> usize {
+        self.inner.decompose_tag()
     }
 
     /// TODO: Doc...
@@ -260,7 +260,7 @@ impl<T, N: Unsigned, R: Reclaim> fmt::Pointer for Owned<T, N, R> {
 mod test {
     use typenum::U2;
 
-    use crate::tests::Leaking;
+    use crate::leak::Leaking;
 
     type Owned<T> = super::Owned<T, U2, Leaking>;
 

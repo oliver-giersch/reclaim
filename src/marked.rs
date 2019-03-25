@@ -48,27 +48,32 @@ pub struct MarkedNonNull<T, N: Unsigned> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Decomposes the integer representation of a marked pointer into a raw pointer and the tag.
+#[inline]
 const fn decompose<T, N: Unsigned>(marked: usize) -> (*mut T, usize) {
     (decompose_ptr::<T, N>(marked), decompose_tag::<T, N>(marked))
 }
 
 /// Decomposes the integer representation of a marked pointer into the raw pointer stripped of the
 /// tag.
+#[inline]
 const fn decompose_ptr<T, N: Unsigned>(marked: usize) -> *mut T {
     (marked & !mark_mask::<T, N>()) as *mut _
 }
 
 /// Decomposes the integer representation of a marked pointer into only the tag.
+#[inline]
 const fn decompose_tag<T, N: Unsigned>(marked: usize) -> usize {
     marked & mark_mask::<T, N>()
 }
 
 /// Returns the bitmask of markable lower bits of a type's pointer.
+#[inline]
 const fn lower_bits<T>() -> usize {
     mem::align_of::<T>().trailing_zeros() as usize
 }
 
 /// TODO: Doc...
+#[inline]
 const fn mark_mask<T, N: Unsigned>() -> usize {
     let _assert = lower_bits::<T>() - N::USIZE;
     (1 << N::USIZE) - 1
