@@ -249,7 +249,7 @@ impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
 
     /// TODO: Doc...
     #[inline]
-    pub unsafe fn deref(&self) -> &T {
+    pub unsafe fn deref(&self) -> &'g T {
         self.inner.as_ref()
     }
 }
