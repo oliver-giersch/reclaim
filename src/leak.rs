@@ -34,12 +34,12 @@ impl Default for Header {
 unsafe impl Reclaim for Leaking {
     type RecordHeader = Header;
 
-    unsafe fn reclaim<T, N: Unsigned>(_: Unlinked<T, N>)
+    unsafe fn retire<T, N: Unsigned>(_: Unlinked<T, N>)
     where
         T: 'static,
     {
     }
-    unsafe fn reclaim_unchecked<T, N: Unsigned>(_: Unlinked<T, N>) {}
+    unsafe fn retire_unchecked<T, N: Unsigned>(_: Unlinked<T, N>) {}
 }
 
 impl<T, N: Unsigned> Protected for LeakingGuard<T, N> {

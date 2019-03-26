@@ -44,7 +44,7 @@ where
     /// choice.
     type RecordHeader: Default + Sized;
 
-    /// Reclaims a record and caches it until it is safe to deallocate it, i.e. when no other
+    /// Retires a record and caches it until it is safe to deallocate it, i.e. when no other
     /// threads can possibly have any live references to it.
     ///
     /// # Safety
@@ -53,11 +53,11 @@ where
     /// While an `Unlinked` can only be safely obtained by atomic operations that actually extract
     /// a value, but it is still possible to enter the same record twice into the same data
     /// structure, although this is not advisable generally.
-    unsafe fn reclaim<T, N: Unsigned>(unlinked: Unlinked<T, N, Self>)
+    unsafe fn retire<T, N: Unsigned>(unlinked: Unlinked<T, N, Self>)
     where
         T: 'static;
 
-    /// Reclaims a record and caches it until it is safe to deallocate it, i.e. when no other
+    /// Retires a record and caches it until it is safe to deallocate it, i.e. when no other
     /// threads can possibly have any live references to it.
     ///
     /// # Safety
@@ -68,7 +68,7 @@ where
     /// implementation after its reclamation and not touch the reclaimed record in any other way.
     /// However, there is no guarantee about when reclamation occurs, so it is impossible to make
     /// any assumption about the liveness of any references in `T`.
-    unsafe fn reclaim_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, N, Self>);
+    unsafe fn retire_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, N, Self>);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -280,14 +280,14 @@ impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
 
     /// TODO: Doc...
     #[inline]
-    pub unsafe fn reclaim(self) where T: 'static {
-        R::reclaim(self)
+    pub unsafe fn retire(self) where T: 'static {
+        R::retire(self)
     }
 
     /// TODO: Doc...
     #[inline]
-    pub unsafe fn reclaim_unchecked(self) {
-        R::reclaim_unchecked(self)
+    pub unsafe fn retire_unchecked(self) {
+        R::retire_unchecked(self)
     }
 }
 
