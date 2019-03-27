@@ -15,7 +15,7 @@ use crate::{NotEqual, Protect, Reclaim, Shared, Unlinked, Unprotected};
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// TODO: Doc...
-pub struct Atomic<T, N: Unsigned, R: Reclaim> {
+pub struct Atomic<T, N: Unsigned, R> {
     inner: AtomicMarkedPtr<T, N>,
     _marker: PhantomData<(T, R)>,
 }
@@ -23,7 +23,7 @@ pub struct Atomic<T, N: Unsigned, R: Reclaim> {
 unsafe impl<T, N: Unsigned, R: Reclaim> Send for Atomic<T, N, R> where T: Send + Sync {}
 unsafe impl<T, N: Unsigned, R: Reclaim> Sync for Atomic<T, N, R> where T: Send + Sync {}
 
-impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
+impl<T, N: Unsigned, R> Atomic<T, N, R> {
     /// TODO: Doc...
     #[inline]
     pub const fn null() -> Self {
@@ -38,7 +38,9 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     pub const fn as_raw(&self) -> &AtomicMarkedPtr<T, N> {
         &self.inner
     }
+}
 
+impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     #[inline]
     pub fn new(val: T) -> Self {
         Self::from(Owned::from(val))

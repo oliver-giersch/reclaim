@@ -132,6 +132,7 @@ where
 }
 
 /// A zero-size "marker" type that represents the failure state of an `acquire_if_equal` operation.
+#[derive(Debug, Default)]
 pub struct NotEqual;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
