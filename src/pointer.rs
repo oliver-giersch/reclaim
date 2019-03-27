@@ -1,7 +1,7 @@
 use core::cmp;
 use core::fmt;
-use core::mem;
 use core::marker::PhantomData;
+use core::mem;
 
 use typenum::Unsigned;
 

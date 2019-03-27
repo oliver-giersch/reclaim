@@ -1,6 +1,7 @@
+//! An abstract interface for concurrent memory reclamation that is based on traits.
+
 #![feature(const_fn)]
 #![cfg_attr(not(feature = "with_std"), feature(alloc))]
-
 #![cfg_attr(not(any(test, feature = "with_std")), no_std)]
 
 #[cfg(not(feature = "with_std"))]
@@ -8,8 +9,10 @@ extern crate alloc;
 
 use core::marker::PhantomData;
 use core::mem;
+use core::ptr::NonNull;
 use core::sync::atomic::Ordering;
 
+// TODO: replace with const generics once available
 pub use typenum::{
     Unsigned, U0, U1, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U2, U20, U21, U22, U23,
     U24, U25, U26, U27, U28, U29, U3, U4, U5, U6, U7, U8, U9,
@@ -33,41 +36,45 @@ pub use crate::owned::Owned;
 // Reclaim (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-///
 /// TODO: Doc...
 pub unsafe trait Reclaim
 where
     Self: Sized,
 {
-    /// Header that is allocated together with every reclaimable record. For reclamation Schemes
-    /// that do not require any header data for records managed by them, `()` is the recommended
-    /// choice.
+    /// Every reclaimable record allocates this type alongside to store additional reclamation
+    /// scheme specific data. When no such data is necessary, `()` is the recommended choice.
     type RecordHeader: Default + Sized;
 
-    /// Retires a record and caches it until it is safe to deallocate it, i.e. when no other
-    /// threads can possibly have any live references to it.
+    /// Retires a record and caches it **at least** until it is safe to deallocate it, i.e. when no
+    /// other threads can possibly have any live references to it.
     ///
     /// # Safety
     ///
-    /// The caller needs to ensure that the record is actually unlinked from the data structure.
-    /// While an `Unlinked` can only be safely obtained by atomic operations that actually extract
-    /// a value, but it is still possible to enter the same record twice into the same data
-    /// structure, although this is not advisable generally.
+    /// The caller has to guarantee that the record is *actually* unlinked from its data structure,
+    /// i.e. there is no way for another thread to acquire a new reference to it. While an
+    /// `Unlinked` can only be safely obtained by atomic operations that do in fact unlink a value,
+    /// it is still possible to enter the same record twice into the same data structure using only
+    /// safe code.
     unsafe fn retire<T, N: Unsigned>(unlinked: Unlinked<T, N, Self>)
     where
         T: 'static;
 
-    /// Retires a record and caches it until it is safe to deallocate it, i.e. when no other
-    /// threads can possibly have any live references to it.
+    /// Retires a record and caches it **at least** until it is safe to deallocate it, i.e. when no
+    /// other threads can possibly have any live references to it.
     ///
     /// # Safety
     ///
-    /// All limitations applying to `reclaim` apply to this method as well. Additionally, the caller
-    /// has to ensure that the `Drop` implementation of `T` (if any) does not access any non-static
-    /// references in `T`. The reclamation scheme ensures to only call a type's `Drop`
-    /// implementation after its reclamation and not touch the reclaimed record in any other way.
-    /// However, there is no guarantee about when reclamation occurs, so it is impossible to make
-    /// any assumption about the liveness of any references in `T`.
+    /// The caller has to guarantee that the record is *actually* unlinked from its data structure,
+    /// i.e. there is no way for another thread to acquire a new reference to it. While an
+    /// `Unlinked` can only be safely obtained by atomic operations that do in fact unlink a value,
+    /// it is still possible to enter the same record twice into the same data structure using only
+    /// safe code.
+    ///
+    /// In addition to these invariant, this method additionally requires the caller to ensure the
+    /// `Drop` implementation for `T` (if any) does not access any **non-static** references. The
+    /// `Reclaim` interface makes no guarantees about the precise time a retired record is actually
+    /// reclaimed. Hence it is not possible to ensure any references stored within the record have
+    /// not become invalid.
     unsafe fn retire_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, N, Self>);
 }
 
@@ -76,65 +83,66 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// TODO: Doc...
-pub trait Protected
+pub trait Protect
 where
     Self: Sized,
 {
-    /// Generic type that is protected from reclamation
+    /// Generic type of value protected from reclamation
     type Item: Sized;
-    /// The number of markable bits
+    /// Number of bits available for storing additional information
     type MarkBits: Unsigned;
-    /// The reclamation scheme associated with this type of guard.
+    /// Reclamation scheme associated with this type of guard
     type Reclaimer: Reclaim;
 
-    /// Creates a new `Protected`.
-    ///
-    /// In case of region-based reclamation schemes (such as EBR), a call to `new` is guaranteed
-    /// to create an active region guard.
+    /// Creates a new empty instance of `Self`.
     fn new() -> Self;
 
-    /// Returns a `Shared` value wrapped in a `Some` from the internally protected pointer. If no
-    /// value or a null-pointer has previously been acquired, `None` is returned.
-    /// The `Shared` that is returned is guaranteed to be protected from reclamation during the
-    /// lifetime of `self`.
+    /// Gets a shared reference to the protected value that is tied to the lifetime of `&self`
     fn shared(&self) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>;
 
-    /// Takes an atomic snapshot of the value stored within `atomic` at the moment of the call's
-    /// invocation and stores it within `self`. The corresponding `Shared` wrapped in a `Some` (or
-    /// `None`) is returned.
+    /// Atomically takes a snapshot of `atomic`'s value and returns a shared and protected reference
+    /// to it.
     ///
-    /// The successfully acquired value is guaranteed to be protected from concurrent reclamation.
+    /// The loaded value is stored within self. If the value of `atomic` is null, no protection
+    /// occurs. Any previously protected value is no longer protected, regardless of the loaded
+    /// value.
     fn acquire(
         &mut self,
         atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
         order: Ordering,
     ) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>;
 
-    /// TODO: Doc...
+    /// Atomically takes a snapshot of `atomic`'s value and returns a shared and protected reference
+    /// to it if the loaded value is equal to `expected`.
+    ///
+    /// A successfully loaded value is stored within self. If the value of `atomic` is null, no
+    /// protection occurs. After a successful load, any previously protected value is no longer
+    /// protected, regardless of the loaded value. In case of a unsuccessful load, the previously
+    /// protected value does not change.
     fn acquire_if_equal(
         &mut self,
         atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
-        compare: MarkedPtr<Self::Item, Self::MarkBits>,
+        expected: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
     ) -> Result<Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>, NotEqual>;
 
-    /// TODO: Doc...
+    /// Releases the currently protected value, which is no longer guaranteed to be protected
+    /// afterwards.
     fn release(&mut self);
 }
 
-/// A ZST struct that represents the failure state of an `acquire_if_equal` operation.
+/// A zero-size "marker" type that represents the failure state of an `acquire_if_equal` operation.
 pub struct NotEqual;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Record
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Type that is allocated, whenever a new `Owned<T>` or `Atomic<T>` is created.
+/// Record type that is managed by a specific reclamation scheme.
 ///
-/// The header is never exposed and has to be manually accessed if and when needed.
-/// One example use case could be reference-counted records, where the count is stored
-/// in the header and increased or decreased whenever a `Protected` is acquired or goes
-/// out of scope.
+/// Whenever a new `Owned` or (non-null) `Atomic` is created a value of this type is allocated on
+/// the heap. The record and its header is never exposed to the data structure using a given memory
+/// reclamation scheme and should only be accessed by the reclamation scheme itself.
 pub struct Record<T, R: Reclaim> {
     header: R::RecordHeader,
     elem: T,
@@ -150,46 +158,60 @@ impl<T, R: Reclaim> Record<T, R> {
         }
     }
 
-    /// Creates a new record with the specified `header` and `elem`.
+    /// Creates a new record with the specified `elem` and `header`.
     #[inline]
     pub fn with_header(elem: T, header: R::RecordHeader) -> Self {
         Self { header, elem }
     }
 
-    /// Returns a reference to header for the record at the pointed-to location of `ptr`.
+    /// Gets a reference to header for the record at the pointed-to location of `elem`.
     ///
     /// # Safety
     ///
-    /// The pointer `elem` must be a valid, non-null and unmarked pointer to a `T`, that was at some
-    /// point constructed as part `Record`.
-    /// Otherwise, the pointer-arithmetic used to access the header will fail and memory-safety
-    /// violated.
+    /// The pointer `elem` must be a valid pointer to an instance of `T` that was allocated as part
+    /// of a `Record`. Otherwise, the pointer arithmetic used to calculate the header's address will
+    /// be incorrect and lead to undefined behavior.
     #[inline]
-    pub unsafe fn get_header<'a>(elem: *mut T) -> &'a R::RecordHeader {
-        let header = (elem as usize) - Self::offset_elem() + Self::offset_header();
+    pub unsafe fn get_header<'a>(elem: NonNull<T>) -> &'a R::RecordHeader {
+        let header = (elem.as_ptr() as usize) - Self::offset_elem() + Self::offset_header();
         &*(header as *mut _)
     }
 
+    /// Gets mutable a reference to header for the record at the pointed-to location of `elem`.
+    ///
+    /// # Safety
+    ///
+    /// The pointer `elem` must be a valid pointer to an instance of `T` that was allocated as part
+    /// of a `Record`. Otherwise, the pointer arithmetic used to calculate the header's address will
+    /// be incorrect and lead to undefined behavior.
+    /// Additionally the caller has to ensure the aliasing rules are not violated by creating a
+    /// mutable record.
     #[inline]
-    pub unsafe fn get_header_mut<'a>(elem: *mut T) -> &'a mut R::RecordHeader {
-        let header = (elem as usize) - Self::offset_elem() + Self::offset_header();
+    pub unsafe fn get_header_mut<'a>(elem: NonNull<T>) -> &'a mut R::RecordHeader {
+        let header = (elem.as_ptr() as usize) - Self::offset_elem() + Self::offset_header();
         &mut *(header as *mut _)
     }
 
-    /// TODO: Doc...
+    /// Gets the pointer to the record belonging to the element pointed to by `elem`.
+    ///
+    /// # Safety
+    ///
+    /// The pointer `elem` must be a valid pointer to an instance of `T` that was allocated as part
+    /// of a `Record`. Otherwise, the pointer arithmetic used to calculate the header's address will
+    /// be incorrect and lead to undefined behavior.
     #[inline]
-    pub unsafe fn get_record(elem: *mut T) -> *mut Self {
-        let record = (elem as usize) - Self::offset_elem();
-        record as *mut _
+    pub unsafe fn get_record(elem: NonNull<T>) -> NonNull<Self> {
+        let record = (elem.as_ptr() as usize) - Self::offset_elem();
+        NonNull::new_unchecked(record as *mut _)
     }
 
-    /// TODO: Doc...
+    /// Gets the offset in bytes from the address of a record to its header field.
     #[inline]
     pub fn offset_header() -> usize {
         offset_of!(Self, header)
     }
 
-    /// TODO: Doc...
+    /// Gets the offset in bytes from the address of a record to its element field.
     #[inline]
     pub fn offset_elem() -> usize {
         offset_of!(Self, elem)
@@ -200,7 +222,7 @@ impl<T, R: Reclaim> Record<T, R> {
 // Shared
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A `Shared` represents a reference to value stored in a concurrent data structure.
+/// A shared reference to a value that is actively protected from reclamation by other threads.
 #[derive(Eq, Ord)]
 pub struct Shared<'g, T, N: Unsigned, R: Reclaim> {
     inner: MarkedNonNull<T, N>,
@@ -280,7 +302,10 @@ impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
 
     /// TODO: Doc...
     #[inline]
-    pub unsafe fn retire(self) where T: 'static {
+    pub unsafe fn retire(self)
+    where
+        T: 'static,
+    {
         R::retire(self)
     }
 

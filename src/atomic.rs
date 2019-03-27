@@ -8,7 +8,7 @@ use typenum::Unsigned;
 use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
 use crate::owned::Owned;
 use crate::pointer::MarkedPointer;
-use crate::{NotEqual, Protected, Reclaim, Shared, Unlinked, Unprotected};
+use crate::{NotEqual, Protect, Reclaim, Shared, Unlinked, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Atomic
@@ -55,7 +55,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     pub fn load<'g>(
         &self,
         order: Ordering,
-        guard: &'g mut impl Protected<Item = T, MarkBits = N, Reclaimer = R>,
+        guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Option<Shared<'g, T, N, R>> {
         guard.acquire(&self, order)
     }
@@ -66,7 +66,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
         &self,
         compare: MarkedPtr<T, N>,
         order: Ordering,
-        guard: &'g mut impl Protected<Item = T, MarkBits = N, Reclaimer = R>,
+        guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Result<Option<Shared<'g, T, N, R>>, NotEqual> {
         guard.acquire_if_equal(self, compare, order)
     }
@@ -74,11 +74,10 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     /// TODO: Doc...
     #[inline]
     pub fn load_unprotected<'a>(&self, order: Ordering) -> Option<Unprotected<T, N, R>> {
-        MarkedNonNull::new(self.inner.load(order))
-            .map(|ptr| Unprotected {
-                inner: ptr,
-                _marker: PhantomData,
-            })
+        MarkedNonNull::new(self.inner.load(order)).map(|ptr| Unprotected {
+            inner: ptr,
+            _marker: PhantomData,
+        })
     }
 
     /// TODO: Doc...

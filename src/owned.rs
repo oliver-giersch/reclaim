@@ -80,13 +80,13 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     /// TODO: Doc...
     #[inline]
     pub fn header(&self) -> &R::RecordHeader {
-        unsafe { Record::<T, R>::get_header(self.inner.decompose_ptr()) }
+        unsafe { Record::<T, R>::get_header(self.inner.decompose_non_null()) }
     }
 
     /// TODO: Doc...
     #[inline]
     pub fn header_mut(&mut self) -> &mut R::RecordHeader {
-        unsafe { Record::<T, R>::get_header_mut(self.inner.decompose_ptr()) }
+        unsafe { Record::<T, R>::get_header_mut(self.inner.decompose_non_null()) }
     }
 
     /// TODO: Doc...
@@ -212,10 +212,10 @@ impl<T, N: Unsigned, R: Reclaim> DerefMut for Owned<T, N, R> {
 impl<T, N: Unsigned, R: Reclaim> Drop for Owned<T, N, R> {
     fn drop(&mut self) {
         unsafe {
-            let elem = self.inner.decompose_ptr();
+            let elem = self.inner.decompose_non_null();
             let record = Record::<_, R>::get_record(elem);
 
-            mem::drop(Box::from_raw(record));
+            mem::drop(Box::from_raw(record.as_ptr()));
         }
     }
 }
