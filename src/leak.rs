@@ -83,7 +83,7 @@ impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
         order: Ordering,
     ) -> Result<Option<Shared<Self::Item, Self::MarkBits>>, crate::NotEqual> {
         match atomic.load_raw(order) {
-            marked if marked == compare => {
+            marked if marked == expected => {
                 self.0 = marked;
                 unsafe { Ok(Shared::from_marked(marked)) }
             }
