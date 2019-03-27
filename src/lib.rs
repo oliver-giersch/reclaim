@@ -280,13 +280,15 @@ impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
 // Unlinked
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Non-nullable Pointer type that has been successfully unlinked from a concurrent data structure
-/// by a swap or compare-and-swap operation.
+/// A reference to a value that has been unlinked and is hence no longer reachable by other threads.
 ///
-/// This implies that no threads can acquire any new references to this value anymore, but there may
-/// still be live references to it that have acquired before the unlink operation has been made.
-/// As long as the invariant that no unique value is inserted more than once in the same data
-/// structure, it is safe to reclaim `Unlinked` types.
+/// `Unlinked` values are the result of (successful) atomic swap or compare-and-swap operations.
+/// Concurrent data structure implementations have to maintain the invariant that no unique value
+/// (pointer) can exist more than once within any data structure. Only then is it safe to `retire`
+/// unlinked values, enabling them to be eventually reclaimed. Note that, while it must be
+/// impossible for other threads to create new references to an already unlinked value, it is
+/// possible and explicitly allowed for other threads to still have live references that have been
+/// created before the value was unlinked.
 #[derive(Eq, Ord)]
 pub struct Unlinked<T, N: Unsigned, R: Reclaim> {
     inner: MarkedNonNull<T, N>,
