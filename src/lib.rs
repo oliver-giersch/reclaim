@@ -8,7 +8,6 @@
 extern crate alloc;
 
 use core::marker::PhantomData;
-use core::mem;
 use core::ptr::NonNull;
 use core::sync::atomic::Ordering;
 
