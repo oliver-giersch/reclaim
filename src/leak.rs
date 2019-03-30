@@ -41,11 +41,7 @@ unsafe impl Reclaim for Leaking {
     type RecordHeader = ();
 
     #[inline]
-    unsafe fn retire<T, N: Unsigned>(_: Unlinked<T, N>)
-    where
-        T: 'static,
-    {
-    }
+    unsafe fn retire<T: 'static, N: Unsigned>(_: Unlinked<T, N>) {}
     #[inline]
     unsafe fn retire_unchecked<T, N: Unsigned>(_: Unlinked<T, N>) {}
 }

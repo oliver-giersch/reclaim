@@ -54,9 +54,7 @@ where
     /// `Unlinked` can only be safely obtained by atomic operations that do in fact unlink a value,
     /// it is still possible to enter the same record twice into the same data structure using only
     /// safe code.
-    unsafe fn retire<T, N: Unsigned>(unlinked: Unlinked<T, N, Self>)
-    where
-        T: 'static;
+    unsafe fn retire<T: 'static, N: Unsigned>(unlinked: Unlinked<T, N, Self>);
 
     /// Retires a record and caches it **at least** until it is safe to deallocate it, i.e. when no
     /// other threads can possibly have any live references to it.
