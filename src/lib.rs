@@ -126,9 +126,6 @@ where
     fn release(&mut self);
 }
 
-/// The return type of an [`acquire_if_equal`](trait.Reclaim.html#method.acquire_if_equal) operation.
-pub type AcquireIfEqualResult<'g, T, N, R> = Result<Option<Shared<'g, T, N, R>>, NotEqual>;
-
 /// A zero-size marker type that represents the failure state of an `acquire_if_equal` operation.
 #[derive(Debug, Default)]
 pub struct NotEqual;
