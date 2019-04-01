@@ -150,8 +150,8 @@ macro_rules! impl_for_non_nullable {
             /// ```
             /// use std::sync::atomic::Ordering;
             ///
-            /// type Atomic<T> = reclaim::leak::Atomic<T, reclaim::U0>;
-            /// type Owned<T> = reclaim::leak::Owned<T, reclaim::U0>;
+            /// type Atomic<T> = reclaim::leak::Atomic<T, reclaim::typenum::U0>;
+            /// type Owned<T> = reclaim::leak::Owned<T, reclaim::typenum::U0>;
             ///
             /// let atomic = Atomic::new(1);
             /// let swap = atomic.swap(Owned::none(), Ordering::Relaxed).unwrap();

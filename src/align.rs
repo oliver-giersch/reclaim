@@ -1,19 +1,34 @@
+//! Thin wrapper types for adjusting a type's alignment to increase the number of markable lower
+//! bits.
+
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 
+/// A wrapper type that is guaranteed to have at least an alignment of 8 bytes.
 pub type Aligned8<T> = Aligned<T, Alignment8>;
+/// A wrapper type that is guaranteed to have at least an alignment of 16 bytes.
 pub type Aligned16<T> = Aligned<T, Alignment16>;
+/// A wrapper type that is guaranteed to have at least an alignment of 32 bytes.
 pub type Aligned32<T> = Aligned<T, Alignment32>;
+/// A wrapper type that is guaranteed to have at least an alignment of 64 bytes.
 pub type Aligned64<T> = Aligned<T, Alignment64>;
+/// A wrapper type that is guaranteed to have at least an alignment of 128 bytes.
 pub type Aligned128<T> = Aligned<T, Alignment128>;
+/// A wrapper type that is guaranteed to have at least an alignment of 256 bytes.
 pub type Aligned256<T> = Aligned<T, Alignment256>;
+/// A wrapper type that is guaranteed to have at least an alignment of 512 bytes.
 pub type Aligned512<T> = Aligned<T, Alignment512>;
+/// A wrapper type that is guaranteed to have at least an alignment of 1024 bytes.
 pub type Aligned1024<T> = Aligned<T, Alignment1K>;
+/// A wrapper type that is guaranteed to have at least an alignment of 2048 bytes.
 pub type Aligned2048<T> = Aligned<T, Alignment2K>;
+/// A wrapper type that is guaranteed to have at least an alignment of 4096 bytes.
 pub type Aligned4096<T> = Aligned<T, Alignment4K>;
 
+/// A wrapper type that is aligned to the size of a cache line (64 bytes).
 pub type CachePadded<T> = Aligned64<T>;
 
+/// A wrapper type with generically variable alignment.
 #[derive(Copy, Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Aligned<T, A: Alignment> {
     inner: T,
@@ -21,6 +36,7 @@ pub struct Aligned<T, A: Alignment> {
 }
 
 impl<T, A: Alignment> Aligned<T, A> {
+    /// Creates a new wrapper with the specified inner value.
     #[inline]
     pub fn new(inner: T) -> Self {
         Self {
@@ -29,6 +45,7 @@ impl<T, A: Alignment> Aligned<T, A> {
         }
     }
 
+    /// Consumes the wrapper type and returns the inner value.
     #[inline]
     pub fn into_inner(self) -> T {
         self.inner
@@ -60,6 +77,7 @@ pub trait Alignment:
 macro_rules! impl_alignment {
     ( $( $id:ident => $align:expr ),+ ) => {
         $(
+            /// A type with an alignment of $align.
             #[derive(Copy, Clone, Default, Debug, Eq, Ord, PartialEq, PartialOrd)]
             #[repr(align($align))]
             pub struct $id;

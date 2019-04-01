@@ -17,23 +17,12 @@ impl<T, N: Unsigned> Clone for MarkedNonNull<T, N> {
 impl<T, N: Unsigned> Copy for MarkedNonNull<T, N> {}
 
 impl<T, N: Unsigned> MarkedNonNull<T, N> {
+    /// The number of available mark bits for this type.
     pub const MARK_BITS: usize = N::USIZE;
-    pub const MARK_MASK: usize = marked::mark_mask::<T, N>();
+    /// The bitmask for the lower markable bits.
+    pub const MARK_MASK: usize = marked::mark_mask::<T>(Self::MARK_BITS);
+    /// The bitmask for the (higher) pointer bits.
     pub const POINTER_MASK: usize = !Self::MARK_MASK;
-
-    /// Creates a new `MarkedNonNull` that is dangling, but well-aligned.
-    ///
-    /// This is useful for initializing types which lazily allocate, like
-    /// `Vec::new` does.
-    ///
-    /// Note that the pointer value may potentially represent a valid pointer to
-    /// a `T`, which means this must not be used as a "not yet initialized"
-    /// sentinel value. Types that lazily allocate must track initialization by
-    /// some other means.
-    #[inline]
-    pub fn dangling() -> Self {
-        Self::from(NonNull::dangling())
-    }
 
     /// TODO: Doc...
     #[inline]
@@ -60,12 +49,29 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// returned.
     #[inline]
     pub fn new(ptr: impl Into<MarkedPtr<T, N>>) -> Option<Self> {
-        match marked::decompose::<T, N>(ptr.into().into_usize()) {
+        match marked::decompose::<T>(ptr.into().into_usize(), Self::MARK_BITS) {
             (raw, _) if raw.is_null() => None,
             (raw, tag) => Some(MarkedNonNull::compose(
                 unsafe { NonNull::new_unchecked(raw) },
                 tag,
             )),
+        }
+    }
+
+    /// Creates a new `MarkedNonNull` that is dangling, but well-aligned.
+    ///
+    /// This is useful for initializing types which lazily allocate, like
+    /// `Vec::new` does.
+    ///
+    /// Note that the pointer value may potentially represent a valid pointer to
+    /// a `T`, which means this must not be used as a "not yet initialized"
+    /// sentinel value. Types that lazily allocate must track initialization by
+    /// some other means.
+    #[inline]
+    pub fn dangling() -> Self {
+        Self {
+            inner: NonNull::dangling(),
+            _marker: PhantomData,
         }
     }
 
@@ -93,34 +99,37 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
 
     /// TODO: Doc...
     #[inline]
-    pub fn decompose(&self) -> (NonNull<T>, usize) {
-        let (ptr, tag) = marked::decompose::<_, N>(self.inner.as_ptr() as usize);
+    pub fn decompose(self) -> (NonNull<T>, usize) {
+        let (ptr, tag) = marked::decompose(self.inner.as_ptr() as usize, Self::MARK_BITS);
         (unsafe { NonNull::new_unchecked(ptr) }, tag)
     }
 
     /// TODO: Doc...
     #[inline]
-    pub fn decompose_ptr(&self) -> *mut T {
-        marked::decompose_ptr::<_, N>(self.inner.as_ptr() as usize)
+    pub fn decompose_ptr(self) -> *mut T {
+        marked::decompose_ptr(self.inner.as_ptr() as usize, Self::MARK_BITS)
     }
 
     /// TODO: Doc...
     #[inline]
-    pub fn decompose_non_null(&self) -> NonNull<T> {
+    pub fn decompose_non_null(self) -> NonNull<T> {
         unsafe {
-            NonNull::new_unchecked(marked::decompose_ptr::<_, N>(self.inner.as_ptr() as usize))
+            NonNull::new_unchecked(marked::decompose_ptr(
+                self.inner.as_ptr() as usize,
+                Self::MARK_BITS,
+            ))
         }
     }
 
     /// TODO: Doc...
     #[inline]
-    pub fn decompose_tag(&self) -> usize {
-        marked::decompose_tag::<T, N>(self.inner.as_ptr() as usize)
+    pub fn decompose_tag(self) -> usize {
+        marked::decompose_tag::<T>(self.inner.as_ptr() as usize, Self::MARK_BITS)
     }
 
     /// TODO: Doc...
     #[inline]
-    pub unsafe fn decompose_ref<'a>(&self) -> (&'a T, usize) {
+    pub unsafe fn decompose_ref<'a>(self) -> (&'a T, usize) {
         let (ptr, tag) = self.decompose();
         (&*ptr.as_ptr(), tag)
     }
@@ -134,13 +143,13 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
 
     /// TODO: Doc...
     #[inline]
-    pub unsafe fn as_ref<'a>(&self) -> &'a T {
+    pub unsafe fn as_ref<'a>(self) -> &'a T {
         &*self.decompose_non_null().as_ptr()
     }
 
     /// TODO: Doc...
     #[inline]
-    pub unsafe fn as_mut<'a>(&mut self) -> &'a mut T {
+    pub unsafe fn as_mut<'a>(self) -> &'a mut T {
         &mut *self.decompose_non_null().as_ptr()
     }
 }
@@ -187,28 +196,28 @@ impl<T, N: Unsigned> fmt::Pointer for MarkedNonNull<T, N> {
     }
 }
 
-impl<T, N: Unsigned> PartialEq for MarkedNonNull<T, N> {
+impl<T, N> PartialEq for MarkedNonNull<T, N> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.inner == other.inner
     }
 }
 
-impl<T, N: Unsigned> PartialOrd for MarkedNonNull<T, N> {
+impl<T, N> PartialOrd for MarkedNonNull<T, N> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         self.inner.partial_cmp(&other.inner)
     }
 }
 
-impl<T, N: Unsigned> PartialEq<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
+impl<T, N> PartialEq<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
     #[inline]
     fn eq(&self, other: &MarkedPtr<T, N>) -> bool {
         self.inner.as_ptr() == other.inner
     }
 }
 
-impl<T, N: Unsigned> PartialOrd<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
+impl<T, N> PartialOrd<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
     #[inline]
     fn partial_cmp(&self, other: &MarkedPtr<T, N>) -> Option<cmp::Ordering> {
         self.inner.as_ptr().partial_cmp(&other.inner)

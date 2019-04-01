@@ -14,7 +14,7 @@ use crate::{NotEqual, Protect, Reclaim, Shared, Unlinked, Unprotected};
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// TODO: Doc...
-pub struct Atomic<T, N: Unsigned, R> {
+pub struct Atomic<T, N, R> {
     inner: AtomicMarkedPtr<T, N>,
     _marker: PhantomData<(T, R)>,
 }
@@ -22,7 +22,7 @@ pub struct Atomic<T, N: Unsigned, R> {
 unsafe impl<T, N: Unsigned, R: Reclaim> Send for Atomic<T, N, R> where T: Send + Sync {}
 unsafe impl<T, N: Unsigned, R: Reclaim> Sync for Atomic<T, N, R> where T: Send + Sync {}
 
-impl<T, N: Unsigned, R> Atomic<T, N, R> {
+impl<T, N, R> Atomic<T, N, R> {
     /// TODO: Doc...
     #[inline]
     pub const fn null() -> Self {
@@ -40,6 +40,7 @@ impl<T, N: Unsigned, R> Atomic<T, N, R> {
 }
 
 impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
+    /// Creates a new [`Atomic`](struct.Atomic.html) by allocating specified `val` on the heap.
     #[inline]
     pub fn new(val: T) -> Self {
         Self::from(Owned::from(val))
@@ -74,7 +75,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
 
     /// TODO: Doc...
     #[inline]
-    pub fn load_unprotected<'a>(&self, order: Ordering) -> Option<Unprotected<T, N, R>> {
+    pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, N, R>> {
         MarkedNonNull::new(self.inner.load(order)).map(|ptr| Unprotected {
             inner: ptr,
             _marker: PhantomData,
@@ -207,6 +208,7 @@ impl<T, N: Unsigned, R: Reclaim> fmt::Pointer for Atomic<T, N, R> {
 // CompareExchangeFailure
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// TODO: Doc...
 #[derive(Debug)]
 pub struct CompareExchangeFailure<T, N, R, S>
 where
@@ -214,17 +216,19 @@ where
     R: Reclaim,
     S: Store<Item = T, MarkBits = N, Reclaimer = R>,
 {
+    /// The actually loaded value
     pub loaded: MarkedPtr<T, N>,
+    /// The value for which the failed swap was attempted
     pub input: S,
     // prevents construction outside of the current module
-    _marker: PhantomData<(R)>,
+    _marker: PhantomData<R>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Store (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Trait for pointer types that can be stored in an `AtomicOwned`.
+/// Trait for pointer types that can be stored in an `Atomic`.
 pub trait Store: MarkedPointer + Sized {
     type Reclaimer: Reclaim;
 }

@@ -1,8 +1,8 @@
 //! An abstract interface for concurrent memory reclamation that is based on traits.
 
-#![feature(const_fn)]
 #![cfg_attr(not(feature = "with_std"), feature(alloc))]
 #![cfg_attr(not(any(test, feature = "with_std")), no_std)]
+#![warn(missing_docs)]
 
 #[cfg(not(feature = "with_std"))]
 extern crate alloc;
@@ -12,12 +12,10 @@ use core::ptr::NonNull;
 use core::sync::atomic::Ordering;
 
 // TODO: replace with const generics once available
-pub use typenum::{
-    Unsigned, U0, U1, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19, U2, U20, U21, U22, U23,
-    U24, U25, U26, U27, U28, U29, U3, U4, U5, U6, U7, U8, U9,
-};
+pub use typenum;
 
 use memoffset::offset_of;
+use typenum::Unsigned;
 
 pub mod align;
 pub mod leak;
@@ -121,14 +119,17 @@ where
         atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
         expected: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
-    ) -> Result<Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>, NotEqual>;
+    ) -> AcquireIfEqualResult<Self::Item, Self::MarkBits, Self::Reclaimer>;
 
     /// Releases the currently protected value, which is no longer guaranteed to be protected
     /// afterwards.
     fn release(&mut self);
 }
 
-/// A zero-size "marker" type that represents the failure state of an `acquire_if_equal` operation.
+/// The return type of an [`acquire_if_equal`](trait.Reclaim.html#method.acquire_if_equal) operation.
+pub type AcquireIfEqualResult<'g, T, N, R> = Result<Option<Shared<'g, T, N, R>>, NotEqual>;
+
+/// A zero-size marker type that represents the failure state of an `acquire_if_equal` operation.
 #[derive(Debug, Default)]
 pub struct NotEqual;
 
@@ -200,6 +201,7 @@ impl<T, R: Reclaim> Record<T, R> {
     #[inline]
     pub unsafe fn get_record(elem: NonNull<T>) -> NonNull<Self> {
         let record = (elem.as_ptr() as usize) - Self::offset_elem();
+        debug_assert_ne!(record, 0);
         NonNull::new_unchecked(record as *mut _)
     }
 
@@ -263,13 +265,13 @@ impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
 
     /// TODO: Doc...
     #[inline]
-    pub fn tag(&self) -> usize {
+    pub fn tag(self) -> usize {
         self.inner.decompose_tag()
     }
 
     /// TODO: Doc...
     #[inline]
-    pub unsafe fn deref(&self) -> &'g T {
+    pub unsafe fn deref(self) -> &'g T {
         self.inner.as_ref()
     }
 }
@@ -288,6 +290,7 @@ impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
 /// possible and explicitly allowed for other threads to still have live references that have been
 /// created before the value was unlinked.
 #[derive(Eq, Ord)]
+#[must_use = "an unlinked value is meant to be retired, otherwise a memory leak is highly likely"]
 pub struct Unlinked<T, N: Unsigned, R: Reclaim> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<(T, R)>,
@@ -320,6 +323,8 @@ impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
 // Unprotected
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A non-null value loaded from an [`Atomic`](../struct.Atomic.html) but without any guarantees
+/// protecting it from reclamation.
 #[derive(Eq, Ord)]
 pub struct Unprotected<T, N: Unsigned, R: Reclaim> {
     inner: MarkedNonNull<T, N>,

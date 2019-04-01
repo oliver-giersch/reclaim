@@ -129,7 +129,7 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     where
         T: 'a,
     {
-        let mut inner = owned.inner;
+        let inner = owned.inner;
         mem::forget(owned);
         unsafe { inner.as_mut() }
     }
