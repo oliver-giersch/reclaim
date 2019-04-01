@@ -5,7 +5,7 @@ use core::sync::atomic::Ordering;
 use typenum::Unsigned;
 
 use crate::marked::MarkedPtr;
-use crate::{AcquireIfEqualResult, Protect, Reclaim};
+use crate::{Protect, Reclaim};
 
 /// An [`Atomic`](../struct.Atomic.html) type that uses the NOP [`Leaking`](struct.Leaking.html) "reclamation scheme"
 pub type Atomic<T, N> = crate::Atomic<T, N, Leaking>;
@@ -84,7 +84,7 @@ impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
         atomic: &Atomic<Self::Item, Self::MarkBits>,
         expected: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
-    ) -> AcquireIfEqualResult<Self::Item, Self::MarkBits, Self::Reclaimer> {
+    ) -> Result<Option<Shared<Self::Item, Self::MarkBits>>, crate::NotEqual> {
         match atomic.load_raw(order) {
             marked if marked == expected => {
                 self.0 = marked;

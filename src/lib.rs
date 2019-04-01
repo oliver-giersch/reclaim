@@ -119,7 +119,7 @@ where
         atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
         expected: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
-    ) -> AcquireIfEqualResult<Self::Item, Self::MarkBits, Self::Reclaimer>;
+    ) -> Result<Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>, NotEqual>;
 
     /// Releases the currently protected value, which is no longer guaranteed to be protected
     /// afterwards.
