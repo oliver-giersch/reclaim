@@ -11,25 +11,70 @@ use core::ptr::NonNull;
 use typenum::Unsigned;
 
 use crate::marked::{MarkedNonNull, MarkedPtr};
-use crate::{Reclaim, Record, Shared};
+use crate::pointer::{Internal, MarkedPointer};
+use crate::{Owned, Reclaim, Record, Shared};
 
-/// TODO: Docs...
-#[derive(Eq, Ord, PartialEq, PartialOrd)]
-pub struct Owned<T, N: Unsigned, R: Reclaim> {
-    inner: MarkedNonNull<T, N>,
-    _marker: PhantomData<(T, R)>,
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// impl Internal, Clone, Copy
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, N: Unsigned, R: Reclaim> Internal for Owned<T, N, R> {}
+impl<T, N: Unsigned, R: Reclaim> Internal for Option<Owned<T, N, R>> {}
+
+impl<T: Clone, N: Unsigned, R: Reclaim> Clone for Owned<T, N, R> {
+    #[inline]
+    fn clone(&self) -> Self {
+        let (reference, tag) = unsafe { self.inner.decompose_ref() };
+        Self::compose(reference.clone(), tag)
+    }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// impl Send, Sync
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 unsafe impl<T, N: Unsigned, R: Reclaim> Send for Owned<T, N, R> where T: Send {}
 unsafe impl<T, N: Unsigned, R: Reclaim> Sync for Owned<T, N, R> where T: Sync {}
 
-impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
-    /// TODO: Doc...
-    #[inline]
-    pub fn none() -> Option<Self> {
-        None
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// impl MarkedPointer
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, N: Unsigned, R: Reclaim> MarkedPointer for Owned<T, N, R> {
+    type Item = T;
+    type MarkBits = N;
+
+    fn as_marked(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        self.inner.into_marked()
     }
 
+    fn into_marked(self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        let marked = self.inner.into_marked();
+        mem::forget(self);
+        marked
+    }
+
+    unsafe fn from_marked(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
+        debug_assert!(!marked.is_null());
+        Self {
+            inner: MarkedNonNull::new_unchecked(marked),
+            _marker: PhantomData,
+        }
+    }
+
+    unsafe fn from_marked_non_null(marked: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self {
+        Self {
+            inner: marked,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T, N: Unsigned, R: Reclaim> MarkedPointer for Option<Owned<T, N, R>> {
+    impl_marked_pointer_option!();
+}
+
+impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     /// TODO: Doc...
     #[inline]
     pub fn new(owned: T) -> Self {
@@ -41,27 +86,14 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
 
     /// TODO: Doc...
     #[inline]
-    pub fn with_tag(owned: T, tag: usize) -> Self {
+    pub fn compose(owned: T, tag: usize) -> Self {
         Self {
             inner: MarkedNonNull::compose(Self::alloc_record(owned), tag),
             _marker: PhantomData,
         }
     }
 
-    /// TODO: Doc...
-    #[inline]
-    pub unsafe fn from_marked(marked: MarkedPtr<T, N>) -> Option<Self> {
-        mem::transmute(marked)
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub unsafe fn from_marked_non_null(marked: MarkedNonNull<T, N>) -> Self {
-        Self {
-            inner: marked,
-            _marker: PhantomData,
-        }
-    }
+    impl_inherent!();
 
     /// TODO: Doc...
     #[inline]
@@ -87,40 +119,6 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     #[inline]
     pub fn header_mut(&mut self) -> &mut R::RecordHeader {
         unsafe { Record::<T, R>::get_header_mut(self.inner.decompose_non_null()) }
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn tag(&self) -> usize {
-        self.inner.decompose_tag()
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn set_tag(&mut self, tag: usize) {
-        self.inner = MarkedNonNull::compose(self.inner.decompose_non_null(), tag);
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn as_marked(&self) -> MarkedPtr<T, N> {
-        self.inner.into_marked()
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn into_marked(owned: Self) -> MarkedPtr<T, N> {
-        let marked = owned.inner.into_marked();
-        mem::forget(owned);
-        marked
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn into_marked_non_null(owned: Self) -> MarkedNonNull<T, N> {
-        let marked = owned.inner;
-        mem::forget(owned);
-        marked
     }
 
     /// TODO: Doc...
@@ -182,17 +180,6 @@ impl<T, N: Unsigned, R: Reclaim> BorrowMut<T> for Owned<T, N, R> {
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> Clone for Owned<T, N, R>
-where
-    T: Clone,
-{
-    #[inline]
-    fn clone(&self) -> Self {
-        let (reference, tag) = unsafe { self.inner.decompose_ref() };
-        Self::with_tag(reference.clone(), tag)
-    }
-}
-
 impl<T, N: Unsigned, R: Reclaim> Deref for Owned<T, N, R> {
     type Target = T;
 
@@ -210,6 +197,7 @@ impl<T, N: Unsigned, R: Reclaim> DerefMut for Owned<T, N, R> {
 }
 
 impl<T, N: Unsigned, R: Reclaim> Drop for Owned<T, N, R> {
+    #[inline]
     fn drop(&mut self) {
         unsafe {
             let elem = self.inner.decompose_non_null();
@@ -220,10 +208,7 @@ impl<T, N: Unsigned, R: Reclaim> Drop for Owned<T, N, R> {
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> Default for Owned<T, N, R>
-where
-    T: Default,
-{
+impl<T: Default, N: Unsigned, R: Reclaim> Default for Owned<T, N, R> {
     #[inline]
     fn default() -> Self {
         Owned::new(T::default())
@@ -261,6 +246,7 @@ mod test {
     use typenum::U2;
 
     use crate::leak::Leaking;
+    use crate::prelude::*;
 
     type Owned<T> = super::Owned<T, U2, Leaking>;
 
@@ -276,48 +262,33 @@ mod test {
     }
 
     #[test]
-    fn from_marked() {
+    fn try_from_marked() {
         let owned = Owned::new(1);
         let marked = Owned::into_marked(owned);
 
-        let from = unsafe { Owned::from_marked(marked).unwrap() };
+        let from = unsafe { Owned::try_from_marked(marked).unwrap() };
         assert_eq!((&1, 0), from.decompose_ref());
     }
 
     #[test]
-    fn with_tag() {
-        let owned = Owned::with_tag(1, 0b11);
+    fn compose() {
+        let owned = Owned::compose(1, 0b11);
         assert_eq!((Some(&1), 0b11), unsafe {
             owned.as_marked().decompose_ref()
         });
-        let owned = Owned::with_tag(2, 0);
+        let owned = Owned::compose(2, 0);
         assert_eq!((Some(&2), 0), unsafe { owned.as_marked().decompose_ref() });
     }
 
     #[test]
     fn header() {
         let owned = Owned::new(1);
-        assert_eq!(owned.header().checksum, 0xDEADBEEF);
+        assert_eq!(owned.header().checksum, 0xDEAD_BEEF);
     }
 
     #[test]
     fn header_mut() {
         let mut owned = Owned::new(1);
-        assert_eq!(owned.header_mut().checksum, 0xDEADBEEF);
-    }
-
-    #[test]
-    fn set_tag() {
-        let mut owned = Owned::with_tag(1, 0b11);
-        owned.set_tag(0);
-        assert_eq!((Some(&1), 0), unsafe { owned.as_marked().decompose_ref() });
-        owned.set_tag(0b1);
-        assert_eq!((Some(&1), 0b1), unsafe {
-            owned.as_marked().decompose_ref()
-        });
-        owned.set_tag(0b11);
-        assert_eq!((Some(&1), 0b11), unsafe {
-            owned.as_marked().decompose_ref()
-        });
+        assert_eq!(owned.header_mut().checksum, 0xDEAD_BEEF);
     }
 }

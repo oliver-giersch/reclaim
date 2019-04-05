@@ -7,14 +7,14 @@ use typenum::{IsGreaterOrEqual, True, Unsigned};
 
 use crate::marked::{self, MarkedNonNull, MarkedPtr};
 
-impl<T, N: Unsigned> Clone for MarkedNonNull<T, N> {
+impl<T, N> Clone for MarkedNonNull<T, N> {
     #[inline]
     fn clone(&self) -> Self {
         Self::from(self.inner)
     }
 }
 
-impl<T, N: Unsigned> Copy for MarkedNonNull<T, N> {}
+impl<T, N> Copy for MarkedNonNull<T, N> {}
 
 impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// The number of available mark bits for this type.
@@ -165,7 +165,7 @@ impl<T, N: Unsigned> fmt::Debug for MarkedNonNull<T, N> {
     }
 }
 
-impl<T, N: Unsigned> From<NonNull<T>> for MarkedNonNull<T, N> {
+impl<T, N> From<NonNull<T>> for MarkedNonNull<T, N> {
     #[inline]
     fn from(ptr: NonNull<T>) -> Self {
         Self {

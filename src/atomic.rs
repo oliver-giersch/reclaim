@@ -5,15 +5,14 @@ use core::sync::atomic::Ordering;
 use typenum::Unsigned;
 
 use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
-use crate::owned::Owned;
 use crate::pointer::MarkedPointer;
-use crate::{NotEqual, Protect, Reclaim, Shared, Unlinked, Unprotected};
+use crate::{NotEqual, Owned, Protect, Reclaim, Shared, Unlinked, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Atomic
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Doc...
+/// An atomic markable pointer type to an owned heap allocated value similar to `AtomicPtr`.
 pub struct Atomic<T, N, R> {
     inner: AtomicMarkedPtr<T, N>,
     _marker: PhantomData<(T, R)>,
@@ -23,7 +22,7 @@ unsafe impl<T, N: Unsigned, R: Reclaim> Send for Atomic<T, N, R> where T: Send +
 unsafe impl<T, N: Unsigned, R: Reclaim> Sync for Atomic<T, N, R> where T: Send + Sync {}
 
 impl<T, N, R> Atomic<T, N, R> {
-    /// TODO: Doc...
+    /// Creates a new `null` pointer.
     #[inline]
     pub const fn null() -> Self {
         Self {
@@ -32,7 +31,7 @@ impl<T, N, R> Atomic<T, N, R> {
         }
     }
 
-    /// TODO: Doc...
+    /// Gets a reference to the underlying raw atomic markable pointer.
     #[inline]
     pub const fn as_raw(&self) -> &AtomicMarkedPtr<T, N> {
         &self.inner
@@ -46,13 +45,32 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
         Self::from(Owned::from(val))
     }
 
-    /// TODO: Doc...
+    /// Loads a raw marked value from the pointer.
+    ///
+    /// `load_raw` takes an `Ordering` argument, which describes the memory ordering
+    /// of this operation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is `Release` or `AcqRel`.
     #[inline]
     pub fn load_raw(&self, order: Ordering) -> MarkedPtr<T, N> {
         self.inner.load(order)
     }
 
-    /// TODO: Doc...
+    /// Loads a value from the pointer and stores it within `guard`.
+    ///
+    /// If the loaded value is non-null, the value is guaranteed to be protected
+    /// from reclamation as long as it is stored within `guard`. This method
+    /// relies on `Protected::acquire`, which is required to be lock-free, but
+    /// not wait free.
+    ///
+    /// `load` takes an `Ordering` argument, which describes the memory ordering
+    /// of this operation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is `Release` or `AcqRel`.
     #[inline]
     pub fn load<'g>(
         &self,
@@ -62,7 +80,19 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
         guard.acquire(&self, order)
     }
 
-    /// TODO: Doc...
+    /// Loads a value from the pointer and stores it within `guard`, but only if
+    /// the loaded value equals `expected`.
+    ///
+    /// If the loaded value is non-null, the value is guaranteed to be protected
+    /// from reclamation as long as it is stored within `guard`. This method
+    /// relies on `Protected::acquire_if_equal`, which is required to be wait free.
+    ///
+    /// `load_if_equal` takes an `Ordering` argument, which describes the memory
+    /// ordering of this operation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is `Release` or `AcqRel`.
     #[inline]
     pub fn load_if_equal<'g>(
         &self,
@@ -82,7 +112,16 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
         })
     }
 
-    /// TODO: Doc...
+    /// Stores either `null` or a valid address to an owned heap allocated value
+    /// into the pointer.
+    ///
+    /// Note, that overwriting a non-null value through `store` will very likely
+    /// lead to memory leaks, since instances of [`Atomic`](struct.Atomic.html)
+    /// will most commonly be associated wit some kind of uniqueness invariants
+    /// in order to be sound.
+    ///
+    /// `store` takes an `Ordering` argument, which describes the memory ordering
+    /// orf this operation.
     #[inline]
     pub fn store(&self, ptr: impl Store<Item = T, MarkBits = N, Reclaimer = R>, order: Ordering) {
         self.inner.store(ptr.into_marked(), order);
@@ -98,7 +137,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
         let res = self.inner.swap(ptr.into_marked(), order);
         // this is safe because the pointer is no longer accessible by other threads
         // (there can still be outstanding references that were loaded before the swap)
-        unsafe { Unlinked::from_marked(res) }
+        unsafe { Unlinked::try_from_marked(res) }
     }
 
     /// TODO: Doc...
@@ -156,7 +195,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     /// TODO: Doc...
     #[inline]
     pub fn take(&mut self) -> Option<Owned<T, N, R>> {
-        // TODO: this is safe because
+        // this is safe because the mutable reference ensures no concurrent access is possible
         MarkedNonNull::new(self.inner.swap(MarkedPtr::null(), Ordering::Relaxed))
             .map(|ptr| unsafe { Owned::from_marked_non_null(ptr) })
     }
@@ -208,7 +247,8 @@ impl<T, N: Unsigned, R: Reclaim> fmt::Pointer for Atomic<T, N, R> {
 // CompareExchangeFailure
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Doc...
+/// The returned error type for a failed [`compare_exchange`](Atomic::compare_exchange) or
+/// [`compare_exchange_weak`](Atomic::compare_exchange_weak) operation.
 #[derive(Debug)]
 pub struct CompareExchangeFailure<T, N, R, S>
 where

@@ -7,14 +7,14 @@ use typenum::{IsGreaterOrEqual, True, Unsigned};
 
 use crate::marked::{self, MarkedNonNull, MarkedPtr};
 
-impl<T, N: Unsigned> Clone for MarkedPtr<T, N> {
+impl<T, N> Clone for MarkedPtr<T, N> {
     #[inline]
     fn clone(&self) -> Self {
         Self::new(self.inner)
     }
 }
 
-impl<T, N: Unsigned> Copy for MarkedPtr<T, N> {}
+impl<T, N> Copy for MarkedPtr<T, N> {}
 
 impl<T, N> MarkedPtr<T, N> {
     /// Creates an unmarked pointer.

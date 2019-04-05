@@ -1,4 +1,6 @@
 //! An abstract interface for concurrent memory reclamation that is based on traits.
+//!
+//! TODO: Doc...
 
 #![cfg_attr(not(feature = "with_std"), feature(alloc))]
 #![cfg_attr(not(any(test, feature = "with_std")), no_std)]
@@ -17,23 +19,33 @@ pub use typenum;
 use memoffset::offset_of;
 use typenum::Unsigned;
 
+// must be ordered first in order to correctly use the macros defined inside
+#[macro_use]
+mod pointer;
+
 pub mod align;
 pub mod leak;
+pub mod prelude {
+    //! Useful and/or required traits for this crate.
+    pub use crate::MarkedPointer;
+}
 
 mod atomic;
 mod marked;
 mod owned;
-mod pointer;
+mod shared;
+mod unlinked;
+mod unprotected;
 
 pub use crate::atomic::{Atomic, CompareExchangeFailure};
 pub use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
-pub use crate::owned::Owned;
+pub use crate::pointer::MarkedPointer;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Reclaim (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Doc...
+/// A trait for retiring and reclaiming entries in concurrent collections and data structures.
 pub unsafe trait Reclaim
 where
     Self: Sized,
@@ -80,7 +92,7 @@ where
 /// TODO: Doc...
 pub trait Protect
 where
-    Self: Sized,
+    Self: Sized + Clone,
 {
     /// Generic type of value protected from reclamation
     type Item: Sized;
@@ -216,61 +228,25 @@ impl<T, R: Reclaim> Record<T, R> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// Owned
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A pointer type for heap allocation like [`Box`](std::boxed::Box) that can be marked.
+#[derive(Eq, Ord, PartialEq, PartialOrd)]
+pub struct Owned<T, N: Unsigned, R: Reclaim> {
+    inner: MarkedNonNull<T, N>,
+    _marker: PhantomData<(T, R)>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Shared
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A shared reference to a value that is actively protected from reclamation by other threads.
-#[derive(Eq, Ord)]
-pub struct Shared<'g, T, N: Unsigned, R: Reclaim> {
+#[derive(Eq, Ord, PartialEq, PartialOrd)]
+pub struct Shared<'g, T, N, R> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<(&'g T, R)>,
-}
-
-impl<'g, T, N: Unsigned, R: Reclaim> Clone for Shared<'g, T, N, R> {
-    #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'g, T, N: Unsigned, R: Reclaim> Copy for Shared<'g, T, N, R> {}
-
-impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
-    /// TODO: Doc...
-    #[inline]
-    pub fn with_tag(shared: Self, tag: usize) -> Self {
-        Self {
-            inner: MarkedNonNull::compose(shared.inner.decompose_non_null(), tag),
-            _marker: PhantomData,
-        }
-    }
-
-    /// TODO: Doc + Test...
-    #[inline]
-    pub fn wrapping_add_tag(shared: Self, add: usize) -> Self {
-        Self::with_tag(shared, shared.tag().wrapping_add(add))
-    }
-
-    /// TODO: Doc + Test...
-    #[inline]
-    pub fn wrapping_sub_tag(shared: Self, sub: usize) -> Self {
-        Self::with_tag(shared, shared.tag().wrapping_sub(sub))
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub fn tag(self) -> usize {
-        self.inner.decompose_tag()
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub unsafe fn deref(self) -> &'g T {
-        self.inner.as_ref()
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -286,71 +262,21 @@ impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
 /// impossible for other threads to create new references to an already unlinked value, it is
 /// possible and explicitly allowed for other threads to still have live references that have been
 /// created before the value was unlinked.
-#[derive(Eq, Ord)]
-#[must_use = "an unlinked value is meant to be retired, otherwise a memory leak is highly likely"]
-pub struct Unlinked<T, N: Unsigned, R: Reclaim> {
+#[derive(Eq, Ord, PartialEq, PartialOrd)]
+#[must_use = "unlinked values are meant to be retired, otherwise a memory leak is highly likely"]
+pub struct Unlinked<T, N, R> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<(T, R)>,
-}
-
-impl<T, N: Unsigned, R: Reclaim> Unlinked<T, N, R> {
-    /// TODO: Doc...
-    #[inline]
-    pub unsafe fn deref(&self) -> &T {
-        self.inner.as_ref()
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub unsafe fn retire(self)
-    where
-        T: 'static,
-    {
-        R::retire(self)
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub unsafe fn retire_unchecked(self) {
-        R::retire_unchecked(self)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Unprotected
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A non-null value loaded from an [`Atomic`](../struct.Atomic.html) but without any guarantees
+/// A non-null value loaded from an [`Atomic`](Atomic) but without any guarantees
 /// protecting it from reclamation.
-#[derive(Eq, Ord)]
-pub struct Unprotected<T, N: Unsigned, R: Reclaim> {
+#[derive(Eq, Ord, PartialEq, PartialOrd)]
+pub struct Unprotected<T, N, R> {
     inner: MarkedNonNull<T, N>,
-    _marker: PhantomData<(R)>,
-}
-
-impl<T, N: Unsigned, R: Reclaim> Clone for Unprotected<T, N, R> {
-    #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<T, N: Unsigned, R: Reclaim> Copy for Unprotected<T, N, R> {}
-
-impl<T, N: Unsigned, R: Reclaim> Unprotected<T, N, R> {
-    /// TODO: Doc...
-    ///
-    /// # Safety
-    ///
-    /// This is generally unsound to call. Only when the caller is able to ensure no memory
-    /// reclamation is happening concurrently can it be considered to be safe to dereference an
-    /// unprotected pointer loaded from a concurrent data structure. This is e.g. the case when
-    /// there are mutable references involved (e.g. during `drop`).
-    #[inline]
-    pub unsafe fn deref_unprotected(&self) -> &T {
-        self.inner.as_ref()
-    }
+    _marker: PhantomData<R>,
 }

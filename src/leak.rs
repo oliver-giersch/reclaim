@@ -12,7 +12,7 @@ pub type Atomic<T, N> = crate::Atomic<T, N, Leaking>;
 /// A [`Shared`](../struct.Shared.html) type that uses the NOP [`Leaking`](struct.Leaking.html) "reclamation scheme"
 pub type Shared<'g, T, N> = crate::Shared<'g, T, N, Leaking>;
 /// An [`Owned`](../struct.Owned.html) type that uses the NOP [`Leaking`](struct.Leaking.html) "reclamation scheme"
-pub type Owned<T, N> = crate::owned::Owned<T, N, Leaking>;
+pub type Owned<T, N> = crate::Owned<T, N, Leaking>;
 /// An [`Unlinked`](../struct.Unlinked.html) type that uses the NOP [`Leaking`](struct.Leaking.html) "reclamation scheme"
 pub type Unlinked<T, N> = crate::Unlinked<T, N, Leaking>;
 /// An [`Unprotected`](../struct.Unprotected.html) type that uses the NOP [`Leaking`](struct.Leaking.html) "reclamation scheme"
@@ -25,6 +25,12 @@ pub struct Leaking;
 /// TODO: Doc...
 #[derive(Default)]
 pub struct LeakingGuard<T, N: Unsigned>(MarkedPtr<T, N>);
+
+impl<T, N: Unsigned> Clone for LeakingGuard<T, N> {
+    fn clone(&self) -> Self {
+        Self(self.0)
+    }
+}
 
 #[cfg(test)]
 pub struct Header {
@@ -65,7 +71,7 @@ impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
 
     #[inline]
     fn shared(&self) -> Option<Shared<Self::Item, Self::MarkBits>> {
-        unsafe { Shared::from_marked(self.0) }
+        unsafe { Shared::try_from_marked(self.0) }
     }
 
     #[inline]
@@ -75,7 +81,7 @@ impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
         order: Ordering,
     ) -> Option<Shared<Self::Item, Self::MarkBits>> {
         self.0 = atomic.load_raw(order);
-        unsafe { Shared::from_marked(self.0) }
+        unsafe { Shared::try_from_marked(self.0) }
     }
 
     #[inline]
@@ -88,7 +94,7 @@ impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
         match atomic.load_raw(order) {
             marked if marked == expected => {
                 self.0 = marked;
-                unsafe { Ok(Shared::from_marked(marked)) }
+                unsafe { Ok(Shared::try_from_marked(marked)) }
             }
             _ => Err(crate::NotEqual),
         }
