@@ -23,12 +23,18 @@ pub type Unprotected<T, N> = crate::Unprotected<T, N, Leaking>;
 pub struct Leaking;
 
 /// TODO: Doc...
-#[derive(Default)]
 pub struct LeakingGuard<T, N: Unsigned>(MarkedPtr<T, N>);
 
 impl<T, N: Unsigned> Clone for LeakingGuard<T, N> {
     fn clone(&self) -> Self {
         Self(self.0)
+    }
+}
+
+impl<T, N: Unsigned> Default for LeakingGuard<T, N> {
+    #[inline]
+    fn default() -> Self {
+        Self(MarkedPtr::null())
     }
 }
 
@@ -98,6 +104,11 @@ impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
             }
             _ => Err(crate::NotEqual),
         }
+    }
+
+    #[inline]
+    fn acquire_from_other(&mut self, other: &Self) {
+        self.0 = other.0;
     }
 
     #[inline]

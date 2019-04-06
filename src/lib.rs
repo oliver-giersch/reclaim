@@ -92,7 +92,7 @@ where
 /// TODO: Doc...
 pub trait Protect
 where
-    Self: Sized + Clone,
+    Self: Sized + Clone + Default,
 {
     /// Generic type of value protected from reclamation
     type Item: Sized;
@@ -132,6 +132,9 @@ where
         expected: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
     ) -> Result<Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>, NotEqual>;
+
+    /// TODO: Doc...
+    fn acquire_from_other(&mut self, other: &Self);
 
     /// Releases the currently protected value, which is no longer guaranteed to be protected
     /// afterwards.
