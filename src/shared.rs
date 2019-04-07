@@ -33,6 +33,11 @@ impl<'g, T, N: Unsigned, R: Reclaim> MarkedPointer for Option<Shared<'g, T, N, R
 impl<'g, T, N: Unsigned, R: Reclaim> Shared<'g, T, N, R> {
     impl_inherent!();
 
+    /// TODO: Experimental
+    pub unsafe fn as_ref<'a>(self) -> &'a T {
+        self.inner.as_ref()
+    }
+
     /// TODO: Doc...
     #[inline]
     pub unsafe fn deref(self) -> &'g T {
