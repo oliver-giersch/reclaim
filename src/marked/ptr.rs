@@ -129,21 +129,21 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
 
     /// TODO: Doc...
     #[inline]
-    pub unsafe fn decompose_ref<'a>(self) -> (&'a T, usize) {
+    pub unsafe fn decompose_ref(&self) -> (&T, usize) {
         let (ptr, tag) = self.decompose();
         (&*ptr.as_ptr(), tag)
     }
 
     /// TODO: Doc...
     #[inline]
-    pub unsafe fn decompose_mut<'a>(&mut self) -> (&'a mut T, usize) {
+    pub unsafe fn decompose_mut(&mut self) -> (&mut T, usize) {
         let (ptr, tag) = self.decompose();
         (&mut *ptr.as_ptr(), tag)
     }
 
     /// TODO: Doc...
     #[inline]
-    pub unsafe fn as_ref<'a>(self) -> &'a T {
+    pub unsafe fn as_ref(&self) -> &T {
         &*self.decompose_non_null().as_ptr()
     }
 

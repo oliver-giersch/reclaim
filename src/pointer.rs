@@ -121,14 +121,25 @@ macro_rules! impl_marked_pointer_option {
 
 macro_rules! impl_inherent {
     () => {
-        /// Gets a `None` for an `Option<Self>`.
+        /// Gets a `None` for an [`Option<Self>`](std::option::Option).
         ///
-        /// This is useful for calls to `Atomic::store`, `Atomic::swap` or
-        /// `Atomic::compare_exchange_*`, when a `null` pointer needs to be inserted. These
-        /// methods accept values of various non-nullable pointer types (`Shared`, `Unlinked`
-        /// and `Unprotected`) and `Option` thereof as argument. However, the compiler is
-        /// usually not able to infer the concrete type, when a `None` is inserted, and this
-        /// function is designed for these cases.
+        /// This is useful for calls to [`store`][store], [`swap`][swap] or
+        /// [`compare_exchange_*`][compare_exchange], when a `null` pointer
+        /// needs to be inserted.
+        /// These methods accept values of various non-nullable pointer types
+        /// ([`Shared`][Shared], [`Owned`][Owned], [`Unlinked`][Unlinked] and
+        /// [`Unprotected`][Unprotected]) and `Option` thereof as argument.
+        /// However, the compiler is usually not able to infer the concrete type,
+        /// when a `None` is inserted, and this function is intended for these
+        /// cases.
+        ///
+        /// [store]: crate::atomic::Atomic::store
+        /// [swap]: crate::atomic::Atomic::swap
+        /// [compare_exchange]: crate::atomic::Atomic::compare_exchange
+        /// [Shared]: crate::Shared
+        /// [Owned]: crate::Owned
+        /// [Unlinked]: crate::Unlinked
+        /// [Unprotected]: crate::Unprotected
         ///
         /// # Example
         ///

@@ -1,6 +1,24 @@
-//! An abstract interface for concurrent memory reclamation that is based on traits.
+//! An abstract & unified interface supporting various schemes for concurrent memory reclamation.
 //!
-//! TODO: Doc...
+//! # Memory Management in Rust
+//!
+//! ...
+//!
+//! # The Need for Automatic Memory Reclamation
+//!
+//! ...
+//!
+//! # Concurrent & Lock-Free Gargage Collection
+//!
+//! ...
+//!
+//! # The `Reclaim` Interface
+//!
+//! ...
+//!
+//! # Pointer Types & Tagging
+//!
+//! ...
 
 #![cfg_attr(not(feature = "with_std"), feature(alloc))]
 #![cfg_attr(not(any(test, feature = "with_std")), no_std)]
@@ -19,7 +37,7 @@ pub use typenum;
 use memoffset::offset_of;
 use typenum::Unsigned;
 
-// must be ordered first in order to correctly use the macros defined inside
+// module must be declared first in order to correctly use the macros defined inside
 #[macro_use]
 mod pointer;
 
@@ -89,7 +107,8 @@ where
 // Protect (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Doc...
+/// A trait for representing pointer types that *protect* their pointed-to value from reclamation
+/// during their lifetime.
 pub trait Protect
 where
     Self: Sized + Clone + Default,
@@ -126,20 +145,25 @@ where
     /// protection occurs. After a successful load, any previously protected value is no longer
     /// protected, regardless of the loaded value. In case of a unsuccessful load, the previously
     /// protected value does not change.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an error result ([`NotEqual`](NotEqual)) if the atomically loaded
+    /// snapshot from `atomic` does not match the `expected` value.
     fn acquire_if_equal(
         &mut self,
         atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
         expected: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
-    ) -> Result<Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>, NotEqual>;
-
-    /// TODO: Doc...
-    fn acquire_from_other(&mut self, other: &Self);
+    ) -> AcquireResult<Self::Item, Self::MarkBits, Self::Reclaimer>;
 
     /// Releases the currently protected value, which is no longer guaranteed to be protected
     /// afterwards.
     fn release(&mut self);
 }
+
+/// Result type for [`acquire_if_equal`](Protect::acquire_if_equal) operations.
+pub type AcquireResult<'g, T, N, R> = Result<Option<Shared<'g, T, N, R>>, NotEqual>;
 
 /// A zero-size marker type that represents the failure state of an `acquire_if_equal` operation.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
@@ -234,7 +258,9 @@ impl<T, R: Reclaim> Record<T, R> {
 // Owned
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A pointer type for heap allocation like [`Box`](std::boxed::Box) that can be marked.
+/// A pointer type for heap allocation like [`Box`](std::boxed::Box) that can be marked and is
+/// guaranteed to allocate the appropriate [`Record`] type for its generic [`Reclaim`] type
+/// parameter alongside its owned value.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
 pub struct Owned<T, N: Unsigned, R: Reclaim> {
     inner: MarkedNonNull<T, N>,
@@ -246,6 +272,9 @@ pub struct Owned<T, N: Unsigned, R: Reclaim> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A shared reference to a value that is actively protected from reclamation by other threads.
+///
+/// Valid `Shared` values are always borrowed from guard values implementing the
+/// [`Protect`](Protect) trait.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
 pub struct Shared<'g, T, N, R> {
     inner: MarkedNonNull<T, N>,
@@ -258,7 +287,9 @@ pub struct Shared<'g, T, N, R> {
 
 /// A reference to a value that has been unlinked and is hence no longer reachable by other threads.
 ///
-/// `Unlinked` values are the result of (successful) atomic swap or compare-and-swap operations.
+/// `Unlinked` values are the result of (successful) atomic swap or compare-and-swap operations on
+/// [`Atomic`](Atomic) values.
+///
 /// Concurrent data structure implementations have to maintain the invariant that no unique value
 /// (pointer) can exist more than once within any data structure. Only then is it safe to `retire`
 /// unlinked values, enabling them to be eventually reclaimed. Note that, while it must be

@@ -12,7 +12,15 @@ use crate::{NotEqual, Owned, Protect, Reclaim, Shared, Unlinked, Unprotected};
 // Atomic
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// An atomic markable pointer type to an owned heap allocated value similar to `AtomicPtr`.
+/// An atomic markable pointer type to an owned heap allocated value similar to
+/// [`AtomicPtr`](std::sync::atomic::AtomicPtr).
+///
+/// The `Atomic` type has similarities to [`Option<Box>`](std::boxed::Box), in the sense that it is
+/// a pointer that is either null or otherwise points to a valid heap allocated value.
+/// Note, that the type does not implement the [`Drop`](std::ops::Drop) trait, meaning it does not
+/// automatically take care of memory deallocation when it goes out of scope.
+/// Use the [`take`](Atomic::take) method to extract an (optional) [`Owned`](crate::Owned) value,
+/// which *does* correctly deallocate memory when it goes out of scope.
 pub struct Atomic<T, N, R> {
     inner: AtomicMarkedPtr<T, N>,
     _marker: PhantomData<(T, R)>,
@@ -31,7 +39,7 @@ impl<T, N, R> Atomic<T, N, R> {
         }
     }
 
-    /// Gets a reference to the underlying raw atomic markable pointer.
+    /// Gets a reference to the underlying (raw) atomic markable pointer.
     #[inline]
     pub const fn as_raw(&self) -> &AtomicMarkedPtr<T, N> {
         &self.inner
@@ -47,12 +55,14 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
 
     /// Loads a raw marked value from the pointer.
     ///
-    /// `load_raw` takes an `Ordering` argument, which describes the memory ordering
+    /// `load_raw` takes an [`Ordering`][ordering] argument, which describes the memory ordering
     /// of this operation.
     ///
     /// # Panics
     ///
     /// Panics if `order` is `Release` or `AcqRel`.
+    ///
+    /// [ordering]: std::sync::atomic::Ordering
     #[inline]
     pub fn load_raw(&self, order: Ordering) -> MarkedPtr<T, N> {
         self.inner.load(order)
@@ -61,16 +71,19 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     /// Loads a value from the pointer and stores it within `guard`.
     ///
     /// If the loaded value is non-null, the value is guaranteed to be protected
-    /// from reclamation as long as it is stored within `guard`. This method
-    /// relies on `Protected::acquire`, which is required to be lock-free, but
-    /// not wait free.
+    /// from reclamation for as long as it is stored within `guard`. This method
+    /// internally relies on [`acquire`](crate::Protect::acquire).
     ///
-    /// `load` takes an `Ordering` argument, which describes the memory ordering
+    /// `load` takes an [`Ordering`][ordering] argument, which describes the memory ordering
     /// of this operation.
     ///
     /// # Panics
     ///
-    /// Panics if `order` is `Release` or `AcqRel`.
+    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: std::sync::atomic::Ordering
+    /// [release]: std::sync::atomic::Ordering::Release
+    /// [acq_rel]: std::sync::atomic::Ordering::AcqRel
     #[inline]
     pub fn load<'g>(
         &self,
@@ -85,14 +98,18 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     ///
     /// If the loaded value is non-null, the value is guaranteed to be protected
     /// from reclamation as long as it is stored within `guard`. This method
-    /// relies on `Protected::acquire_if_equal`, which is required to be wait free.
+    /// relies on [`acquire_if_equal`](crate::Protect::acquire_if_equal).
     ///
-    /// `load_if_equal` takes an `Ordering` argument, which describes the memory
+    /// `load_if_equal` takes an [`Ordering`][ordering] argument, which describes the memory
     /// ordering of this operation.
     ///
     /// # Panics
     ///
-    /// Panics if `order` is `Release` or `AcqRel`.
+    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: std::sync::atomic::Ordering
+    /// [release]: std::sync::atomic::Ordering::Release
+    /// [acq_rel]: std::sync::atomic::Ordering::AcqRel
     #[inline]
     pub fn load_if_equal<'g>(
         &self,
@@ -103,7 +120,16 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
         guard.acquire_if_equal(self, compare, order)
     }
 
-    /// TODO: Doc...
+    /// Loads a value from the pointer that is explicitly **not** protected from reclamation,
+    /// meaning another thread could free the value's memory at any time.
+    ///
+    /// This method is similar to [`load_raw`](Atomic::load_raw), but the resulting
+    /// [`Unprotected`](crate::Unprotected) type has stronger guarantees than a raw
+    /// [`MarkedPtr`](crate::marked::MarkedPtr). It can be useful to load an unprotected
+    /// pointer if that pointer does not need to be dereferenced, but is only used to
+    /// reinsert it in a different spot, which is e.g. done when removing a value from
+    /// a linked list or a stack.
+    ///
     #[inline]
     pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, N, R>> {
         MarkedNonNull::new(self.inner.load(order)).map(|ptr| Unprotected {
@@ -112,22 +138,43 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
         })
     }
 
-    /// Stores either `null` or a valid address to an owned heap allocated value
+    /// Stores either `null` or a valid pointer to an owned heap allocated value
     /// into the pointer.
     ///
     /// Note, that overwriting a non-null value through `store` will very likely
-    /// lead to memory leaks, since instances of [`Atomic`](struct.Atomic.html)
-    /// will most commonly be associated wit some kind of uniqueness invariants
-    /// in order to be sound.
+    /// lead to memory leaks, since instances of [`Atomic`](Atomic) will most commonly
+    /// be associated wit some kind of uniqueness invariants in order to be sound.
     ///
-    /// `store` takes an `Ordering` argument, which describes the memory ordering
-    /// orf this operation.
+    /// `store` takes an [`Ordering`][ordering] argument, which
+    /// describes the memory ordering of this operation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is [`Acquire`][acquire] or [`AcqRel`][acq_rel]
+    ///
+    /// [ordering]: std::sync::atomic::Ordering
+    /// [acquire]: std::sync::atomic::Ordering::Acquire
+    /// [acq_rel]: std::sync::atomic::Ordering::AcqRel
     #[inline]
     pub fn store(&self, ptr: impl Store<Item = T, MarkBits = N, Reclaimer = R>, order: Ordering) {
         self.inner.store(ptr.into_marked(), order);
     }
 
-    /// TODO: Doc...
+    /// Stores either `null` or a valid pointer to an owned heap allocated value
+    /// into the pointer, returning the previous value.
+    ///
+    /// The returned value can be safely reclaimed as long as the *uniqueness*
+    /// invariant is maintained.
+    ///
+    /// `swap` takes an [`Ordering`][ordering] argument which describes the memory
+    /// ordering of this operation. All ordering modes are possible. Note that using
+    /// [`Acquire`][acquire] makes the store part of this operation [`Relaxed`][relaxed],
+    /// and using [`Release`][release] makes the load part [`Relaxed`][relaxed].
+    ///
+    /// [ordering]: std::sync::atomic::Ordering
+    /// [relaxed]: std::sync::atomic::Ordering::Relaxed
+    /// [acquire]: std::sync::atomic::Ordering::Acquire
+    /// [release]: std::sync::atomic::Ordering::Release
     #[inline]
     pub fn swap(
         &self,
@@ -140,7 +187,33 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
         unsafe { Unlinked::try_from_marked(res) }
     }
 
-    /// TODO: Doc...
+    /// Stores a value (either null or valid) into the pointer if the current value
+    /// is the same as `current`.
+    ///
+    /// The return value is a result indicating whether the `new` value was written and
+    /// containing the previous and now unlinked value.
+    /// On success this value is guaranteed to be equal to `current` and can be safely
+    /// reclaimed as long as the *uniqueness* invariant is maintained.
+    /// On failure, a [struct](CompareExchangeFailure) is returned that contains both
+    /// the actual value and the value that was previously attempted to be inserted (`new`).
+    /// This is necessary, because it is possible to attempt insertion of move-only types
+    /// such as [`Owned`](crate::Owned) or [`Unlinked`](crate::Unlinked), which would
+    /// otherwise be irretrievably lost when the `compare_exchange` fails.
+    ///
+    /// `compare_exchange` takes two [`Ordering`][ordering] arguments to describe the memory
+    /// ordering of this operation. The first describes the required ordering if the
+    /// operation succeeds while the second describes the required ordering when the
+    /// operation fails. Using [`Acquire`][acquire] as success ordering makes the store part
+    /// of this operation [`Relaxed`][relaxed], and using [`Release`][release] makes the
+    /// successful load [`Relaxed`][relaxed]. The failure ordering can only be
+    /// [`SeqCst`][seq_cst], [`Acquire`][acquire] or [`Relaxed`][relaxed] and must be
+    /// equivalent to or weaker than the success ordering.
+    ///
+    /// [ordering]: std::sync::atomic::Ordering
+    /// [relaxed]: std::sync::atomic::Ordering::Relaxed
+    /// [acquire]: std::sync::atomic::Ordering::Acquire
+    /// [release]: std::sync::atomic::Ordering::Release
+    /// [seq_cst]: std::sync::atomic::Ordering::SeqCst
     #[inline]
     pub fn compare_exchange<C, S>(
         &self,
@@ -166,7 +239,36 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
             })
     }
 
-    /// TODO: Doc...
+    /// Stores a value (either null or valid) into the pointer if the current value
+    /// is the same as `current`.
+    ///
+    /// Unlike [`compare_exchange`](Atomic::compare_exchange), this function is allowed
+    /// to spuriously fail even when the comparision succeeds, which can result in more
+    /// efficient code on some platforms.
+    /// The return value is a result indicating whether the `new` value was written and
+    /// containing the previous and now unlinked value.
+    /// On success this value is guaranteed to be equal to `current` and can be safely
+    /// reclaimed as long as the *uniqueness* invariant is maintained.
+    /// On failure, a [struct](CompareExchangeFailure) is returned that contains both
+    /// the actual value and the value that was previously attempted to be inserted (`new`).
+    /// This is necessary, because it is possible to attempt insertion of move-only types
+    /// such as [`Owned`](crate::Owned) or [`Unlinked`](crate::Unlinked), which would
+    /// otherwise be irretrievably lost when the `compare_exchange` fails.
+    ///
+    /// `compare_exchange` takes two [`Ordering`][ordering] arguments to describe the memory
+    /// ordering of this operation. The first describes the required ordering if the
+    /// operation succeeds while the second describes the required ordering when the
+    /// operation fails. Using [`Acquire`][acquire] as success ordering makes the store part
+    /// of this operation [`Relaxed`][relaxed], and using [`Release`][release] makes the
+    /// successful load [`Relaxed`][relaxed]. The failure ordering can only be
+    /// [`SeqCst`][seq_cst], [`Acquire`][acquire] or [`Relaxed`][relaxed] and must be
+    /// equivalent to or weaker than the success ordering.
+    ///
+    /// [ordering]: std::sync::atomic::Ordering
+    /// [relaxed]: std::sync::atomic::Ordering::Relaxed
+    /// [acquire]: std::sync::atomic::Ordering::Acquire
+    /// [release]: std::sync::atomic::Ordering::Release
+    /// [seq_cst]: std::sync::atomic::Ordering::SeqCst
     #[inline]
     pub fn compare_exchange_weak<C, S>(
         &self,
@@ -192,7 +294,14 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
             })
     }
 
-    /// TODO: Doc...
+    /// Takes the value out of the pointer as an optional [`Owned`][owned], leaving a
+    /// `null` pointer in its place.
+    ///
+    /// This is similar to [`Option::take`](std::option::Option::take) and is useful for
+    /// manually dropping the value pointed-to by the `Atomic`, since [`Owned`][owned]
+    /// values behave like [`Boxes`](std::boxed::Box) when they are dropped.
+    ///
+    /// [owned]: crate::Owned
     #[inline]
     pub fn take(&mut self) -> Option<Owned<T, N, R>> {
         // this is safe because the mutable reference ensures no concurrent access is possible

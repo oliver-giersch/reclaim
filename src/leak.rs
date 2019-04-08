@@ -107,11 +107,6 @@ impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
     }
 
     #[inline]
-    fn acquire_from_other(&mut self, other: &Self) {
-        self.0 = other.0;
-    }
-
-    #[inline]
     fn release(&mut self) {
         self.0 = MarkedPtr::null();
     }

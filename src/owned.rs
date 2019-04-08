@@ -75,7 +75,12 @@ impl<T, N: Unsigned, R: Reclaim> MarkedPointer for Option<Owned<T, N, R>> {
 }
 
 impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
-    /// TODO: Doc...
+    /// Allocates memory for a [`Record<T>`](Record) on the heap and then
+    /// places a record with a default header and `owned` into it.
+    ///
+    /// This does only allocate memory if at least one of
+    /// [`RecordHeader`](crate::Reclaim::RecordHeader) or
+    /// `T` are not zero-sized.
     #[inline]
     pub fn new(owned: T) -> Self {
         Self {
@@ -84,7 +89,8 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
         }
     }
 
-    /// TODO: Doc...
+    /// Creates a new `Owned` like [`new`](Owned::new) but composes the returned
+    /// pointer with an initial `tag` value.
     #[inline]
     pub fn compose(owned: T, tag: usize) -> Self {
         Self {

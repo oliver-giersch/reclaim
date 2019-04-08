@@ -43,7 +43,7 @@ impl<T, N: Unsigned, R: Reclaim> Unprotected<T, N, R> {
     /// there are mutable references involved (e.g. during `drop`).
     #[inline]
     pub unsafe fn deref_unprotected<'a>(self) -> &'a T {
-        self.inner.as_ref()
+        &*self.inner.decompose_ptr()
     }
 }
 
