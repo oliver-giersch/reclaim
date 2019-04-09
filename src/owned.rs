@@ -79,8 +79,11 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     /// places a record with a default header and `owned` into it.
     ///
     /// This does only allocate memory if at least one of
-    /// [`RecordHeader`](crate::Reclaim::RecordHeader) or
-    /// `T` are not zero-sized.
+    /// [`RecordHeader`][header] or `T` are not zero-sized.
+    /// If the [`RecordHeader`][header] is a ZST, this behaves
+    /// identically to [`Box::new`](std::boxed::Box::new)
+    ///
+    /// [header]: crate::Reclaim::RecordHeader
     #[inline]
     pub fn new(owned: T) -> Self {
         Self {
@@ -89,8 +92,8 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
         }
     }
 
-    /// Creates a new `Owned` like [`new`](Owned::new) but composes the returned
-    /// pointer with an initial `tag` value.
+    /// Creates a new `Owned` like [`new`](Owned::new) but composes the
+    /// returned pointer with an initial `tag` value.
     #[inline]
     pub fn compose(owned: T, tag: usize) -> Self {
         Self {
@@ -138,7 +141,18 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
         unsafe { inner.as_mut() }
     }
 
-    /// TODO: Doc...
+    /// Leaks the `owned` value and turns it into a "protected" [`Shared`][shared]
+    /// value with arbitrary lifetime `'a`.
+    ///
+    /// Note, that the protection in this case stems from the fact, the given `owned` can
+    /// not have been part of a concurrent data structure (barring unsafe construction) and
+    /// can not possibly be reclaimed by another thread.
+    /// Once the resulting [`Shared`][shared] has been successfully inserted into a data
+    /// structure, this protection ceases to hold and calling [`deref`][deref] is no longer
+    /// safe to call.
+    ///
+    /// [shared]: crate::Shared
+    /// [deref]: crate::Shared::deref
     #[inline]
     pub fn leak_shared<'a>(owned: Self) -> Shared<'a, T, N, R> {
         let inner = owned.inner;
@@ -150,7 +164,7 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
         }
     }
 
-    /// TODO: Doc...
+    /// Allocates a records wrapping `owned` and returns the pointer to the wrapped value.
     #[inline]
     fn alloc_record(owned: T) -> NonNull<T> {
         let record = Box::leak(Box::new(Record::<_, R>::new(owned)));

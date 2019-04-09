@@ -130,7 +130,7 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     /// Additionally, the lifetime 'a returned is arbitrarily chosen and does not necessarily
     /// reflect the actual lifetime of the data.
     #[inline]
-    pub unsafe fn decompose_mut<'a>(&mut self) -> (Option<&'a mut T>, usize) {
+    pub unsafe fn decompose_mut<'a>(self) -> (Option<&'a mut T>, usize) {
         let (ptr, tag) = self.decompose();
         (ptr.as_mut(), tag)
     }
@@ -260,11 +260,11 @@ mod test {
 
     #[test]
     fn decompose_mut() {
-        let mut null: MarkedPtr<Aligned8<i32>, U3> = MarkedPtr::null();
+        let null: MarkedPtr<Aligned8<i32>, U3> = MarkedPtr::null();
         assert_eq!((None, 0), unsafe { null.decompose_mut() });
 
         let mut aligned = Aligned8::new(1);
-        let mut ptr: MarkedPtr<Aligned8<i32>, U3> = MarkedPtr::compose(&mut aligned, 3);
+        let ptr: MarkedPtr<Aligned8<i32>, U3> = MarkedPtr::compose(&mut aligned, 3);
         assert_eq!((Some(&mut aligned), 3), unsafe { ptr.decompose_mut() });
     }
 

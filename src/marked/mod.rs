@@ -4,6 +4,7 @@ use core::ptr::NonNull;
 use core::sync::atomic::AtomicPtr;
 
 use typenum::Unsigned;
+use typenum::U0;
 
 mod atomic;
 mod ptr;
@@ -13,12 +14,16 @@ mod raw;
 // AtomicMarkedPtr
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A raw pointer type which can be safely shared between threads and which can store additional
-/// information in its lower (unused) bits.
+/// A raw pointer type which can be safely shared between threads, which
+/// can store additional information in its lower (unused) bits.
 ///
-/// This type has the same in-memory representation as a *mut T. It is similar to `AtomicPtr`,
-/// except that all its methods involve a `MarkedPtr` instead of *mut T.
-pub struct AtomicMarkedPtr<T, N> {
+/// This type has the same in-memory representation as a *mut T. It is mostly
+/// identical to [`AtomicPtr`][atomic], except that all of its methods involve
+/// a [`MarkedPtr`][marked] instead of `*mut T`.
+///
+/// [atomic]: std::sync::atomic::AtomicPtr
+/// [marked]: MarkedPtr
+pub struct AtomicMarkedPtr<T, N = U0> {
     inner: AtomicPtr<T>,
     _marker: PhantomData<N>,
 }
@@ -27,9 +32,18 @@ pub struct AtomicMarkedPtr<T, N> {
 // MarkedPtr
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Doc...
-#[derive(Eq, Ord)]
-pub struct MarkedPtr<T, N> {
+/// A raw, unsafe pointer type like `*mut T` of which up to `N` of its
+/// lower bits can be used to store additional information (the *tag*).
+///
+/// Note, that the upper bound for `N` is dictated by the alignment of
+/// type `T`. A type with an alignment of `8` (all pointers on 64-bit
+/// architectures) e.g. can have up to `3` mark bits.
+/// Attempts to declare types with more mark bits will lead to a
+/// compile-time error.
+/// The [`align`](crate::align) module exposes wrapper types for
+/// artificially increase the alignment of types in order to use
+/// more mark bits.
+pub struct MarkedPtr<T, N = U0> {
     inner: *mut T,
     _marker: PhantomData<N>,
 }
@@ -38,9 +52,9 @@ pub struct MarkedPtr<T, N> {
 // MarkedNonNull
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Doc...
+/// A non-nullable marked raw pointer type like [`NonNull`](std::ptr::NonNull).
 #[derive(Eq, Ord)]
-pub struct MarkedNonNull<T, N> {
+pub struct MarkedNonNull<T, N = U0> {
     inner: NonNull<T>,
     _marker: PhantomData<N>,
 }
@@ -49,7 +63,8 @@ pub struct MarkedNonNull<T, N> {
 // helper functions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Decomposes the integer representation of a marked pointer into a raw pointer and the tag.
+/// Decomposes the integer representation of a marked pointer into a
+/// raw pointer and its tag.
 #[inline]
 const fn decompose<T>(marked: usize, mark_bits: usize) -> (*mut T, usize) {
     (
@@ -58,26 +73,30 @@ const fn decompose<T>(marked: usize, mark_bits: usize) -> (*mut T, usize) {
     )
 }
 
-/// Decomposes the integer representation of a marked pointer into the raw pointer stripped of the
-/// tag.
+/// Decomposes the integer representation of a marked pointer into
+/// a raw pointer stripped of its tag.
 #[inline]
 const fn decompose_ptr<T>(marked: usize, mark_bits: usize) -> *mut T {
     (marked & !mark_mask::<T>(mark_bits)) as *mut _
 }
 
-/// Decomposes the integer representation of a marked pointer into only the tag.
+/// Decomposes the integer representation of a marked pointer into
+/// *only* the tag.
 #[inline]
 const fn decompose_tag<T>(marked: usize, mark_bits: usize) -> usize {
     marked & mark_mask::<T>(mark_bits)
 }
 
-/// Returns the bitmask of markable lower bits of a type's pointer.
+/// Gets the number of unused (markable) lower bits in a pointer for
+/// type `T`.
 #[inline]
 const fn lower_bits<T>() -> usize {
     mem::align_of::<T>().trailing_zeros() as usize
 }
 
-/// TODO: Doc...
+/// Gets the integer representation for the bitmask of markable lower
+/// bits of a pointer for type `T`.
+#[deny(const_err)]
 #[inline]
 const fn mark_mask<T>(mark_bits: usize) -> usize {
     let _assert_sufficient_alignment = lower_bits::<T>() - mark_bits;

@@ -10,7 +10,7 @@ unsafe impl<T, N: Unsigned> Send for AtomicMarkedPtr<T, N> {}
 unsafe impl<T, N: Unsigned> Sync for AtomicMarkedPtr<T, N> {}
 
 impl<T, N> AtomicMarkedPtr<T, N> {
-    /// TODO: Doc...
+    /// Creates a new `AtomicMarkedPtr`.
     #[inline]
     pub const fn new(ptr: MarkedPtr<T, N>) -> Self {
         Self {
@@ -19,7 +19,7 @@ impl<T, N> AtomicMarkedPtr<T, N> {
         }
     }
 
-    /// TODO: Doc...
+    /// Creates a new & unmarked `null` pointer.
     #[inline]
     pub const fn null() -> Self {
         Self::new(MarkedPtr::null())
@@ -34,31 +34,95 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     /// The bitmask for the (higher) pointer bits.
     pub const POINTER_MASK: usize = !Self::MARK_MASK;
 
-    /// TODO: Doc...
+    /// Consumes `self` and returns the inner [`MarkedPtr`](crate::marked::MarkedPtr)
     #[inline]
     pub fn into_inner(self) -> MarkedPtr<T, N> {
         MarkedPtr::new(self.inner.into_inner())
     }
 
-    /// TODO: Doc...
+    /// Loads a value from the pointer.
+    ///
+    /// `load` takes an [`Ordering`][ordering] argument which describes the memory
+    /// ordering of this operation. Possible values are [`SeqCst`][seq_cst],
+    /// [`Acquire`][acquire] and [`Relaxed`][relaxed].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: std::sync::atomic::Ordering
+    /// [relaxed]: std::sync::atomic::Ordering::Relaxed
+    /// [acquire]: std::sync::atomic::Ordering::Acquire
+    /// [release]: std::sync::atomic::Ordering::Release
+    /// [acq_rel]: std::sync::atomic::Ordering::AcqRel
+    /// [seq_cst]: std::sync::atomic::Ordering::SeqCst
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::atomic::Ordering;
+    ///
+    /// type MarkedPtr<T> = reclaim::MarkedPtr<T, reclaim::typenum::U1>;
+    /// type AtomicMarkedPtr<T> = reclaim::AtomicMarkedPtr<T, reclaim::typenum::U1>;
+    ///
+    /// let ptr = &mut 5;
+    /// let marked = MarkedPtr::compose(ptr, 0b1);
+    /// let atomic = AtomicMarkedPtr::new(marked);
+    ///
+    /// let value = atomic.load(Ordering::Relaxed);
+    /// assert_eq!((Some(&mut 5), 0b1), unsafe { value.decompose_mut() });
+    /// ```
     #[inline]
     pub fn load(&self, order: Ordering) -> MarkedPtr<T, N> {
         MarkedPtr::new(self.inner.load(order))
     }
 
-    /// TODO: Doc...
+    /// Stores a value into the pointer.
+    ///
+    /// `store` takes an [`Ordering`][ordering] argument which describes the memory
+    /// ordering of this operation. Possible values are [`SeqCst`][seq_cst],
+    /// [`Release`][release] and [`Relaxed`][relaxed].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is [`Acquire`][acquire] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: std::sync::atomic::Ordering
+    /// [relaxed]: std::sync::atomic::Ordering::Relaxed
+    /// [acquire]: std::sync::atomic::Ordering::Acquire
+    /// [release]: std::sync::atomic::Ordering::Release
+    /// [acq_rel]: std::sync::atomic::Ordering::AcqRel
+    /// [seq_cst]: std::sync::atomic::Ordering::SeqCst
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::atomic::Ordering;
+    ///
+    /// type MarkedPtr<T> = reclaim::MarkedPtr<T, reclaim::typenum::U0>;
+    /// type AtomicMarkedPtr<T> = reclaim::AtomicMarkedPtr<T, reclaim::typenum::U0>;
+    ///
+    /// let ptr = &mut 5;
+    /// let marked = MarkedPtr::new(ptr);
+    /// let atomic = AtomicMarkedPtr::new(marked);
+    ///
+    /// let other_marked = MarkedPtr::new(&mut 10);
+    ///
+    /// atomic.store(other_marked, Ordering::Relaxed);
+    /// ```
     #[inline]
     pub fn store(&self, ptr: MarkedPtr<T, N>, order: Ordering) {
         self.inner.store(ptr.inner, order);
     }
 
-    /// TODO: Doc...
+    /// Stores a value into the pointer, returning the previous value.
     #[inline]
     pub fn swap(&self, ptr: MarkedPtr<T, N>, order: Ordering) -> MarkedPtr<T, N> {
         MarkedPtr::new(self.inner.swap(ptr.inner, order))
     }
 
-    /// TODO: Doc...
+    /// Stores a value into the pointer if the current value is the same
+    /// as `current`.
     #[inline]
     pub fn compare_and_swap(
         &self,
@@ -69,7 +133,8 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
         MarkedPtr::new(self.inner.compare_and_swap(current.inner, new.inner, order))
     }
 
-    /// TODO: Doc...
+    /// Stores a value into the pointer if the current value is the same
+    /// as `current`.
     #[inline]
     pub fn compare_exchange(
         &self,
@@ -84,7 +149,8 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
             .map_err(MarkedPtr::new)
     }
 
-    /// TODO: Doc...
+    /// Stores a value into the pointer if the current value is the same
+    /// as `current`.
     #[inline]
     pub fn compare_exchange_weak(
         &self,

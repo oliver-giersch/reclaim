@@ -13,21 +13,25 @@ pub trait MarkedPointer: Sized + Internal {
     /// Number of bits available for storing additional information
     type MarkBits: Unsigned;
 
-    /// TODO: Doc...
+    /// Gets the tag value of the marked pointer.
+    ///
+    /// In the case that `&self` is a `None` (i.e. a `null` pointer),
+    /// the returned value is always `0`.
     fn tag(&self) -> usize {
         self.as_marked().decompose_tag()
     }
 
-    /// TODO: Doc...
+    /// Consumes `self` and returns the same value but with stripped
+    /// of its tag.
     fn strip_tag(self) -> Self {
         let ptr = self.into_marked().decompose_ptr();
         unsafe { Self::from_marked(MarkedPtr::new(ptr)) }
     }
 
-    /// TODO: Doc...
+    /// Gets the raw inner marked pointer.
     fn as_marked(&self) -> MarkedPtr<Self::Item, Self::MarkBits>;
 
-    /// Consumes `self` and returns a marked pointer
+    /// Consumes `self` and returns the raw inner marked pointer.
     fn into_marked(self) -> MarkedPtr<Self::Item, Self::MarkBits>;
 
     /// Constructs a `Self` from a raw marked pointer.
@@ -160,7 +164,12 @@ macro_rules! impl_inherent {
             None
         }
 
-        /// TODO: Doc...
+        /// Creates a new [`Option<Self>`](std::option::Option) from a marked pointer.
+        ///
+        /// # Safety
+        ///
+        /// The caller has to ensure `marked` is either `null` or a valid pointer to a heap
+        /// allocated value of the appropriate `Self` type.
         #[inline]
         pub unsafe fn try_from_marked(marked: $crate::marked::MarkedPtr<T, N>) -> Option<Self> {
             $crate::marked::MarkedNonNull::new(marked).map(|ptr| Self {
@@ -169,13 +178,13 @@ macro_rules! impl_inherent {
             })
         }
 
-        /// TODO: Doc...
+        /// Consumes `self` and returns the raw inner non-null marked pointer.
         #[inline]
         pub fn into_marked_non_null(self) -> $crate::marked::MarkedNonNull<T, N> {
             self.inner
         }
 
-        /// TODO: Doc...
+        /// Consumes `self` and returns the same value but with the specified `tag`.
         #[inline]
         pub fn with_tag(self, tag: usize) -> Self {
             Self {
