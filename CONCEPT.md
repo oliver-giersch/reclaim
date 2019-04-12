@@ -28,15 +28,21 @@ as it would allow removing the dependency on the `memoffset` crate.
 
 ### Primary Traits
 
-#### GlobalReclaim
+#### Reclaim
 
-The `GlobalReclaim` trait will replace the current `Reclaim` trait.
+The `Reclaim` trait will remain largely unchanged, but most of its requirements
+are moved into the `LocalReclaim` trait, which it has to extend. 
 If the implemented reclamation scheme requires management of thread local
 state, it will be only usable in `std` environments, where thread local
 variables can be accessed like statics (with the `thread_local` macro).
 
+Most reclamation schemes do not strictly require thread local state in order
+to function, but frequently make use of thread local storage for the sake of
+performance and efficiency, as allows costly writes to shared memory to be
+delayed or avoided.
+
 ```rust
-pub trait GlobalReclaim: Reclaim + Sync {
+pub trait Reclaim: LocalReclaim + Sync {
     // allows using the trait in a fully generic manner, but requires GAT
     fn guarded<T, const N: usize>() -> Self::Guarded<T, N>;
     unsafe fn retire<T: 'static, const N: usize>(unlinked: Unlinked<T, Self, N>);
@@ -44,11 +50,15 @@ pub trait GlobalReclaim: Reclaim + Sync {
 }
 ```
 
-#### Reclaim
+Most implementations of this trait will use the underlying methods of the `LocalReclaim`
+trait and supply the `&Self::Local` argument from thread local state.
+Otherwise, they can e.g. just supply a default `&()` argument, if no local state needs
+to be managed.
 
-The `Reclaim` trait will become `#[no_std]` compatible and receive an additional `Allocator`
-associated type, through which a custom allocator can be specified.
+#### LocalReclaim
 
+The `LocalReclaim` trait will be the `#[no_std]` compatible foundational trait for `Reclaim`.
+Custom allocators can be specified with the additional `Allocator` associated type.
 It is not yet clear, exactly which trait the `Allocator` type must be bound by.
 The current assumption/premise is, that an allocator that is usable for concurrent memory
 reclamation can **impossibly** be stateful and must function like a global allocator, but
@@ -60,7 +70,7 @@ This is applicable, if a reclamation scheme does not require any thread local st
 managed.
 
 ```rust
-pub trait Reclaim: Sized  {
+pub trait LocalReclaim: Sized  {
     type Allocator: GlobalAlloc; // or some other trait
     // needs GAT
     type Guarded<T, const N: usize>: Protect<Item = T, Reclaimer = Self, MARK_BITS = N>;
@@ -79,6 +89,11 @@ pub trait Reclaim: Sized  {
     );
 }
 ```
+
+Any reclamation scheme can and must implement this trait.
+Implementing the `Reclaim` trait is strictly optional but is the correct thing to do, if a reclamation
+scheme does either not require any actual thread local state or exists in an environment, which can
+use thread local statics.
 
 #### Protect
 
@@ -124,3 +139,50 @@ to consist of the following:
 - `AtomicMarkedPtr`
 - `MarkedPtr`
 - `MarkedNonNull`
+
+These types will remain largely unchanged, but their definition will be adjusted to use
+`const generics` for the generic type parameter `N` like so:
+
+```rust
+pub struct MarkedPtr<T, const N: usize = 0> {
+    ...
+}
+````
+
+The implicit trait bound `T: Sized` will not be relaxed primarily for two reasons:
+
+- fat pointers can not be read/written on 64-bit architectures
+- unsized types have undetermined alignment, which is required to determine the
+  number of mark bits
+  
+#### Atomic
+
+The primary `Atomic` type will remain largely unchanged:
+
+```rust
+pub struct Atomic<T, R, const N: usize = 0> {
+    ...
+}
+```
+
+Its API will continue to be oriented on the API of `Option` and `AtomicPtr`.
+
+#### Owned
+
+The `Box` like but markable `Owned` type must be defined as follows:
+
+```rust
+pub struct Owned<T, R: LocalReclaim, const N: usize> {
+    ...
+}
+```
+
+The `LocalReclaim` trait bound must be part of the type definition because it is required for
+correctly dropping and correctly deallocating an `Owned`.
+
+
+#### Non-nullable Pointers
+
+- `Shared`
+- `Unlinked`
+- `Unprotected`
