@@ -120,9 +120,6 @@ where
     /// Reclamation scheme associated with this type of guard
     type Reclaimer: Reclaim;
 
-    /// Creates a new empty instance of `Self`.
-    fn new() -> Self;
-
     /// Gets a shared reference to the protected value that is tied to the lifetime of `&self`
     fn shared(&self) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>;
 
