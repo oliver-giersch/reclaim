@@ -70,7 +70,7 @@ unsafe impl Reclaim for Leaking {
     unsafe fn retire_unchecked<T, N: Unsigned>(_: Unlinked<T, N>) {}
 }
 
-impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
+unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
     type Item = T;
     type MarkBits = N;
     type Reclaimer = Leaking;
