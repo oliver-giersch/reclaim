@@ -111,7 +111,7 @@ where
 /// during their lifetime.
 pub unsafe trait Protect
 where
-    Self: Sized + Clone + Default,
+    Self: Sized + Clone,
 {
     /// Generic type of value protected from reclamation
     type Item: Sized;
