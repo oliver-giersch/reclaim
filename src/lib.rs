@@ -109,7 +109,7 @@ where
 
 /// A trait for representing pointer types that *protect* their pointed-to value from reclamation
 /// during their lifetime.
-pub trait Protect
+pub unsafe trait Protect
 where
     Self: Sized + Clone + Default,
 {
