@@ -5,20 +5,20 @@ use typenum::Unsigned;
 
 use crate::marked::MarkedNonNull;
 use crate::pointer::{Internal, MarkedPointer};
-use crate::{Reclaim, Unlinked};
+use crate::{LocalReclaim, Reclaim, Unlinked};
 
 impl<T, R, N> Internal for Unlinked<T, R, N> {}
 impl<T, R, N> Internal for Option<Unlinked<T, R, N>> {}
 
-impl<T, R: Reclaim, N: Unsigned> MarkedPointer for Unlinked<T, R, N> {
+impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unlinked<T, R, N> {
     impl_marked_pointer!();
 }
 
-impl<T, R: Reclaim, N: Unsigned> MarkedPointer for Option<Unlinked<T, R, N>> {
+impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Unlinked<T, R, N>> {
     impl_marked_pointer_option!();
 }
 
-impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
+impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     impl_inherent!();
 
     /// TODO: Doc...
@@ -35,6 +35,23 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
 
     /// TODO: Doc...
     #[inline]
+    pub unsafe fn retire_local(self, local: &R::Local)
+    where
+        T: 'static,
+    {
+        R::retire_local(local, self)
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub unsafe fn retire_local_unchecked(self, local: &R::Local) {
+        R::retire_local_unchecked(local, self)
+    }
+}
+
+impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
+    /// TODO: Doc...
+    #[inline]
     pub unsafe fn retire(self)
     where
         T: 'static,
@@ -49,7 +66,7 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
     }
 }
 
-impl<T, R: Reclaim, N: Unsigned> fmt::Debug for Unlinked<T, R, N> {
+impl<T, R: LocalReclaim, N: Unsigned> fmt::Debug for Unlinked<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (ptr, tag) = self.inner.decompose();
@@ -60,7 +77,7 @@ impl<T, R: Reclaim, N: Unsigned> fmt::Debug for Unlinked<T, R, N> {
     }
 }
 
-impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Unlinked<T, R, N> {
+impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Unlinked<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)

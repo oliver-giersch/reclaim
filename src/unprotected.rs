@@ -5,7 +5,7 @@ use typenum::Unsigned;
 
 use crate::marked::MarkedNonNull;
 use crate::pointer::{Internal, MarkedPointer};
-use crate::{Reclaim, Unprotected};
+use crate::{LocalReclaim, Unprotected};
 
 impl<T, R, N> Internal for Unprotected<T, R, N> {}
 impl<T, R, N> Internal for Option<Unprotected<T, R, N>> {}
@@ -20,17 +20,17 @@ impl<T, R, N> Clone for Unprotected<T, R, N> {
     }
 }
 
-impl<T, R: Reclaim, N> Copy for Unprotected<T, R, N> {}
+impl<T, R: LocalReclaim, N> Copy for Unprotected<T, R, N> {}
 
-impl<T, R: Reclaim, N: Unsigned> MarkedPointer for Unprotected<T, R, N> {
+impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unprotected<T, R, N> {
     impl_marked_pointer!();
 }
 
-impl<T, R: Reclaim, N: Unsigned> MarkedPointer for Option<Unprotected<T, R, N>> {
+impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Unprotected<T, R, N>> {
     impl_marked_pointer_option!();
 }
 
-impl<T, R: Reclaim, N: Unsigned> Unprotected<T, R, N> {
+impl<T, R: LocalReclaim, N: Unsigned> Unprotected<T, R, N> {
     impl_inherent!();
 
     /// TODO: Doc...
@@ -47,7 +47,7 @@ impl<T, R: Reclaim, N: Unsigned> Unprotected<T, R, N> {
     }
 }
 
-impl<T, R: Reclaim, N: Unsigned> fmt::Debug for Unprotected<T, R, N> {
+impl<T, R: LocalReclaim, N: Unsigned> fmt::Debug for Unprotected<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (ptr, tag) = self.inner.decompose();
@@ -58,7 +58,7 @@ impl<T, R: Reclaim, N: Unsigned> fmt::Debug for Unprotected<T, R, N> {
     }
 }
 
-impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Unprotected<T, R, N> {
+impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Unprotected<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)

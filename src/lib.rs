@@ -66,12 +66,8 @@ pub use crate::pointer::MarkedPointer;
 /// A trait for retiring and reclaiming entries in concurrent collections and data structures.
 pub unsafe trait Reclaim
 where
-    Self: Sized,
+    Self: LocalReclaim,
 {
-    /// Every reclaimable record allocates this type alongside to store additional reclamation
-    /// scheme specific data. When no such data is necessary, `()` is the recommended choice.
-    type RecordHeader: Default + Sized;
-
     /// Retires a record and caches it **at least** until it is safe to deallocate it, i.e. when no
     /// other threads can possibly have any live references to it.
     ///
@@ -103,6 +99,77 @@ where
     unsafe fn retire_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, Self, N>);
 }
 
+unsafe impl<R> Reclaim for R
+where
+    R: LocalReclaim<Local = ()>,
+{
+    #[inline]
+    unsafe fn retire<T: 'static, N: Unsigned>(unlinked: Unlinked<T, Self, N>) {
+        Self::retire_local(&(), unlinked)
+    }
+
+    #[inline]
+    unsafe fn retire_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, Self, N>) {
+        Self::retire_local_unchecked(&(), unlinked)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// RetireLocal (trait)
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO: Doc...
+pub unsafe trait LocalReclaim
+where
+    Self: Sized,
+{
+    // TODO: type Allocator;
+    // TODO: type Guarded<T, const N: usize>: Protect<Item = T, MARK_BITS = N>;
+
+    /// TODO: Doc...
+    type Local: Sized;
+
+    /// Every reclaimable record allocates this type alongside to store additional reclamation
+    /// scheme specific data. When no such data is necessary, `()` is the recommended choice.
+    type RecordHeader: Default + Sized;
+
+    /// Retires a record and caches it **at least** until it is safe to deallocate it, i.e. when no
+    /// other threads can possibly have any live references to it.
+    ///
+    /// # Safety
+    ///
+    /// The caller has to guarantee that the record is *actually* unlinked from its data structure,
+    /// i.e. there is no way for another thread to acquire a new reference to it. While an
+    /// `Unlinked` can only be safely obtained by atomic operations that do in fact unlink a value,
+    /// it is still possible to enter the same record twice into the same data structure using only
+    /// safe code.
+    unsafe fn retire_local<T: 'static, N: Unsigned>(
+        local: &Self::Local,
+        unlinked: Unlinked<T, Self, N>,
+    );
+
+    /// Retires a record and caches it **at least** until it is safe to deallocate it, i.e. when no
+    /// other threads can possibly have any live references to it.
+    ///
+    /// # Safety
+    ///
+    /// The caller has to guarantee that the record is *actually* unlinked from its data structure,
+    /// i.e. there is no way for another thread to acquire a new reference to it. While an
+    /// `Unlinked` can only be safely obtained by atomic operations that do in fact unlink a value,
+    /// it is still possible to enter the same record twice into the same data structure using only
+    /// safe code.
+    ///
+    /// In addition to these invariant, this method additionally requires the caller to ensure the
+    /// `Drop` implementation for `T` (if any) does not access any **non-static** references. The
+    /// `Reclaim` interface makes no guarantees about the precise time a retired record is actually
+    /// reclaimed. Hence it is not possible to ensure any references stored within the record have
+    /// not become invalid.
+    unsafe fn retire_local_unchecked<T, N: Unsigned>(
+        local: &Self::Local,
+        unlinked: Unlinked<T, Self, N>,
+    );
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Protect (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,7 +183,7 @@ where
     /// Generic type of value protected from reclamation
     type Item: Sized;
     /// Reclamation scheme associated with this type of guard
-    type Reclaimer: Reclaim;
+    type Reclaimer: LocalReclaim;
     /// Number of bits available for storing additional information
     type MarkBits: Unsigned;
 
@@ -175,12 +242,12 @@ pub struct NotEqual;
 /// Whenever a new `Owned` or (non-null) `Atomic` is created a value of this type is allocated on
 /// the heap. The record and its header is never exposed to the data structure using a given memory
 /// reclamation scheme and should only be accessed by the reclamation scheme itself.
-pub struct Record<T, R: Reclaim> {
+pub struct Record<T, R: LocalReclaim> {
     header: R::RecordHeader,
     elem: T,
 }
 
-impl<T, R: Reclaim> Record<T, R> {
+impl<T, R: LocalReclaim> Record<T, R> {
     /// Creates a new record with the specified `elem` and a default header.
     #[inline]
     pub fn new(elem: T) -> Self {
@@ -259,7 +326,7 @@ impl<T, R: Reclaim> Record<T, R> {
 /// guaranteed to allocate the appropriate [`Record`] type for its generic [`Reclaim`] type
 /// parameter alongside its owned value.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
-pub struct Owned<T, R: Reclaim, N: Unsigned> {
+pub struct Owned<T, R: LocalReclaim, N: Unsigned> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<(T, R)>,
 }

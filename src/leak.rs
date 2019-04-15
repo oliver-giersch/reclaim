@@ -5,7 +5,7 @@ use core::sync::atomic::Ordering;
 use typenum::Unsigned;
 
 use crate::marked::MarkedPtr;
-use crate::{AcquireResult, Protect, Reclaim};
+use crate::{AcquireResult, LocalReclaim, Protect};
 
 /// An [`Atomic`](../struct.Atomic.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme
 pub type Atomic<T, N> = crate::Atomic<T, Leaking, N>;
@@ -57,7 +57,9 @@ impl Default for Header {
     }
 }
 
-unsafe impl Reclaim for Leaking {
+unsafe impl LocalReclaim for Leaking {
+    type Local = ();
+
     #[cfg(test)]
     type RecordHeader = Header;
     #[cfg(not(test))]
@@ -65,16 +67,16 @@ unsafe impl Reclaim for Leaking {
 
     /// Leaks the given value.
     #[inline]
-    unsafe fn retire<T: 'static, N: Unsigned>(_: Unlinked<T, N>) {}
+    unsafe fn retire_local<T: 'static, N: Unsigned>(_: &(), _: Unlinked<T, N>) {}
     /// Leaks the given value.
     #[inline]
-    unsafe fn retire_unchecked<T, N: Unsigned>(_: Unlinked<T, N>) {}
+    unsafe fn retire_local_unchecked<T, N: Unsigned>(_: &(), _: Unlinked<T, N>) {}
 }
 
 unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
     type Item = T;
-    type MarkBits = N;
     type Reclaimer = Leaking;
+    type MarkBits = N;
 
     /// Gets the optional [`Shared`](crate::Shared) value for the guard.
     #[inline]
