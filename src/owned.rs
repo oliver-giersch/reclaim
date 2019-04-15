@@ -18,10 +18,10 @@ use crate::{Owned, Reclaim, Record, Shared};
 // impl Internal, Clone, Copy
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, N: Unsigned, R: Reclaim> Internal for Owned<T, N, R> {}
-impl<T, N: Unsigned, R: Reclaim> Internal for Option<Owned<T, N, R>> {}
+impl<T, R: Reclaim, N: Unsigned> Internal for Owned<T, R, N> {}
+impl<T, R: Reclaim, N: Unsigned> Internal for Option<Owned<T, R, N>> {}
 
-impl<T: Clone, N: Unsigned, R: Reclaim> Clone for Owned<T, N, R> {
+impl<T: Clone, R: Reclaim, N: Unsigned> Clone for Owned<T, R, N> {
     #[inline]
     fn clone(&self) -> Self {
         let (reference, tag) = unsafe { self.inner.decompose_ref() };
@@ -33,14 +33,14 @@ impl<T: Clone, N: Unsigned, R: Reclaim> Clone for Owned<T, N, R> {
 // impl Send, Sync
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-unsafe impl<T, N: Unsigned, R: Reclaim> Send for Owned<T, N, R> where T: Send {}
-unsafe impl<T, N: Unsigned, R: Reclaim> Sync for Owned<T, N, R> where T: Sync {}
+unsafe impl<T, R: Reclaim, N: Unsigned> Send for Owned<T, R, N> where T: Send {}
+unsafe impl<T, R: Reclaim, N: Unsigned> Sync for Owned<T, R, N> where T: Sync {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // impl MarkedPointer
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, N: Unsigned, R: Reclaim> MarkedPointer for Owned<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
     type Item = T;
     type MarkBits = N;
 
@@ -70,11 +70,11 @@ impl<T, N: Unsigned, R: Reclaim> MarkedPointer for Owned<T, N, R> {
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> MarkedPointer for Option<Owned<T, N, R>> {
+impl<T, R: Reclaim, N: Unsigned> MarkedPointer for Option<Owned<T, R, N>> {
     impl_marked_pointer_option!();
 }
 
-impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> Owned<T, R, N> {
     /// Allocates memory for a [`Record<T>`](Record) on the heap and then
     /// places a record with a default header and `owned` into it.
     ///
@@ -154,7 +154,7 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     /// [shared]: crate::Shared
     /// [deref]: crate::Shared::deref
     #[inline]
-    pub fn leak_shared<'a>(owned: Self) -> Shared<'a, T, N, R> {
+    pub fn leak_shared<'a>(owned: Self) -> Shared<'a, T, R, N> {
         let inner = owned.inner;
         mem::forget(owned);
 
@@ -172,35 +172,35 @@ impl<T, N: Unsigned, R: Reclaim> Owned<T, N, R> {
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> AsRef<T> for Owned<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> AsRef<T> for Owned<T, R, N> {
     #[inline]
     fn as_ref(&self) -> &T {
         &**self
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> AsMut<T> for Owned<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> AsMut<T> for Owned<T, R, N> {
     #[inline]
     fn as_mut(&mut self) -> &mut T {
         &mut **self
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> Borrow<T> for Owned<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> Borrow<T> for Owned<T, R, N> {
     #[inline]
     fn borrow(&self) -> &T {
         &**self
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> BorrowMut<T> for Owned<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> BorrowMut<T> for Owned<T, R, N> {
     #[inline]
     fn borrow_mut(&mut self) -> &mut T {
         &mut **self
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> Deref for Owned<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> Deref for Owned<T, R, N> {
     type Target = T;
 
     #[inline]
@@ -209,14 +209,14 @@ impl<T, N: Unsigned, R: Reclaim> Deref for Owned<T, N, R> {
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> DerefMut for Owned<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> DerefMut for Owned<T, R, N> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.inner.as_mut() }
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> Drop for Owned<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> Drop for Owned<T, R, N> {
     #[inline]
     fn drop(&mut self) {
         unsafe {
@@ -228,24 +228,25 @@ impl<T, N: Unsigned, R: Reclaim> Drop for Owned<T, N, R> {
     }
 }
 
-impl<T: Default, N: Unsigned, R: Reclaim> Default for Owned<T, N, R> {
+impl<T: Default, R: Reclaim, N: Unsigned> Default for Owned<T, R, N> {
     #[inline]
     fn default() -> Self {
         Owned::new(T::default())
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> From<T> for Owned<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> From<T> for Owned<T, R, N> {
     #[inline]
     fn from(owned: T) -> Self {
         Owned::new(owned)
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> fmt::Debug for Owned<T, N, R>
+impl<T, R: Reclaim, N: Unsigned> fmt::Debug for Owned<T, R, N>
 where
     T: fmt::Debug,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (reference, tag) = unsafe { self.inner.decompose_ref() };
         f.debug_struct("Owned")
@@ -255,7 +256,8 @@ where
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> fmt::Pointer for Owned<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Owned<T, R, N> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)
     }
@@ -268,7 +270,7 @@ mod test {
     use crate::leak::Leaking;
     use crate::prelude::*;
 
-    type Owned<T> = super::Owned<T, U2, Leaking>;
+    type Owned<T> = super::Owned<T, Leaking, U2>;
 
     #[test]
     fn new() {

@@ -82,7 +82,7 @@ where
     /// `Unlinked` can only be safely obtained by atomic operations that do in fact unlink a value,
     /// it is still possible to enter the same record twice into the same data structure using only
     /// safe code.
-    unsafe fn retire<T: 'static, N: Unsigned>(unlinked: Unlinked<T, N, Self>);
+    unsafe fn retire<T: 'static, N: Unsigned>(unlinked: Unlinked<T, Self, N>);
 
     /// Retires a record and caches it **at least** until it is safe to deallocate it, i.e. when no
     /// other threads can possibly have any live references to it.
@@ -100,7 +100,7 @@ where
     /// `Reclaim` interface makes no guarantees about the precise time a retired record is actually
     /// reclaimed. Hence it is not possible to ensure any references stored within the record have
     /// not become invalid.
-    unsafe fn retire_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, N, Self>);
+    unsafe fn retire_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, Self, N>);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,13 +115,13 @@ where
 {
     /// Generic type of value protected from reclamation
     type Item: Sized;
-    /// Number of bits available for storing additional information
-    type MarkBits: Unsigned;
     /// Reclamation scheme associated with this type of guard
     type Reclaimer: Reclaim;
+    /// Number of bits available for storing additional information
+    type MarkBits: Unsigned;
 
     /// Gets a shared reference to the protected value that is tied to the lifetime of `&self`
-    fn shared(&self) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>;
+    fn shared(&self) -> Option<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>;
 
     /// Atomically takes a snapshot of `atomic`'s value and returns a shared and protected reference
     /// to it.
@@ -131,9 +131,9 @@ where
     /// value.
     fn acquire(
         &mut self,
-        atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
+        atomic: &Atomic<Self::Item, Self::Reclaimer, Self::MarkBits>,
         order: Ordering,
-    ) -> Option<Shared<Self::Item, Self::MarkBits, Self::Reclaimer>>;
+    ) -> Option<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>;
 
     /// Atomically takes a snapshot of `atomic`'s value and returns a shared and protected reference
     /// to it if the loaded value is equal to `expected`.
@@ -149,10 +149,10 @@ where
     /// snapshot from `atomic` does not match the `expected` value.
     fn acquire_if_equal(
         &mut self,
-        atomic: &Atomic<Self::Item, Self::MarkBits, Self::Reclaimer>,
+        atomic: &Atomic<Self::Item, Self::Reclaimer, Self::MarkBits>,
         expected: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
-    ) -> AcquireResult<Self::Item, Self::MarkBits, Self::Reclaimer>;
+    ) -> AcquireResult<Self::Item, Self::Reclaimer, Self::MarkBits>;
 
     /// Releases the currently protected value, which is no longer guaranteed to be protected
     /// afterwards.
@@ -160,7 +160,7 @@ where
 }
 
 /// Result type for [`acquire_if_equal`](Protect::acquire_if_equal) operations.
-pub type AcquireResult<'g, T, N, R> = Result<Option<Shared<'g, T, N, R>>, NotEqual>;
+pub type AcquireResult<'g, T, R, N> = Result<Option<Shared<'g, T, R, N>>, NotEqual>;
 
 /// A zero-size marker type that represents the failure state of an `acquire_if_equal` operation.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
@@ -259,7 +259,7 @@ impl<T, R: Reclaim> Record<T, R> {
 /// guaranteed to allocate the appropriate [`Record`] type for its generic [`Reclaim`] type
 /// parameter alongside its owned value.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
-pub struct Owned<T, N: Unsigned, R: Reclaim> {
+pub struct Owned<T, R: Reclaim, N: Unsigned> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<(T, R)>,
 }
@@ -273,7 +273,7 @@ pub struct Owned<T, N: Unsigned, R: Reclaim> {
 /// Valid `Shared` values are always borrowed from guard values implementing the
 /// [`Protect`](Protect) trait.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
-pub struct Shared<'g, T, N, R> {
+pub struct Shared<'g, T, R, N> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<(&'g T, R)>,
 }
@@ -295,7 +295,7 @@ pub struct Shared<'g, T, N, R> {
 /// created before the value was unlinked.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
 #[must_use = "unlinked values are meant to be retired, otherwise a memory leak is highly likely"]
-pub struct Unlinked<T, N, R> {
+pub struct Unlinked<T, R, N> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<(T, R)>,
 }
@@ -307,7 +307,7 @@ pub struct Unlinked<T, N, R> {
 /// A non-null value loaded from an [`Atomic`](Atomic) but without any guarantees
 /// protecting it from reclamation.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
-pub struct Unprotected<T, N, R> {
+pub struct Unprotected<T, R, N> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<R>,
 }

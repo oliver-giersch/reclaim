@@ -39,8 +39,8 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     ///
     /// `ptr` may be marked, but must be non-null.
     #[inline]
-    pub unsafe fn new_unchecked(ptr: impl Into<MarkedPtr<T, N>>) -> Self {
-        Self::from(NonNull::new_unchecked(ptr.into().inner))
+    pub unsafe fn new_unchecked(ptr: MarkedPtr<T, N>) -> Self {
+        Self::from(NonNull::new_unchecked(ptr.inner))
     }
 
     /// Creates a new `MarkedNonNull` if `ptr` is non-null.
@@ -48,8 +48,8 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// `ptr` may be marked, but the tag will be discarded, when `ptr` is null and only `None` is
     /// returned.
     #[inline]
-    pub fn new(ptr: impl Into<MarkedPtr<T, N>>) -> Option<Self> {
-        match marked::decompose::<T>(ptr.into().into_usize(), Self::MARK_BITS) {
+    pub fn new(ptr: MarkedPtr<T, N>) -> Option<Self> {
+        match marked::decompose::<T>(ptr.into_usize(), Self::MARK_BITS) {
             (raw, _) if raw.is_null() => None,
             (raw, tag) => Some(MarkedNonNull::compose(
                 unsafe { NonNull::new_unchecked(raw) },
@@ -81,7 +81,7 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
         MarkedPtr::new(self.inner.as_ptr())
     }
 
-    /// TODO: Doc...
+    /// Composes a new marked non-null pointer from a non-null pointer and a tag value.
     #[inline]
     pub fn compose(ptr: NonNull<T>, tag: usize) -> Self {
         debug_assert_eq!(

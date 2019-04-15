@@ -21,15 +21,15 @@ use crate::{NotEqual, Owned, Protect, Reclaim, Shared, Unlinked, Unprotected};
 /// automatically take care of memory deallocation when it goes out of scope.
 /// Use the [`take`](Atomic::take) method to extract an (optional) [`Owned`](crate::Owned) value,
 /// which *does* correctly deallocate memory when it goes out of scope.
-pub struct Atomic<T, N, R> {
+pub struct Atomic<T, R, N> {
     inner: AtomicMarkedPtr<T, N>,
     _marker: PhantomData<(T, R)>,
 }
 
-unsafe impl<T, N: Unsigned, R: Reclaim> Send for Atomic<T, N, R> where T: Send + Sync {}
-unsafe impl<T, N: Unsigned, R: Reclaim> Sync for Atomic<T, N, R> where T: Send + Sync {}
+unsafe impl<T, R: Reclaim, N: Unsigned> Send for Atomic<T, R, N> where T: Send + Sync {}
+unsafe impl<T, R: Reclaim, N: Unsigned> Sync for Atomic<T, R, N> where T: Send + Sync {}
 
-impl<T, N, R> Atomic<T, N, R> {
+impl<T, R, N> Atomic<T, R, N> {
     /// Creates a new `null` pointer.
     #[inline]
     pub const fn null() -> Self {
@@ -46,7 +46,7 @@ impl<T, N, R> Atomic<T, N, R> {
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
     /// Creates a new [`Atomic`](struct.Atomic.html) by allocating specified `val` on the heap.
     #[inline]
     pub fn new(val: T) -> Self {
@@ -89,7 +89,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
         &self,
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
-    ) -> Option<Shared<'g, T, N, R>> {
+    ) -> Option<Shared<'g, T, R, N>> {
         guard.acquire(&self, order)
     }
 
@@ -116,7 +116,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
         compare: MarkedPtr<T, N>,
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
-    ) -> Result<Option<Shared<'g, T, N, R>>, NotEqual> {
+    ) -> Result<Option<Shared<'g, T, R, N>>, NotEqual> {
         guard.acquire_if_equal(self, compare, order)
     }
 
@@ -131,7 +131,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     /// a linked list or a stack.
     ///
     #[inline]
-    pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, N, R>> {
+    pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, R, N>> {
         MarkedNonNull::new(self.inner.load(order)).map(|ptr| Unprotected {
             inner: ptr,
             _marker: PhantomData,
@@ -178,9 +178,9 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     #[inline]
     pub fn swap(
         &self,
-        ptr: impl Store<Item = T, MarkBits = N, Reclaimer = R>,
+        ptr: impl Store<Item = T, Reclaimer = R, MarkBits = N>,
         order: Ordering,
-    ) -> Option<Unlinked<T, N, R>> {
+    ) -> Option<Unlinked<T, R, N>> {
         let res = self.inner.swap(ptr.into_marked(), order);
         // this is safe because the pointer is no longer accessible by other threads
         // (there can still be outstanding references that were loaded before the swap)
@@ -221,7 +221,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
         new: S,
         success: Ordering,
         failure: Ordering,
-    ) -> Result<C::Unlinked, CompareExchangeFailure<T, N, R, S>>
+    ) -> Result<C::Unlinked, CompareExchangeFailure<T, R, S, N>>
     where
         C: Compare<Item = T, MarkBits = N, Reclaimer = R>,
         S: Store<Item = T, MarkBits = N, Reclaimer = R>,
@@ -276,7 +276,7 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
         new: S,
         success: Ordering,
         failure: Ordering,
-    ) -> Result<C::Unlinked, CompareExchangeFailure<T, N, R, S>>
+    ) -> Result<C::Unlinked, CompareExchangeFailure<T, R, S, N>>
     where
         C: Compare<Item = T, MarkBits = N, Reclaimer = R>,
         S: Store<Item = T, MarkBits = N, Reclaimer = R>,
@@ -303,30 +303,30 @@ impl<T, N: Unsigned, R: Reclaim> Atomic<T, N, R> {
     ///
     /// [owned]: crate::Owned
     #[inline]
-    pub fn take(&mut self) -> Option<Owned<T, N, R>> {
+    pub fn take(&mut self) -> Option<Owned<T, R, N>> {
         // this is safe because the mutable reference ensures no concurrent access is possible
         MarkedNonNull::new(self.inner.swap(MarkedPtr::null(), Ordering::Relaxed))
             .map(|ptr| unsafe { Owned::from_marked_non_null(ptr) })
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> Default for Atomic<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> Default for Atomic<T, R, N> {
     #[inline]
     fn default() -> Self {
         Self::null()
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> From<T> for Atomic<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> From<T> for Atomic<T, R, N> {
     #[inline]
     fn from(val: T) -> Self {
         Self::new(val)
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> From<Owned<T, N, R>> for Atomic<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> From<Owned<T, R, N>> for Atomic<T, R, N> {
     #[inline]
-    fn from(owned: Owned<T, N, R>) -> Self {
+    fn from(owned: Owned<T, R, N>) -> Self {
         Self {
             inner: AtomicMarkedPtr::from(Owned::into_marked(owned)),
             _marker: PhantomData,
@@ -334,7 +334,7 @@ impl<T, N: Unsigned, R: Reclaim> From<Owned<T, N, R>> for Atomic<T, N, R> {
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> fmt::Debug for Atomic<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> fmt::Debug for Atomic<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (ptr, tag) = self.inner.load(Ordering::SeqCst).decompose();
@@ -345,7 +345,7 @@ impl<T, N: Unsigned, R: Reclaim> fmt::Debug for Atomic<T, N, R> {
     }
 }
 
-impl<T, N: Unsigned, R: Reclaim> fmt::Pointer for Atomic<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Atomic<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.load(Ordering::SeqCst), f)
@@ -359,11 +359,11 @@ impl<T, N: Unsigned, R: Reclaim> fmt::Pointer for Atomic<T, N, R> {
 /// The returned error type for a failed [`compare_exchange`](Atomic::compare_exchange) or
 /// [`compare_exchange_weak`](Atomic::compare_exchange_weak) operation.
 #[derive(Debug)]
-pub struct CompareExchangeFailure<T, N, R, S>
+pub struct CompareExchangeFailure<T, R, S, N>
 where
-    N: Unsigned,
     R: Reclaim,
     S: Store<Item = T, MarkBits = N, Reclaimer = R>,
+    N: Unsigned,
 {
     /// The actually loaded value
     pub loaded: MarkedPtr<T, N>,
@@ -382,35 +382,35 @@ pub trait Store: MarkedPointer + Sized {
     type Reclaimer: Reclaim;
 }
 
-impl<T, N: Unsigned, R: Reclaim> Store for Owned<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> Store for Owned<T, R, N> {
     type Reclaimer = R;
 }
 
-impl<T, N: Unsigned, R: Reclaim> Store for Option<Owned<T, N, R>> {
+impl<T, R: Reclaim, N: Unsigned> Store for Option<Owned<T, R, N>> {
     type Reclaimer = R;
 }
 
-impl<'g, T, N: Unsigned, R: Reclaim> Store for Shared<'g, T, N, R> {
+impl<'g, T, R: Reclaim, N: Unsigned> Store for Shared<'g, T, R, N> {
     type Reclaimer = R;
 }
 
-impl<'g, T, N: Unsigned, R: Reclaim> Store for Option<Shared<'g, T, N, R>> {
+impl<'g, T, R: Reclaim, N: Unsigned> Store for Option<Shared<'g, T, R, N>> {
     type Reclaimer = R;
 }
 
-impl<T, N: Unsigned, R: Reclaim> Store for Unlinked<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> Store for Unlinked<T, R, N> {
     type Reclaimer = R;
 }
 
-impl<T, N: Unsigned, R: Reclaim> Store for Option<Unlinked<T, N, R>> {
+impl<T, R: Reclaim, N: Unsigned> Store for Option<Unlinked<T, R, N>> {
     type Reclaimer = R;
 }
 
-impl<T, N: Unsigned, R: Reclaim> Store for Unprotected<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> Store for Unprotected<T, R, N> {
     type Reclaimer = R;
 }
 
-impl<T, N: Unsigned, R: Reclaim> Store for Option<Unprotected<T, N, R>> {
+impl<T, R: Reclaim, N: Unsigned> Store for Option<Unprotected<T, R, N>> {
     type Reclaimer = R;
 }
 
@@ -423,22 +423,22 @@ pub trait Compare: MarkedPointer + Sized {
     type Unlinked: MarkedPointer<Item = Self::Item, MarkBits = Self::MarkBits>;
 }
 
-impl<'g, T, N: Unsigned, R: Reclaim> Compare for Shared<'g, T, N, R> {
+impl<'g, T, R: Reclaim, N: Unsigned> Compare for Shared<'g, T, R, N> {
     type Reclaimer = R;
-    type Unlinked = Unlinked<T, N, R>;
+    type Unlinked = Unlinked<T, R, N>;
 }
 
-impl<'g, T, N: Unsigned, R: Reclaim> Compare for Option<Shared<'g, T, N, R>> {
+impl<'g, T, R: Reclaim, N: Unsigned> Compare for Option<Shared<'g, T, R, N>> {
     type Reclaimer = R;
-    type Unlinked = Option<Unlinked<T, N, R>>;
+    type Unlinked = Option<Unlinked<T, R, N>>;
 }
 
-impl<T, N: Unsigned, R: Reclaim> Compare for Unprotected<T, N, R> {
+impl<T, R: Reclaim, N: Unsigned> Compare for Unprotected<T, R, N> {
     type Reclaimer = R;
-    type Unlinked = Unlinked<T, N, R>;
+    type Unlinked = Unlinked<T, R, N>;
 }
 
-impl<T, N: Unsigned, R: Reclaim> Compare for Option<Unprotected<T, N, R>> {
+impl<T, R: Reclaim, N: Unsigned> Compare for Option<Unprotected<T, R, N>> {
     type Reclaimer = R;
-    type Unlinked = Option<Unlinked<T, N, R>>;
+    type Unlinked = Option<Unlinked<T, R, N>>;
 }

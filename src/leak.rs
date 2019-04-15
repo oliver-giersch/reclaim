@@ -8,15 +8,15 @@ use crate::marked::MarkedPtr;
 use crate::{AcquireResult, Protect, Reclaim};
 
 /// An [`Atomic`](../struct.Atomic.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme
-pub type Atomic<T, N> = crate::Atomic<T, N, Leaking>;
+pub type Atomic<T, N> = crate::Atomic<T, Leaking, N>;
 /// A [`Shared`](../struct.Shared.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme
-pub type Shared<'g, T, N> = crate::Shared<'g, T, N, Leaking>;
+pub type Shared<'g, T, N> = crate::Shared<'g, T, Leaking, N>;
 /// An [`Owned`](../struct.Owned.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme
-pub type Owned<T, N> = crate::Owned<T, N, Leaking>;
+pub type Owned<T, N> = crate::Owned<T, Leaking, N>;
 /// An [`Unlinked`](../struct.Unlinked.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme
-pub type Unlinked<T, N> = crate::Unlinked<T, N, Leaking>;
+pub type Unlinked<T, N> = crate::Unlinked<T, Leaking, N>;
 /// An [`Unprotected`](../struct.Unprotected.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme
-pub type Unprotected<T, N> = crate::Unprotected<T, N, Leaking>;
+pub type Unprotected<T, N> = crate::Unprotected<T, Leaking, N>;
 
 /// A no-op memory "reclamation" scheme that deliberately leaks all memory.
 #[derive(Debug, Default)]
@@ -29,6 +29,7 @@ pub struct Leaking;
 pub struct LeakingGuard<T, N: Unsigned>(MarkedPtr<T, N>);
 
 impl<T, N: Unsigned> Clone for LeakingGuard<T, N> {
+    #[inline]
     fn clone(&self) -> Self {
         Self(self.0)
     }
@@ -75,12 +76,6 @@ unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
     type MarkBits = N;
     type Reclaimer = Leaking;
 
-    /// Gets a new `null` pointer guard.
-    #[inline]
-    fn new() -> Self {
-        Self(MarkedPtr::null())
-    }
-
     /// Gets the optional [`Shared`](crate::Shared) value for the guard.
     #[inline]
     fn shared(&self) -> Option<Shared<Self::Item, Self::MarkBits>> {
@@ -105,7 +100,7 @@ unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
         atomic: &Atomic<Self::Item, Self::MarkBits>,
         expected: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
-    ) -> AcquireResult<Self::Item, Self::MarkBits, Self::Reclaimer> {
+    ) -> AcquireResult<Self::Item, Self::Reclaimer, Self::MarkBits> {
         match atomic.load_raw(order) {
             marked if marked == expected => {
                 self.0 = marked;

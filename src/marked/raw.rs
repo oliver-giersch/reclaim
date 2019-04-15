@@ -44,7 +44,7 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     pub const MARK_BITS: usize = N::USIZE;
     /// The bitmask for the lower markable bits.
     pub const MARK_MASK: usize = marked::mark_mask::<T>(Self::MARK_BITS);
-    /// The bitmask for the (higher) pointer bits.
+    /// The bitmask for the higher pointer bits.
     pub const POINTER_MASK: usize = !Self::MARK_MASK;
 
     /// Gets the numeric inner representation of the pointer with its tag.
