@@ -1,4 +1,4 @@
-#[cfg(not(feature = "with_std"))]
+#[cfg(feature = "no-std")]
 use alloc::boxed::Box;
 
 use core::borrow::{Borrow, BorrowMut};
