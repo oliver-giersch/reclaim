@@ -46,6 +46,8 @@ pub mod leak;
 pub mod prelude {
     //! Useful and/or required traits for this crate.
     pub use crate::MarkedPointer;
+    pub use crate::Protect;
+    pub use crate::Reclaim;
 }
 
 mod atomic;
