@@ -20,11 +20,11 @@
 //!
 //! ...
 
-#![cfg_attr(feature = "no-std", feature(alloc))]
-#![cfg_attr(all(not(test), feature = "no-std"), no_std)]
+#![cfg_attr(not(feature = "std"), feature(alloc))]
+#![cfg_attr(not(any(test, feature = "std")), no_std)]
 #![warn(missing_docs)]
 
-#[cfg(feature = "no-std")]
+#[cfg(not(feature = "std"))]
 extern crate alloc;
 
 use core::marker::PhantomData;
