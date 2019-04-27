@@ -1,7 +1,7 @@
 use core::cmp::{self, PartialEq, PartialOrd};
 use core::fmt;
 use core::marker::PhantomData;
-use core::ptr::NonNull;
+use core::ptr::{self, NonNull};
 
 use typenum::{IsGreaterOrEqual, True, Unsigned};
 
@@ -49,12 +49,9 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// returned.
     #[inline]
     pub fn new(ptr: MarkedPtr<T, N>) -> Option<Self> {
-        match marked::decompose::<T>(ptr.into_usize(), Self::MARK_BITS) {
-            (raw, _) if raw.is_null() => None,
-            (raw, tag) => Some(MarkedNonNull::compose(
-                unsafe { NonNull::new_unchecked(raw) },
-                tag,
-            )),
+        match ptr.into_usize() {
+            0 => None,
+            _ => Some(unsafe { Self::new_unchecked(ptr) }),
         }
     }
 

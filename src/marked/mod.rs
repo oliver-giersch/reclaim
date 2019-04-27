@@ -36,7 +36,7 @@ pub struct AtomicMarkedPtr<T, N = U0> {
 /// lower bits can be used to store additional information (the *tag*).
 ///
 /// Note, that the upper bound for `N` is dictated by the alignment of
-/// type `T`. A type with an alignment of `8` (all pointers on 64-bit
+/// type `T`. A type with an alignment of `8` (e.g. a `usize` on 64-bit
 /// architectures) e.g. can have up to `3` mark bits.
 /// Attempts to declare types with more mark bits will lead to a
 /// compile-time error.
@@ -203,6 +203,16 @@ mod test {
         assert_eq!(
             marked::decompose(composed as usize, U3::USIZE),
             (&mut aligned as *mut _, 0b0)
+        );
+    }
+
+    #[test]
+    fn marked_null() {
+        let ptr: *mut Align4 = ptr::null_mut();
+        let marked = marked::compose::<_, U1>(ptr, 1);
+        assert_eq!(
+            marked::decompose::<Align4>(marked as usize, 1),
+            (ptr::null_mut(), 1)
         );
     }
 }
