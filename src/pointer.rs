@@ -70,7 +70,7 @@ macro_rules! impl_marked_pointer {
             marked: $crate::marked::MarkedPtr<Self::Item, Self::MarkBits>
         ) -> Self
         {
-            debug_assert_ne!(!marked.into_usize(), 0);
+            debug_assert_ne!(marked.into_usize(), 0);
             Self {
                 inner: MarkedNonNull::new_unchecked(marked),
                 _marker: PhantomData,
