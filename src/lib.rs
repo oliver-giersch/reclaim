@@ -37,9 +37,11 @@ pub use typenum;
 use memoffset::offset_of;
 use typenum::Unsigned;
 
-// module must be declared first in order to correctly use the macros defined inside
 #[macro_use]
-mod pointer;
+mod pointer_old;
+
+#[macro_use]
+mod macros;
 
 pub mod align;
 pub mod leak;
@@ -53,13 +55,14 @@ pub mod prelude {
 mod atomic;
 mod marked;
 mod owned;
+mod pointer;
 mod shared;
 mod unlinked;
 mod unprotected;
 
 pub use crate::atomic::{Atomic, CompareExchangeFailure};
 pub use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
-pub use crate::pointer::MarkedPointer;
+pub use crate::pointer_old::MarkedPointer;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Reclaim (trait)

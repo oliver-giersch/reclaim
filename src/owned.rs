@@ -11,7 +11,7 @@ use core::ptr::NonNull;
 use typenum::Unsigned;
 
 use crate::marked::{MarkedNonNull, MarkedPtr};
-use crate::pointer::{Internal, MarkedPointer};
+use crate::pointer_old::{Internal, MarkedPointer};
 use crate::{LocalReclaim, Owned, Record, Shared};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

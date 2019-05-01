@@ -5,7 +5,7 @@ use core::sync::atomic::Ordering;
 use typenum::Unsigned;
 
 use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
-use crate::pointer::MarkedPointer;
+use crate::pointer_old::MarkedPointer;
 use crate::{LocalReclaim, NotEqual, Owned, Protect, Shared, Unlinked, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

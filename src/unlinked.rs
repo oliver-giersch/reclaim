@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use typenum::Unsigned;
 
 use crate::marked::MarkedNonNull;
-use crate::pointer::{Internal, MarkedPointer};
+use crate::pointer_old::{Internal, MarkedPointer};
 use crate::{LocalReclaim, Reclaim, Unlinked};
 
 impl<T, R, N> Internal for Unlinked<T, R, N> {}
