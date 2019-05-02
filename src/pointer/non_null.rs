@@ -1,16 +1,20 @@
-use core::ptr::NonNull;
+use core::cmp;
+use core::convert::TryFrom;
+use core::fmt;
+use core::marker::PhantomData;
+use core::ptr::{self, NonNull};
 
 use typenum::{IsGreaterOrEqual, True, Unsigned};
 
 use crate::pointer::{
-    self,
+    self, InvalidNullError,
     Marked::{self, Null, OnlyTag, Value},
     MarkedNonNull, MarkedPtr, NonNullable,
 };
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Copy & Clone
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, N> Clone for MarkedNonNull<T, N> {
     #[inline]
@@ -21,9 +25,9 @@ impl<T, N> Clone for MarkedNonNull<T, N> {
 
 impl<T, N> Copy for MarkedNonNull<T, N> {}
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // inherent
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// The number of available mark bits for this type.
@@ -60,11 +64,167 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// if `ptr` is non-null.
     pub fn new(ptr: MarkedPtr<T, N>) -> Marked<Self> {
         match ptr.decompose() {
-            (raw, 0) if raw.is_null() => Null,
-            (raw, tag) if raw.is_null() => OnlyTag(tag),
-            _ => unsafe { Value(Self::new_unchecked(ptr)) },
+            (raw, _) if !raw.is_null() => unsafe { Value(Self::new_unchecked(ptr)) },
+            (_, 0) => Null,
+            (_, tag) => OnlyTag(tag),
+        }
+    }
+
+    /// Creates a new `MarkedNonNull` that is dangling, but well-aligned.
+    ///
+    /// This is useful for initializing types which lazily allocate, like
+    /// `Vec::new` does.
+    ///
+    /// Note that the pointer value may potentially represent a valid pointer to
+    /// a `T`, which means this must not be used as a "not yet initialized"
+    /// sentinel value. Types that lazily allocate must track initialization by
+    /// some other means.
+    #[inline]
+    pub fn dangling() -> Self {
+        Self { inner: NonNull::dangling(), _marker: PhantomData }
+    }
+
+    /// Converts the pointer to the equivalent [`MarkedPtr`][crate::pointer::MarkedPtr].
+    #[inline]
+    pub fn into_marked_ptr(self) -> MarkedPtr<T, N> {
+        MarkedPtr::new(self.inner.as_ptr())
+    }
+
+    /// Composes a new marked non-null pointer from a non-null pointer and a tag
+    /// value.
+    #[inline]
+    pub fn compose(ptr: NonNull<T>, tag: usize) -> Self {
+        debug_assert_eq!(0, ptr.as_ptr() as usize & Self::MARK_MASK, "`ptr` is not well aligned");
+        unsafe { Self::from(NonNull::new_unchecked(pointer::compose::<_, N>(ptr.as_ptr(), tag))) }
+    }
+
+    /// Decomposes the marked pointer, returning the separated raw
+    /// [`NonNull`][core::ptr::NonNull] pointer and its tag.
+    #[inline]
+    pub fn decompose(self) -> (NonNull<T>, usize) {
+        let (ptr, tag) = pointer::decompose(self.inner.as_ptr() as usize, Self::MARK_BITS);
+        (unsafe { NonNull::new_unchecked(ptr) }, tag)
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub fn decompose_ptr(self) -> *mut T {
+        pointer::decompose_ptr(self.inner.as_ptr() as usize, Self::MARK_BITS)
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub fn decompose_non_null(self) -> NonNull<T> {
+        unsafe {
+            NonNull::new_unchecked(pointer::decompose_ptr(
+                self.inner.as_ptr() as usize,
+                Self::MARK_BITS,
+            ))
         }
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Debug & Pointer (fmt)
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, N: Unsigned> fmt::Debug for MarkedNonNull<T, N> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let (ptr, tag) = self.decompose();
+        f.debug_struct("MarkedNonNull").field("ptr", &ptr).field("tag", &tag).finish()
+    }
+}
+
+impl<T, N: Unsigned> fmt::Pointer for MarkedNonNull<T, N> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Pointer::fmt(&self.decompose_non_null(), f)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// From & TryFrom
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, N> From<NonNull<T>> for MarkedNonNull<T, N> {
+    #[inline]
+    fn from(ptr: NonNull<T>) -> Self {
+        Self { inner: ptr, _marker: PhantomData }
+    }
+}
+
+impl<'a, T, N: Unsigned> From<&'a T> for MarkedNonNull<T, N> {
+    #[inline]
+    fn from(reference: &'a T) -> Self {
+        Self::from(NonNull::from(reference))
+    }
+}
+
+impl<'a, T, N: Unsigned> From<&'a mut T> for MarkedNonNull<T, N> {
+    #[inline]
+    fn from(reference: &'a mut T) -> Self {
+        Self::from(NonNull::from(reference))
+    }
+}
+
+impl<T, N: Unsigned> TryFrom<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
+    type Error = InvalidNullError;
+
+    #[inline]
+    fn try_from(ptr: MarkedPtr<T, N>) -> Result<Self, Self::Error> {
+        match ptr.decompose() {
+            (raw, _) if raw.is_null() => Err(InvalidNullError),
+            _ => unsafe { Ok(MarkedNonNull::new_unchecked(ptr)) },
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Eq/PartialEq & Ord/PartialOrd
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, N> PartialEq for MarkedNonNull<T, N> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<T, N> PartialOrd for MarkedNonNull<T, N> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.inner.partial_cmp(&other.inner)
+    }
+}
+
+impl<T, N> PartialEq<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
+    #[inline]
+    fn eq(&self, other: &MarkedPtr<T, N>) -> bool {
+        self.inner.as_ptr() == other.inner
+    }
+}
+
+impl<T, N> PartialOrd<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
+    #[inline]
+    fn partial_cmp(&self, other: &MarkedPtr<T, N>) -> Option<cmp::Ordering> {
+        self.inner.as_ptr().partial_cmp(&other.inner)
+    }
+}
+
 impl<T, N> NonNullable for MarkedNonNull<T, N> {}
+
+#[cfg(test)]
+mod tests {
+    use crate::pointer::{Marked, MarkedNonNull, MarkedPtr};
+
+    #[test]
+    fn new() {
+        let ptr = &mut 1;
+        let val = ptr as *mut _ as usize;
+
+        let unmarked = MarkedPtr::new(ptr);
+        let marked = MarkedNonNull::new(unmarked);
+        assert!(marked.is_value());
+    }
+}

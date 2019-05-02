@@ -7,9 +7,9 @@ use typenum::{IsGreaterOrEqual, True, Unsigned};
 
 use crate::pointer::{self, MarkedNonNull, MarkedPtr};
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Copy & Clone
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, N> Clone for MarkedPtr<T, N> {
     #[inline]
@@ -20,9 +20,9 @@ impl<T, N> Clone for MarkedPtr<T, N> {
 
 impl<T, N> Copy for MarkedPtr<T, N> {}
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // inherent (const)
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, N> MarkedPtr<T, N> {
     /// Creates an unmarked pointer.
@@ -45,9 +45,9 @@ impl<T, N> MarkedPtr<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // inherent
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, N: Unsigned> MarkedPtr<T, N> {
     /// The number of available mark bits for this type.
@@ -98,12 +98,6 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     #[inline]
     pub fn decompose_tag(self) -> usize {
         pointer::decompose_tag::<T>(self.into_usize(), Self::MARK_BITS)
-    }
-
-    /// Returns true if the pointer is null (regardless of the tag).
-    #[inline]
-    pub fn is_null(self) -> bool {
-        self.decompose_ptr().is_null()
     }
 
     /// Decomposes the marked pointer, returning an optional reference and the
@@ -168,11 +162,17 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     pub unsafe fn as_mut<'a>(self) -> Option<&'a mut T> {
         self.decompose_ptr().as_mut()
     }
+
+    /// Returns true if the pointer is null (regardless of the tag).
+    #[inline]
+    pub fn is_null(self) -> bool {
+        self.decompose_ptr().is_null()
+    }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Debug & Pointer (fmt)
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, N: Unsigned> fmt::Debug for MarkedPtr<T, N> {
     #[inline]
@@ -189,9 +189,9 @@ impl<T, N: Unsigned> fmt::Pointer for MarkedPtr<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // From
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, N: Unsigned> From<*const T> for MarkedPtr<T, N> {
     #[inline]
@@ -227,9 +227,9 @@ impl<T, N: Unsigned> From<NonNull<T>> for MarkedPtr<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // PartialEq & PartialOrd
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, N> PartialEq for MarkedPtr<T, N> {
     #[inline]
@@ -312,28 +312,26 @@ mod test {
 
     #[test]
     fn from() {
-        let mut x = 1;
+        let mut x = Aligned8::new(1);
 
-        let from_ref: MarkedPtr<usize, U1> = MarkedPtr::from(&x);
-        let from_mut_ref: MarkedPtr<usize, U1> = MarkedPtr::from(&mut x);
-        let from_const: MarkedPtr<usize, U1> = MarkedPtr::from(&x as *const usize);
-        let from_mut: MarkedPtr<usize, U1> = MarkedPtr::from(&x as *const _ as *mut usize);
+        let from_ref = MarkedPtr1N::from(&x);
+        let from_mut = MarkedPtr1N::from(&mut x);
+        let from_const_ptr = MarkedPtr1N::from(&x as *const _);
+        let from_mut_ptr = MarkedPtr1N::from(&mut x as *mut _);
 
-        assert!(from_ref == from_mut_ref && from_const == from_mut);
-        assert!(from_ref == from_mut && from_const == from_mut_ref);
+        assert!(from_ref == from_mut && from_const_ptr == from_mut_ptr);
     }
 
     #[test]
     fn eq_ord() {
-        let null: MarkedPtr<Aligned8<i32>, U3> = MarkedPtr::null();
+        let null = MarkedPtr3N::null();
         assert!(null.is_null());
         assert_eq!(null, null);
 
-        let reference = &Aligned8::new(1);
-        let marked1: MarkedPtr<Aligned8<i32>, U3> =
-            MarkedPtr::compose(reference as *const _ as *mut _, 1);
-        let marked2: MarkedPtr<Aligned8<i32>, U3> =
-            MarkedPtr::compose(reference as *const _ as *mut _, 2);
+        let mut reference = Aligned8::new(1);
+        let marked1 = MarkedPtr3N::compose(&mut reference, 0b01);
+        let marked2 = MarkedPtr3N::compose(&mut reference, 0b11);
+
         assert_ne!(marked1, marked2);
         assert!(marked1 < marked2);
     }
@@ -341,8 +339,9 @@ mod test {
     #[test]
     fn convert() {
         let mut aligned = Aligned8::new(1);
-        let from: MarkedPtr<Aligned8<i32>, U1> = MarkedPtr::compose(&mut aligned, 0b1);
-        let convert: MarkedPtr<Aligned8<i32>, U3> = MarkedPtr::convert(from);
+
+        let marked = MarkedPtr1N::compose(&mut aligned, 0b1);
+        let convert = MarkedPtr3N::convert(marked);
 
         assert_eq!((Some(&aligned), 0b1), unsafe { convert.decompose_ref() });
     }
