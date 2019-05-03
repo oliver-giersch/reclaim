@@ -37,9 +37,9 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn as_ref(&self) -> Marked<&T> {
         match *self {
-            Value(ref value) => Marked(value),
+            Value(ref value) => Value(value),
             OnlyTag(ref tag) => OnlyTag(*tag),
-            Null => Null
+            Null => Null,
         }
     }
 
@@ -47,9 +47,9 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn as_mut(&mut self) -> Marked<&mut T> {
         match *self {
-            Value(ref mut value) => Marked(value),
+            Value(ref mut value) => Value(value),
             OnlyTag(ref tag) => OnlyTag(*tag),
-            Null => Null
+            Null => Null,
         }
     }
 
@@ -99,6 +99,9 @@ impl<T: NonNullable> Marked<T> {
     /// TODO: Doc...
     #[inline]
     pub fn replace(&mut self, value: T) -> Self {
-        mem::replace(self, value)
+        mem::replace(self, Value(value))
     }
 }
+
+impl<'a, T> NonNullable for &'a T {}
+impl<'a, T> NonNullable for &'a mut T {}

@@ -4,8 +4,7 @@ use core::sync::atomic::Ordering;
 
 use typenum::Unsigned;
 
-use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
-use crate::pointer_old::MarkedPointer;
+use crate::pointer::{AtomicMarkedPtr, MarkedNonNull, MarkedPointer, MarkedPtr};
 use crate::{LocalReclaim, NotEqual, Owned, Protect, Shared, Unlinked, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,10 +32,7 @@ impl<T, R, N> Atomic<T, R, N> {
     /// Creates a new `null` pointer.
     #[inline]
     pub const fn null() -> Self {
-        Self {
-            inner: AtomicMarkedPtr::null(),
-            _marker: PhantomData,
-        }
+        Self { inner: AtomicMarkedPtr::null(), _marker: PhantomData }
     }
 
     /// Gets a reference to the underlying (raw) atomic markable pointer.
@@ -132,10 +128,8 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     ///
     #[inline]
     pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, R, N>> {
-        MarkedNonNull::new(self.inner.load(order)).map(|ptr| Unprotected {
-            inner: ptr,
-            _marker: PhantomData,
-        })
+        MarkedNonNull::new(self.inner.load(order))
+            .map(|ptr| Unprotected { inner: ptr, _marker: PhantomData })
     }
 
     /// Stores either `null` or a valid pointer to an owned heap allocated value
@@ -327,10 +321,7 @@ impl<T, R: LocalReclaim, N: Unsigned> From<T> for Atomic<T, R, N> {
 impl<T, R: LocalReclaim, N: Unsigned> From<Owned<T, R, N>> for Atomic<T, R, N> {
     #[inline]
     fn from(owned: Owned<T, R, N>) -> Self {
-        Self {
-            inner: AtomicMarkedPtr::from(Owned::into_marked(owned)),
-            _marker: PhantomData,
-        }
+        Self { inner: AtomicMarkedPtr::from(Owned::into_marked(owned)), _marker: PhantomData }
     }
 }
 
@@ -338,10 +329,7 @@ impl<T, R: LocalReclaim, N: Unsigned> fmt::Debug for Atomic<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (ptr, tag) = self.inner.load(Ordering::SeqCst).decompose();
-        f.debug_struct("Atomic")
-            .field("ptr", &ptr)
-            .field("tag", &tag)
-            .finish()
+        f.debug_struct("Atomic").field("ptr", &ptr).field("tag", &tag).finish()
     }
 }
 

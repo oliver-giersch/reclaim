@@ -4,7 +4,7 @@ use core::sync::atomic::Ordering;
 
 use typenum::Unsigned;
 
-use crate::marked::MarkedPtr;
+use crate::pointer::{Marked, MarkedPtr};
 use crate::{AcquireResult, LocalReclaim, Protect};
 
 /// An [`Atomic`](../struct.Atomic.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme
@@ -51,9 +51,7 @@ pub struct Header {
 impl Default for Header {
     #[inline]
     fn default() -> Self {
-        Self {
-            checksum: 0xDEAD_BEEF,
-        }
+        Self { checksum: 0xDEAD_BEEF }
     }
 }
 
@@ -78,10 +76,11 @@ unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
     type Reclaimer = Leaking;
     type MarkBits = N;
 
-    /// Gets the optional [`Shared`](crate::Shared) value for the guard.
+    /// Gets a shared reference wrapped in a [`Marked`] for the protected value,
+    /// which is tied to the lifetime of self.
     #[inline]
-    fn shared(&self) -> Option<Shared<Self::Item, Self::MarkBits>> {
-        unsafe { Shared::try_from_marked(self.0) }
+    fn marked(&self) -> Marked<Shared<Self::Item, Self::MarkBits>> {
+        unsafe { Marked::from_marked_ptr(self.0) }
     }
 
     /// Acquires a value from shared memory.
@@ -90,7 +89,7 @@ unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
         &mut self,
         atomic: &Atomic<Self::Item, Self::MarkBits>,
         order: Ordering,
-    ) -> Option<Shared<Self::Item, Self::MarkBits>> {
+    ) -> Marked<Shared<Self::Item, Self::MarkBits>> {
         self.0 = atomic.load_raw(order);
         unsafe { Shared::try_from_marked(self.0) }
     }

@@ -2,7 +2,7 @@ use core::cmp;
 use core::convert::TryFrom;
 use core::fmt;
 use core::marker::PhantomData;
-use core::ptr::{self, NonNull};
+use core::ptr::NonNull;
 
 use typenum::{IsGreaterOrEqual, True, Unsigned};
 
@@ -267,7 +267,7 @@ impl<T, N> NonNullable for MarkedNonNull<T, N> {}
 
 #[cfg(test)]
 mod tests {
-    use crate::pointer::{Marked, MarkedNonNull, MarkedPtr};
+    use crate::pointer::{MarkedNonNull, MarkedPtr};
 
     #[test]
     fn new() {

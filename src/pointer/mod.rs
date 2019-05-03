@@ -27,13 +27,13 @@ pub trait MarkedPointer: Sized + Internal {
     fn tag(&self) -> usize;
 
     /// Consumes `self` and returns the same value but without any tag.
-    fn clear_tag(&self) -> Self;
+    fn clear_tag(self) -> Self;
 
     /// Returns the equivalent raw marked pointer.
     fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits>;
 
     /// Consumes `self` and returns the equivalent raw marked pointer.
-    fn into_marked_ptr(self);
+    fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits>;
 
     /// Constructs a `Self` from a raw marked pointer.
     ///
@@ -42,7 +42,7 @@ pub trait MarkedPointer: Sized + Internal {
     /// The caller has to ensure that raw is a valid pointer for the respective
     /// `Self` type. If `Self` is nullable, a null pointer is a valid value.
     /// Otherwise, all values must be valid pointers.
-    unsafe fn from_marked_ptr();
+    unsafe fn from_marked_ptr(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self;
 
     /// Constructs a `Self` from a raw non-null marked pointer
     ///
@@ -50,7 +50,7 @@ pub trait MarkedPointer: Sized + Internal {
     ///
     /// The same caveats as with [`from_marked_ptr`][MarkedPointer::from_marked_ptr]
     /// apply as well.
-    unsafe fn from_marked_non_null();
+    unsafe fn from_marked_non_null(marked: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

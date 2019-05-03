@@ -14,10 +14,7 @@ impl<T, N> AtomicMarkedPtr<T, N> {
     /// Creates a new `AtomicMarkedPtr`.
     #[inline]
     pub const fn new(ptr: MarkedPtr<T, N>) -> Self {
-        Self {
-            inner: AtomicPtr::new(ptr.inner),
-            _marker: PhantomData,
-        }
+        Self { inner: AtomicPtr::new(ptr.inner), _marker: PhantomData }
     }
 
     /// Creates a new & unmarked `null` pointer.
@@ -190,10 +187,7 @@ impl<T, N: Unsigned> fmt::Debug for AtomicMarkedPtr<T, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (ptr, tag) = self.load(Ordering::SeqCst).decompose();
-        f.debug_struct("AtomicMarkedPtr")
-            .field("ptr", &ptr)
-            .field("tag", &tag)
-            .finish()
+        f.debug_struct("AtomicMarkedPtr").field("ptr", &ptr).field("tag", &tag).finish()
     }
 }
 
@@ -237,8 +231,8 @@ mod tests {
 
     use crate::align::Aligned8;
 
-    type AtomicMarkedPtr<T> = crate::marked::AtomicMarkedPtr<T, U3>;
-    type MarkedPtr<T> = crate::marked::MarkedPtr<T, U3>;
+    type AtomicMarkedPtr<T> = crate::pointer::AtomicMarkedPtr<T, U3>;
+    type MarkedPtr<T> = crate::pointer::MarkedPtr<T, U3>;
 
     #[test]
     fn null() {
@@ -252,14 +246,8 @@ mod tests {
         let reference = &Aligned8::new(1usize);
         let marked = AtomicMarkedPtr::new(MarkedPtr::from(reference));
         let from = AtomicMarkedPtr::from(reference as *const _ as *mut Aligned8<usize>);
-        assert_eq!(
-            marked.load(Ordering::Relaxed).into_usize(),
-            reference as *const _ as usize
-        );
-        assert_eq!(
-            from.load(Ordering::Relaxed).into_usize(),
-            reference as *const _ as usize
-        );
+        assert_eq!(marked.load(Ordering::Relaxed).into_usize(), reference as *const _ as usize);
+        assert_eq!(from.load(Ordering::Relaxed).into_usize(), reference as *const _ as usize);
     }
 
     #[test]

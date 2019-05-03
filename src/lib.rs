@@ -24,6 +24,7 @@
 #![cfg_attr(not(any(test, feature = "std")), no_std)]
 #![warn(missing_docs)]
 
+// TODO: remove once 1.35 is there
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
@@ -38,16 +39,16 @@ use memoffset::offset_of;
 use typenum::Unsigned;
 
 #[macro_use]
-mod pointer_old;
-
-#[macro_use]
 mod macros;
 
 pub mod align;
 pub mod leak;
 pub mod prelude {
-    //! Useful and/or required traits for this crate.
-    pub use crate::MarkedPointer;
+    //! Useful and/or required types and traits for this crate.
+    pub use crate::pointer::{
+        Marked::{self, Null, OnlyTag, Value},
+        MarkedPointer,
+    };
     pub use crate::Protect;
     pub use crate::Reclaim;
 }
@@ -60,8 +61,7 @@ mod unlinked;
 mod unprotected;
 
 pub use crate::atomic::{Atomic, CompareExchangeFailure};
-pub use crate::marked::{AtomicMarkedPtr, MarkedNonNull, MarkedPtr};
-pub use crate::pointer_old::MarkedPointer;
+pub use crate::pointer::{AtomicMarkedPtr, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Reclaim (trait)
@@ -191,11 +191,17 @@ where
     /// Number of bits available for storing additional information
     type MarkBits: Unsigned;
 
-    /// Gets a shared reference to the protected value that is tied to the lifetime of `&self`
-    fn shared(&self) -> Option<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>;
+    /// Gets a shared reference to the protected value that is tied to the lifetime of self.
+    fn shared(&self) -> Option<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>> {
+        self.marked().into_option()
+    }
+
+    /// Gets a shared reference wrapped in a [`Marked`] for the protected value,
+    /// which is tied to the lifetime of self.
+    fn marked(&self) -> Marked<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>;
 
     /// Atomically takes a snapshot of `atomic`'s value and returns a shared and protected reference
-    /// to it.
+    /// wrapped in a [`Marked`] to it.
     ///
     /// The loaded value is stored within self. If the value of `atomic` is null, no protection
     /// occurs. Any previously protected value is no longer protected, regardless of the loaded
@@ -204,10 +210,10 @@ where
         &mut self,
         atomic: &Atomic<Self::Item, Self::Reclaimer, Self::MarkBits>,
         order: Ordering,
-    ) -> Option<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>;
+    ) -> Marked<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>;
 
     /// Atomically takes a snapshot of `atomic`'s value and returns a shared and protected reference
-    /// to it if the loaded value is equal to `expected`.
+    /// wrapped in a [`Marked`] to it, if the loaded value is equal to `expected`.
     ///
     /// A successfully loaded value is stored within self. If the value of `atomic` is null, no
     /// protection occurs. After a successful load, any previously protected value is no longer
@@ -231,7 +237,7 @@ where
 }
 
 /// Result type for [`acquire_if_equal`](Protect::acquire_if_equal) operations.
-pub type AcquireResult<'g, T, R, N> = Result<Option<Shared<'g, T, R, N>>, NotEqual>;
+pub type AcquireResult<'g, T, R, N> = Result<Marked<Shared<'g, T, R, N>>, NotEqual>;
 
 /// A zero-size marker type that represents the failure state of an `acquire_if_equal` operation.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
@@ -255,10 +261,7 @@ impl<T, R: LocalReclaim> Record<T, R> {
     /// Creates a new record with the specified `elem` and a default header.
     #[inline]
     pub fn new(elem: T) -> Self {
-        Self {
-            header: Default::default(),
-            elem,
-        }
+        Self { header: Default::default(), elem }
     }
 
     /// Creates a new record with the specified `elem` and `header`.

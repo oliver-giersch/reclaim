@@ -10,16 +10,18 @@ use core::ptr::NonNull;
 
 use typenum::Unsigned;
 
-use crate::marked::{MarkedNonNull, MarkedPtr};
-use crate::pointer_old::{Internal, MarkedPointer};
+use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, MarkedPtr, NonNullable};
 use crate::{LocalReclaim, Owned, Record, Shared};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // impl Internal, Clone, Copy
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl<T, R: LocalReclaim, N: Unsigned> NonNullable for Owned<T, R, N> {}
+
 impl<T, R: LocalReclaim, N: Unsigned> Internal for Owned<T, R, N> {}
 impl<T, R: LocalReclaim, N: Unsigned> Internal for Option<Owned<T, R, N>> {}
+impl<T, R: LocalReclaim, N: Unsigned> Internal for Marked<Owned<T, R, N>> {}
 
 impl<T: Clone, R: LocalReclaim, N: Unsigned> Clone for Owned<T, R, N> {
     #[inline]
@@ -43,35 +45,43 @@ unsafe impl<T, R: LocalReclaim, N: Unsigned> Sync for Owned<T, R, N> where T: Sy
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
     type Item = T;
     type MarkBits = N;
+    const MARK_BITS: usize = N::USIZE;
 
-    fn as_marked(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+    #[inline]
+    fn tag(&self) -> usize {
+        self.inner.decompose_tag()
+    }
+
+    #[inline]
+    fn clear_tag(self) -> Self {
+        self.with_tag(0)
+    }
+
+    #[inline]
+    fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
         self.inner.into_marked()
     }
 
-    fn into_marked(self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+    #[inline]
+    fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits> {
         let marked = self.inner.into_marked();
         mem::forget(self);
         marked
     }
 
-    unsafe fn from_marked(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
+    #[inline]
+    unsafe fn from_marked_ptr(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
         debug_assert!(!marked.is_null());
-        Self {
-            inner: MarkedNonNull::new_unchecked(marked),
-            _marker: PhantomData,
-        }
+        Self { inner: MarkedNonNull::new_unchecked(marked), _marker: PhantomData }
     }
 
     unsafe fn from_marked_non_null(marked: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self {
-        Self {
-            inner: marked,
-            _marker: PhantomData,
-        }
+        Self { inner: marked, _marker: PhantomData }
     }
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Owned<T, R, N>> {
-    impl_marked_pointer_option!();
+    impl_trait_option!();
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
@@ -86,20 +96,14 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     /// [header]: crate::Reclaim::RecordHeader
     #[inline]
     pub fn new(owned: T) -> Self {
-        Self {
-            inner: MarkedNonNull::from(Self::alloc_record(owned)),
-            _marker: PhantomData,
-        }
+        Self { inner: MarkedNonNull::from(Self::alloc_record(owned)), _marker: PhantomData }
     }
 
     /// Creates a new `Owned` like [`new`](Owned::new) but composes the
     /// returned pointer with an initial `tag` value.
     #[inline]
     pub fn compose(owned: T, tag: usize) -> Self {
-        Self {
-            inner: MarkedNonNull::compose(Self::alloc_record(owned), tag),
-            _marker: PhantomData,
-        }
+        Self { inner: MarkedNonNull::compose(Self::alloc_record(owned), tag), _marker: PhantomData }
     }
 
     impl_inherent!();
@@ -138,7 +142,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     {
         let inner = owned.inner;
         mem::forget(owned);
-        unsafe { inner.as_mut() }
+        unsafe { &mut *inner.decompose_ptr() }
     }
 
     /// Leaks the `owned` value and turns it into a "protected" [`Shared`][shared]
@@ -158,10 +162,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
         let inner = owned.inner;
         mem::forget(owned);
 
-        Shared {
-            inner,
-            _marker: PhantomData,
-        }
+        Shared { inner, _marker: PhantomData }
     }
 
     /// Allocates a records wrapping `owned` and returns the pointer to the wrapped value.
@@ -249,10 +250,7 @@ where
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (reference, tag) = unsafe { self.inner.decompose_ref() };
-        f.debug_struct("Owned")
-            .field("value", reference)
-            .field("tag", &tag)
-            .finish()
+        f.debug_struct("Owned").field("value", reference).field("tag", &tag).finish()
     }
 }
 
@@ -268,7 +266,6 @@ mod test {
     use typenum::U2;
 
     use crate::leak::Leaking;
-    use crate::prelude::*;
 
     type Owned<T> = super::Owned<T, Leaking, U2>;
 
@@ -295,9 +292,7 @@ mod test {
     #[test]
     fn compose() {
         let owned = Owned::compose(1, 0b11);
-        assert_eq!((Some(&1), 0b11), unsafe {
-            owned.as_marked().decompose_ref()
-        });
+        assert_eq!((Some(&1), 0b11), unsafe { owned.as_marked().decompose_ref() });
         let owned = Owned::compose(2, 0);
         assert_eq!((Some(&2), 0), unsafe { owned.as_marked().decompose_ref() });
     }
