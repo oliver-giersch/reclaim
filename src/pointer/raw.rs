@@ -238,6 +238,22 @@ impl<T, N: Unsigned> From<NonNull<T>> for MarkedPtr<T, N> {
     }
 }
 
+impl<T, N: Unsigned> From<(*mut T, usize)> for MarkedPtr<T, N> {
+    #[inline]
+    fn from(pair: (*mut T, usize)) -> Self {
+        let (ptr, tag) = pair;
+        Self::compose(ptr, tag)
+    }
+}
+
+impl<T, N: Unsigned> From<(*const T, usize)> for MarkedPtr<T, N> {
+    #[inline]
+    fn from(pair: (*const T, usize)) -> Self {
+        let (ptr, tag) = pair;
+        Self::compose(ptr, tag)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // PartialEq & PartialOrd
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -53,7 +53,6 @@ pub mod prelude {
 }
 
 mod atomic;
-mod marked;
 mod owned;
 mod pointer;
 mod shared;

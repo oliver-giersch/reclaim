@@ -203,3 +203,80 @@ impl<T, N: Unsigned> fmt::Pointer for AtomicMarkedPtr<T, N> {
         fmt::Pointer::fmt(&self.load(Ordering::SeqCst).decompose_ptr(), f)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// From
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, N: Unsigned> From<*const T> for AtomicMarkedPtr<T, N> {
+    #[inline]
+    fn from(ptr: *const T) -> Self {
+        AtomicMarkedPtr::new(MarkedPtr::from(ptr))
+    }
+}
+
+impl<T, N: Unsigned> From<*mut T> for AtomicMarkedPtr<T, N> {
+    #[inline]
+    fn from(ptr: *mut T) -> Self {
+        AtomicMarkedPtr::new(MarkedPtr::from(ptr))
+    }
+}
+
+impl<T, N: Unsigned> From<MarkedPtr<T, N>> for AtomicMarkedPtr<T, N> {
+    #[inline]
+    fn from(ptr: MarkedPtr<T, N>) -> Self {
+        AtomicMarkedPtr::new(ptr)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::sync::atomic::Ordering;
+
+    use typenum::U3;
+
+    use crate::align::Aligned8;
+
+    type AtomicMarkedPtr<T> = crate::marked::AtomicMarkedPtr<T, U3>;
+    type MarkedPtr<T> = crate::marked::MarkedPtr<T, U3>;
+
+    #[test]
+    fn null() {
+        let ptr: AtomicMarkedPtr<usize> = AtomicMarkedPtr::null();
+        assert_eq!(ptr.load(Ordering::Relaxed).into_usize(), 0);
+        assert_eq!(ptr.into_inner().into_usize(), 0);
+    }
+
+    #[test]
+    fn new() {
+        let reference = &Aligned8::new(1usize);
+        let marked = AtomicMarkedPtr::new(MarkedPtr::from(reference));
+        let from = AtomicMarkedPtr::from(reference as *const _ as *mut Aligned8<usize>);
+        assert_eq!(
+            marked.load(Ordering::Relaxed).into_usize(),
+            reference as *const _ as usize
+        );
+        assert_eq!(
+            from.load(Ordering::Relaxed).into_usize(),
+            reference as *const _ as usize
+        );
+    }
+
+    #[test]
+    fn store() {
+        let raw = MarkedPtr::from(&Aligned8::new(1usize));
+        let atomic = AtomicMarkedPtr::null();
+
+        atomic.store(raw, Ordering::Relaxed);
+        assert_eq!(atomic.load(Ordering::Relaxed), raw);
+    }
+
+    #[test]
+    fn swap() {
+        let reference: &i32 = &1;
+        let atomic: AtomicMarkedPtr<i32> = AtomicMarkedPtr::from(reference as *const _);
+        let swap = atomic.swap(MarkedPtr::null(), Ordering::Relaxed);
+        assert_eq!(swap.into_usize(), reference as *const _ as usize);
+        assert_eq!(atomic.load(Ordering::Relaxed).into_usize(), 0);
+    }
+}
