@@ -106,13 +106,14 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
         (unsafe { NonNull::new_unchecked(ptr) }, tag)
     }
 
-    /// TODO: Doc...
+    /// Decomposes the marked pointer, returning only the separated raw pointer.
     #[inline]
     pub fn decompose_ptr(self) -> *mut T {
         pointer::decompose_ptr(self.inner.as_ptr() as usize, Self::MARK_BITS)
     }
 
-    /// TODO: Doc...
+    /// Decomposes the marked pointer, returning only the separated raw
+    /// [`NonNull`][core::ptr::NonNull] pointer.
     #[inline]
     pub fn decompose_non_null(self) -> NonNull<T> {
         unsafe {
@@ -121,6 +122,56 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
                 Self::MARK_BITS,
             ))
         }
+    }
+
+    /// Decomposes the marked pointer, returning only the separated tag.
+    #[inline]
+    pub fn decompose_tag(self) -> usize {
+        pointer::decompose_tag(self.inner.as_ptr() as usize, Self::MARK_BITS)
+    }
+
+    /// Decomposes the marked pointer, dereferences the the raw pointer and returns both the
+    /// reference and the separated tag.
+    ///
+    /// The resulting lifetime is bound to self so this behaves "as if"
+    /// it were actually an instance of T that is getting borrowed. If a longer
+    /// (unbound) lifetime is needed, use e.g. `&*my_ptr.decompose_ptr()`.
+    #[inline]
+    pub unsafe fn decompose_ref(&self) -> (&T, usize) {
+        let (ptr, tag) = self.decompose();
+        (&*ptr.as_ptr(), tag)
+    }
+
+    /// Decomposes the marked pointer, mutably dereferences the the raw pointer and returns both the
+    /// mutable reference and the separated tag.
+    ///
+    /// The resulting lifetime is bound to self so this behaves "as if"
+    /// it were actually an instance of T that is getting borrowed. If a longer
+    /// (unbound) lifetime is needed, use e.g. `&mut *my_ptr.decompose_ptr()`.
+    #[inline]
+    pub unsafe fn decompose_mut(&mut self) -> (&mut T, usize) {
+        let (ptr, tag) = self.decompose();
+        (&mut *ptr.as_ptr(), tag)
+    }
+
+    /// Decomposes the marked pointer, returning only the dereferenced raw pointer.
+    ///
+    /// The resulting lifetime is bound to self so this behaves "as if"
+    /// it were actually an instance of T that is getting borrowed. If a longer
+    /// (unbound) lifetime is needed, use e.g. `&*my_ptr.decompose_ptr()`.
+    #[inline]
+    pub unsafe fn as_ref(&self) -> &T {
+        &*self.decompose_non_null().as_ptr()
+    }
+
+    /// Decomposes the marked pointer, returning only the mutably dereferenced raw pointer.
+    ///
+    /// The resulting lifetime is bound to self so this behaves "as if"
+    /// it were actually an instance of T that is getting borrowed. If a longer
+    /// (unbound) lifetime is needed, use e.g. `&mut *my_ptr.decompose_ptr()`.
+    #[inline]
+    pub unsafe fn as_mut(&mut self) -> &mut T {
+        &mut *self.decompose_non_null().as_ptr()
     }
 }
 
