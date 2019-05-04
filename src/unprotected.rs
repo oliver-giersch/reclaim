@@ -3,11 +3,12 @@ use core::marker::PhantomData;
 
 use typenum::Unsigned;
 
-use crate::pointer::{Internal, MarkedNonNull, MarkedPointer};
+use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
 use crate::{LocalReclaim, Unprotected};
 
-impl<T, R, N> Internal for Unprotected<T, R, N> {}
-impl<T, R, N> Internal for Option<Unprotected<T, R, N>> {}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Copy & Clone
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R, N> Clone for Unprotected<T, R, N> {
     #[inline]
@@ -18,6 +19,10 @@ impl<T, R, N> Clone for Unprotected<T, R, N> {
 
 impl<T, R: LocalReclaim, N> Copy for Unprotected<T, R, N> {}
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// MarkedPointer
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unprotected<T, R, N> {
     impl_trait!();
 }
@@ -25,6 +30,14 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unprotected<T, R, N> {
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Unprotected<T, R, N>> {
     impl_trait_option!();
 }
+
+impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Unprotected<T, R, N>> {
+    impl_trait_marked!();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// inherent
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> Unprotected<T, R, N> {
     impl_inherent!();
@@ -43,6 +56,10 @@ impl<T, R: LocalReclaim, N: Unsigned> Unprotected<T, R, N> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Debug & Pointer
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<T, R: LocalReclaim, N: Unsigned> fmt::Debug for Unprotected<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -57,3 +74,17 @@ impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Unprotected<T, R, N> {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Internal
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, R, N> Internal for Unprotected<T, R, N> {}
+impl<T, R, N> Internal for Option<Unprotected<T, R, N>> {}
+impl<T, R, N> Internal for Marked<Unprotected<T, R, N>> {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// NonNullable
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, R, N> NonNullable for Unprotected<T, R, N> {}

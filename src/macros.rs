@@ -53,7 +53,7 @@ macro_rules! impl_trait_option {
         #[inline]
         fn tag(&self) -> usize {
             match *self {
-                Some(ptr) => ptr.tag(),
+                Some(ref ptr) => ptr.tag(),
                 None => 0,
             }
         }
@@ -100,8 +100,8 @@ macro_rules! impl_trait_marked {
         #[inline]
         fn tag(&self) -> usize {
             match *self {
-                Marked::Value(ptr) => ptr.tag(),
-                Marked::OnlyTag(tag) => tag,
+                Marked::Value(ref ptr) => ptr.tag(),
+                Marked::OnlyTag(ref tag) => *tag,
                 Marked::Null => 0,
             }
         }
@@ -198,13 +198,10 @@ macro_rules! impl_inherent {
         /// The caller has to ensure `marked` is either `null` or a valid pointer to a heap
         /// allocated value of the appropriate `Self` type.
         #[inline]
-        pub unsafe fn try_from_marked(marked: crate::pointer::MarkedPtr<T, N>) -> Option<Self> {
-
-
-            crate::pointer::MarkedNonNull::new(marked).into_option().map(|ptr| Self {
-                inner: ptr,
-                _marker: PhantomData,
-            })
+        pub unsafe fn try_from_marked(
+            marked: crate::pointer::MarkedPtr<T, N>
+        ) -> crate::pointer::Marked<Self> {
+            crate::pointer::MarkedNonNull::new(marked).map(|ptr| core::mem::transmute(ptr))
         }
 
         /// Consumes `self` and returns the raw inner non-null marked pointer.
@@ -221,7 +218,5 @@ macro_rules! impl_inherent {
                 _marker: PhantomData,
             }
         }
-
-        pub unsafe fn
     };
 }

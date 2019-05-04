@@ -3,13 +3,8 @@ use core::marker::PhantomData;
 
 use typenum::Unsigned;
 
-use crate::pointer::{Internal, MarkedNonNull, MarkedPointer, NonNullable};
+use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
 use crate::{LocalReclaim, Shared};
-
-impl<'g, T, R, N> NonNullable for Shared<'g, T, R, N> {}
-
-impl<'g, T, R, N> Internal for Shared<'g, T, R, N> {}
-impl<'g, T, R, N> Internal for Option<Shared<'g, T, R, N>> {}
 
 impl<'g, T, R, N> Clone for Shared<'g, T, N, R> {
     #[inline]
@@ -26,6 +21,10 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Shared<'g, T, R, N> 
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Shared<'g, T, R, N>> {
     impl_trait_option!();
+}
+
+impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Shared<'g, T, R, N>> {
+    impl_trait_marked!();
 }
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
@@ -59,3 +58,9 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Shared<'g, T, R, N> {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)
     }
 }
+
+impl<'g, T, R, N> Internal for Shared<'g, T, R, N> {}
+impl<'g, T, R, N> Internal for Option<Shared<'g, T, R, N>> {}
+impl<'g, T, R, N> Internal for Marked<Shared<'g, T, R, N>> {}
+
+impl<'g, T, R, N> NonNullable for Shared<'g, T, R, N> {}

@@ -1,123 +1,99 @@
 //! Thin wrapper types for adjusting a type's alignment to increase the number of markable lower
 //! bits.
 
-use core::fmt;
+use core::borrow::{Borrow, BorrowMut};
 use core::ops::{Deref, DerefMut};
 
-/// A wrapper type that is guaranteed to have at least an alignment of 8 bytes.
-pub type Aligned8<T> = Aligned<T, Alignment8>;
-/// A wrapper type that is guaranteed to have at least an alignment of 16 bytes.
-pub type Aligned16<T> = Aligned<T, Alignment16>;
-/// A wrapper type that is guaranteed to have at least an alignment of 32 bytes.
-pub type Aligned32<T> = Aligned<T, Alignment32>;
-/// A wrapper type that is guaranteed to have at least an alignment of 64 bytes.
-pub type Aligned64<T> = Aligned<T, Alignment64>;
-/// A wrapper type that is guaranteed to have at least an alignment of 128 bytes.
-pub type Aligned128<T> = Aligned<T, Alignment128>;
-/// A wrapper type that is guaranteed to have at least an alignment of 256 bytes.
-pub type Aligned256<T> = Aligned<T, Alignment256>;
-/// A wrapper type that is guaranteed to have at least an alignment of 512 bytes.
-pub type Aligned512<T> = Aligned<T, Alignment512>;
-/// A wrapper type that is guaranteed to have at least an alignment of 1024 bytes.
-pub type Aligned1024<T> = Aligned<T, Alignment1K>;
-/// A wrapper type that is guaranteed to have at least an alignment of 2048 bytes.
-pub type Aligned2048<T> = Aligned<T, Alignment2K>;
-/// A wrapper type that is guaranteed to have at least an alignment of 4096 bytes.
-pub type Aligned4096<T> = Aligned<T, Alignment4K>;
-
-/// A wrapper type that is aligned to the size of a cache line (64 bytes).
-pub type CachePadded<T> = Aligned64<T>;
-
-/// A wrapper type with generically variable alignment.
-#[derive(Copy, Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
-pub struct Aligned<T, A: Alignment> {
-    inner: T,
-    align: A,
-}
-
-impl<T, A: Alignment> Aligned<T, A> {
-    /// Creates a new wrapper with the specified inner value.
-    #[inline]
-    pub fn new(inner: T) -> Self {
-        Self {
-            inner,
-            align: Default::default(),
-        }
-    }
-
-    /// Consumes the wrapper type and returns the inner value.
-    #[inline]
-    pub fn into_inner(self) -> T {
-        self.inner
-    }
-}
-
-impl<T, A: Alignment> Deref for Aligned<T, A> {
-    type Target = T;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<T, A: Alignment> DerefMut for Aligned<T, A> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
-/// TODO: Doc...
-pub trait Alignment:
-    Copy + Clone + Default + fmt::Debug + Eq + Ord + PartialEq + PartialOrd
-{
-}
-
-macro_rules! impl_alignment {
-    ( $( $id:ident => $align:expr ),+ ) => {
+macro_rules! impl_align {
+    ($(struct align($align:expr) $wrapper:ident;)*) => {
         $(
-            /// A type with an alignment of $align.
-            #[derive(Copy, Clone, Default, Debug, Eq, Ord, PartialEq, PartialOrd)]
+            #[doc = "A thin wrapper type with an alignment of at least $align bytes."]
+            #[derive(Copy, Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
             #[repr(align($align))]
-            pub struct $id;
-            impl Alignment for $id {}
+            pub struct $wrapper<T>(pub T);
+
+            impl<T> Deref for $wrapper<T> {
+                type Target = T;
+
+                #[inline]
+                fn deref(&self) -> &Self::Target {
+                    &self.0
+                }
+            }
+
+            impl<T> DerefMut for $wrapper<T> {
+                #[inline]
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.0
+                }
+            }
+
+            impl<T> AsRef<T> for $wrapper<T> {
+                #[inline]
+                fn as_ref(&self) -> &T {
+                    &self.0
+                }
+            }
+
+            impl<T> AsMut<T> for $wrapper<T> {
+                #[inline]
+                fn as_mut(&mut self) -> &mut T {
+                    &mut self.0
+                }
+            }
+
+            impl<T> Borrow<T> for $wrapper<T> {
+                #[inline]
+                fn borrow(&self) -> &T {
+                    &self.0
+                }
+            }
+
+            impl<T> BorrowMut<T> for $wrapper<T> {
+                #[inline]
+                fn borrow_mut(&mut self) -> &mut T {
+                    &mut self.0
+                }
+            }
         )*
     };
 }
 
-impl_alignment! {
-    Alignment1    => 0x1,
-    Alignment2    => 0x2,
-    Alignment4    => 0x4,
-    Alignment8    => 0x8,
-    Alignment16   => 0x10,
-    Alignment32   => 0x20,
-    Alignment64   => 0x40,
-    Alignment128  => 0x80,
-    Alignment256  => 0x100,
-    Alignment512  => 0x200,
-    Alignment1K   => 0x400,
-    Alignment2K   => 0x800,
-    Alignment4K   => 0x1000,
-    Alignment8k   => 0x2000,
-    Alignment16k  => 0x4000,
-    Alignment32k  => 0x8000,
-    Alignment64K  => 0x10000,
-    Alignment128K => 0x20000,
-    Alignment256K => 0x40000,
-    Alignment512K => 0x80000,
-    Alignment1M   => 0x100000,
-    Alignment2M   => 0x200000,
-    Alignment4M   => 0x400000,
-    Alignment8M   => 0x800000,
-    Alignment16M  => 0x1000000,
-    Alignment32M  => 0x2000000,
-    Alignment64M  => 0x4000000,
-    Alignment128M => 0x8000000,
-    Alignment256M => 0x10000000,
-    Alignment512M => 0x20000000
+impl_align! {
+    struct align(1) Aligned1;
+    struct align(2) Aligned2;
+    struct align(4) Aligned4;
+    struct align(8) Aligned8;
+    struct align(16) Aligned16;
+    struct align(32) Aligned32;
+    struct align(64) Aligned64;
+    struct align(128) Aligned128;
+    struct align(256) Aligned256;
+    struct align(512) Aligned512;
+    struct align(1024) Aligned1024;
+    struct align(2048) Aligned2048;
+    struct align(4096) Aligned4096;
+    struct align(0x2000) Aligned8k;
+    struct align(0x4000) Aligned16k;
+    struct align(0x8000) Aligned32k;
+    struct align(0x10000) Aligned64k;
+    struct align(0x20000) Aligned128k;
+    struct align(0x40000) Aligned256k;
+    struct align(0x80000) Aligned512k;
+    struct align(0x100000) Aligned1M;
+    struct align(0x200000) Aligned2M;
+    struct align(0x400000) Aligned4M;
+    struct align(0x800000) Aligned8M;
+    struct align(0x1000000) Aligned16M;
+    struct align(0x2000000) Aligned32M;
+    struct align(0x4000000) Aligned64M;
+    struct align(0x8000000) Aligned128M;
+    struct align(0x10000000) Aligned256M;
+    struct align(0x10000000) Aligned512M;
 }
+
+/// A wrapper type that is aligned to the size of a cache line (commonly 64 bytes).
+pub type CacheAligned<T> = Aligned64<T>;
 
 #[cfg(test)]
 mod tests {

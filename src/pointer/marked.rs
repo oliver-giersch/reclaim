@@ -80,6 +80,16 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
+    /// TODO: Doc...
+    #[inline]
+    pub fn map<U: NonNullable>(self, func: impl (FnOnce(T) -> U)) -> Marked<U> {
+        match self {
+            Value(ptr) => Value(func(ptr)),
+            OnlyTag(tag) => OnlyTag(tag),
+            Null => Null,
+        }
+    }
+
     /// Converts `self` into an option, returning `Some` if a `Value` is
     /// contained.
     #[inline]
@@ -102,6 +112,10 @@ impl<T: NonNullable> Marked<T> {
         mem::replace(self, Value(value))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// NonNull
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'a, T> NonNullable for &'a T {}
 impl<'a, T> NonNullable for &'a mut T {}

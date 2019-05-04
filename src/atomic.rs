@@ -4,7 +4,7 @@ use core::sync::atomic::Ordering;
 
 use typenum::Unsigned;
 
-use crate::pointer::{AtomicMarkedPtr, MarkedNonNull, MarkedPointer, MarkedPtr};
+use crate::pointer::{AtomicMarkedPtr, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
 use crate::{LocalReclaim, NotEqual, Owned, Protect, Shared, Unlinked, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -86,6 +86,16 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Option<Shared<'g, T, R, N>> {
+        guard.acquire(&self, order).into_option()
+    }
+
+    /// TODO: Doc...
+    #[inline]
+    pub fn load_marked<'g>(
+        &self,
+        order: Ordering,
+        guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
+    ) -> Marked<Shared<'g, T, R, N>> {
         guard.acquire(&self, order)
     }
 
@@ -113,7 +123,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Result<Option<Shared<'g, T, R, N>>, NotEqual> {
-        guard.acquire_if_equal(self, compare, order)
+        guard.acquire_if_equal(self, compare, order).map(|marked| marked.into_option())
     }
 
     /// Loads a value from the pointer that is explicitly **not** protected from reclamation,
@@ -130,6 +140,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, R, N>> {
         MarkedNonNull::new(self.inner.load(order))
             .map(|ptr| Unprotected { inner: ptr, _marker: PhantomData })
+            .into_option()
     }
 
     /// Stores either `null` or a valid pointer to an owned heap allocated value
@@ -151,7 +162,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// [acq_rel]: std::sync::atomic::Ordering::AcqRel
     #[inline]
     pub fn store(&self, ptr: impl Store<Item = T, MarkBits = N, Reclaimer = R>, order: Ordering) {
-        self.inner.store(ptr.into_marked(), order);
+        self.inner.store(ptr.into_marked_ptr(), order);
     }
 
     /// Stores either `null` or a valid pointer to an owned heap allocated value
@@ -175,10 +186,10 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         ptr: impl Store<Item = T, Reclaimer = R, MarkBits = N>,
         order: Ordering,
     ) -> Option<Unlinked<T, R, N>> {
-        let res = self.inner.swap(ptr.into_marked(), order);
+        let res = self.inner.swap(ptr.into_marked_ptr(), order);
         // this is safe because the pointer is no longer accessible by other threads
         // (there can still be outstanding references that were loaded before the swap)
-        unsafe { Unlinked::try_from_marked(res) }
+        unsafe { Unlinked::try_from_marked(res).into_option() }
     }
 
     /// Stores a value (either null or valid) into the pointer if the current value
@@ -220,15 +231,15 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         C: Compare<Item = T, MarkBits = N, Reclaimer = R>,
         S: Store<Item = T, MarkBits = N, Reclaimer = R>,
     {
-        let current = current.into_marked();
-        let new = new.into_marked();
+        let current = current.into_marked_ptr();
+        let new = new.into_marked_ptr();
 
         self.inner
             .compare_exchange(current, new, success, failure)
-            .map(|ptr| unsafe { C::Unlinked::from_marked(ptr) })
+            .map(|ptr| unsafe { C::Unlinked::from_marked_ptr(ptr) })
             .map_err(|ptr| CompareExchangeFailure {
                 loaded: ptr,
-                input: unsafe { S::from_marked(new) },
+                input: unsafe { S::from_marked_ptr(new) },
                 _marker: PhantomData,
             })
     }
@@ -275,15 +286,15 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         C: Compare<Item = T, MarkBits = N, Reclaimer = R>,
         S: Store<Item = T, MarkBits = N, Reclaimer = R>,
     {
-        let current = current.into_marked();
-        let new = new.into_marked();
+        let current = current.into_marked_ptr();
+        let new = new.into_marked_ptr();
 
         self.inner
             .compare_exchange_weak(current, new, success, failure)
-            .map(|ptr| unsafe { C::Unlinked::from_marked(ptr) })
+            .map(|ptr| unsafe { C::Unlinked::from_marked_ptr(ptr) })
             .map_err(|ptr| CompareExchangeFailure {
                 loaded: ptr,
-                input: unsafe { S::from_marked(new) },
+                input: unsafe { S::from_marked_ptr(new) },
                 _marker: PhantomData,
             })
     }
@@ -301,6 +312,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         // this is safe because the mutable reference ensures no concurrent access is possible
         MarkedNonNull::new(self.inner.swap(MarkedPtr::null(), Ordering::Relaxed))
             .map(|ptr| unsafe { Owned::from_marked_non_null(ptr) })
+            .into_option()
     }
 }
 
@@ -321,7 +333,7 @@ impl<T, R: LocalReclaim, N: Unsigned> From<T> for Atomic<T, R, N> {
 impl<T, R: LocalReclaim, N: Unsigned> From<Owned<T, R, N>> for Atomic<T, R, N> {
     #[inline]
     fn from(owned: Owned<T, R, N>) -> Self {
-        Self { inner: AtomicMarkedPtr::from(Owned::into_marked(owned)), _marker: PhantomData }
+        Self { inner: AtomicMarkedPtr::from(Owned::into_marked_ptr(owned)), _marker: PhantomData }
     }
 }
 

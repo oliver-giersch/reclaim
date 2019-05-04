@@ -109,8 +109,11 @@ pub struct AtomicMarkedPtr<T, N> {
 /// TODO: Doc...
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Marked<T: NonNullable> {
+    /// TODO:
     Value(T),
+    /// TODO: Doc...
     OnlyTag(usize),
+    /// TODO: Doc...
     Null,
 }
 
@@ -189,15 +192,15 @@ mod test {
 
     use crate::align;
 
-    type Align1 = align::Aligned<u8, align::Alignment1>;
-    type Align2 = align::Aligned<u8, align::Alignment2>;
-    type Align4 = align::Aligned<u8, align::Alignment4>;
-    type Align8 = align::Aligned8<u8>;
-    type Align16 = align::Aligned16<u8>;
-    type Align32 = align::Aligned32<u8>;
-    type Align64 = align::Aligned64<u8>;
-    type Align1024 = align::Aligned1024<u8>;
-    type Align4096 = align::Aligned4096<u8>;
+    type Align1 = crate::align::Aligned1<u8>;
+    type Align2 = crate::align::Aligned2<u8>;
+    type Align4 = crate::align::Aligned4<u8>;
+    type Align8 = crate::align::Aligned8<u8>;
+    type Align16 = crate::align::Aligned16<u8>;
+    type Align32 = crate::align::Aligned32<u8>;
+    type Align64 = crate::align::Aligned64<u8>;
+    type Align1024 = crate::align::Aligned128<u8>;
+    type Align4096 = crate::align::Aligned256<u8>;
 
     #[test]
     fn lower_bits() {
@@ -222,7 +225,7 @@ mod test {
 
     #[test]
     fn compose() {
-        let ptr: *mut Align4 = &Align4::new(0) as *const _ as *mut _;
+        let ptr: *mut Align4 = &Align4(0) as *const _ as *mut _;
 
         assert_eq!(super::compose::<Align4, U2>(ptr::null_mut(), 0), ptr::null_mut());
         assert_eq!(super::compose::<_, U2>(ptr, 0), ptr);
@@ -236,7 +239,7 @@ mod test {
 
     #[test]
     fn decompose() {
-        let mut aligned = Align8::new(0);
+        let mut aligned = Align8(0);
 
         let composed = super::compose::<_, U3>(&mut aligned, 0b0);
         assert_eq!(super::decompose(composed as usize, U3::USIZE), (&mut aligned as *mut _, 0b0));

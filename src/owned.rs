@@ -39,7 +39,7 @@ unsafe impl<T, R: LocalReclaim, N: Unsigned> Send for Owned<T, R, N> where T: Se
 unsafe impl<T, R: LocalReclaim, N: Unsigned> Sync for Owned<T, R, N> where T: Sync {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl MarkedPointer
+// MarkedPointer
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
@@ -59,12 +59,12 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
 
     #[inline]
     fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
-        self.inner.into_marked()
+        self.inner.into_marked_ptr()
     }
 
     #[inline]
     fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits> {
-        let marked = self.inner.into_marked();
+        let marked = self.inner.into_marked_ptr();
         mem::forget(self);
         marked
     }
@@ -266,6 +266,7 @@ mod test {
     use typenum::U2;
 
     use crate::leak::Leaking;
+    use crate::pointer::MarkedPointer;
 
     type Owned<T> = super::Owned<T, Leaking, U2>;
 
@@ -283,18 +284,18 @@ mod test {
     #[test]
     fn try_from_marked() {
         let owned = Owned::new(1);
-        let marked = Owned::into_marked(owned);
+        let marked = Owned::into_marked_ptr(owned);
 
-        let from = unsafe { Owned::try_from_marked(marked).unwrap() };
+        let from = unsafe { Owned::try_from_marked(marked).unwrap_value() };
         assert_eq!((&1, 0), from.decompose_ref());
     }
 
     #[test]
     fn compose() {
         let owned = Owned::compose(1, 0b11);
-        assert_eq!((Some(&1), 0b11), unsafe { owned.as_marked().decompose_ref() });
+        assert_eq!((Some(&1), 0b11), unsafe { owned.into_marked_ptr().decompose_ref() });
         let owned = Owned::compose(2, 0);
-        assert_eq!((Some(&2), 0), unsafe { owned.as_marked().decompose_ref() });
+        assert_eq!((Some(&2), 0), unsafe { owned.into_marked_ptr().decompose_ref() });
     }
 
     #[test]

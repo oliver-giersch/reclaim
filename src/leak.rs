@@ -4,7 +4,7 @@ use core::sync::atomic::Ordering;
 
 use typenum::Unsigned;
 
-use crate::pointer::{Marked, MarkedPtr};
+use crate::pointer::{Marked, MarkedPointer, MarkedPtr};
 use crate::{AcquireResult, LocalReclaim, Protect};
 
 /// An [`Atomic`](../struct.Atomic.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme

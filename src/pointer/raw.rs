@@ -250,7 +250,7 @@ impl<T, N: Unsigned> From<(*const T, usize)> for MarkedPtr<T, N> {
     #[inline]
     fn from(pair: (*const T, usize)) -> Self {
         let (ptr, tag) = pair;
-        Self::compose(ptr, tag)
+        Self::compose(ptr as *mut _, tag)
     }
 }
 
@@ -290,6 +290,7 @@ impl<T, N> PartialOrd<MarkedNonNull<T, N>> for MarkedPtr<T, N> {
 mod test {
     use core::ptr;
 
+    use matches::assert_matches;
     use typenum::{U0, U1, U3};
 
     use crate::align::Aligned8;
@@ -306,9 +307,9 @@ mod test {
         let marked_null = MarkedPtr3N::compose(ptr::null_mut(), 0b111);
         assert_eq!((None, 0b111), unsafe { marked_null.decompose_ref() });
 
-        let value = Aligned8::new(1);
-        let marked = MarkedPtr3N::compose(&value as *const _ as *mut _, 0b11);
-        assert_eq!((Some(&value), 0b11), unsafe { marked.decompose_ref() });
+        let value = Aligned8(1);
+        let marked = MarkedPtr3N::compose(&value as *const Aligned8<i32> as *mut _, 0b11);
+        assert_eq!((Some(&Aligned8(value)), 0b11), unsafe { marked.decompose_ref() });
     }
 
     #[test]
@@ -319,27 +320,25 @@ mod test {
         let marked_null = MarkedPtr3N::compose(ptr::null_mut(), 0b111);
         assert_eq!((None, 0b111), unsafe { marked_null.decompose_mut() });
 
-        let mut value = Aligned8::new(1);
+        let mut value = Aligned8(1);
         let marked = MarkedPtr3N::compose(&mut value, 0b11);
-        assert_eq!((Some(&mut value), 0b11), unsafe { marked.decompose_mut() });
+        assert_eq!((Some(&mut Aligned8(value)), 0b11), unsafe { marked.decompose_mut() });
     }
 
     #[test]
     fn from_usize() {
         unsafe {
-            assert_eq!(
-                Some(&1),
-                UnmarkedMarkedPtr::from_usize(&1i32 as *const _ as usize).as_ref()
-            );
+            let unmarked = UnmarkedMarkedPtr::from_usize(&Aligned8(1) as *const _ as usize);
+            assert_matches!(unmarked.as_ref(), Some(&Aligned8(1)));
 
             let tagged = (&1i32 as *const _ as usize) | 0b1;
-            assert_eq!((Some(&1), 0b1), MarkedPtr1N::from_usize(tagged).decompose_ref(),);
+            assert_eq!((Some(&1), 0b1), MarkedPtr1N::from_usize(tagged).decompose_ref());
         }
     }
 
     #[test]
     fn from() {
-        let mut x = Aligned8::new(1);
+        let mut x = Aligned8(1);
 
         let from_ref = MarkedPtr1N::from(&x);
         let from_mut = MarkedPtr1N::from(&mut x);
@@ -355,9 +354,9 @@ mod test {
         assert!(null.is_null());
         assert_eq!(null, null);
 
-        let mut reference = Aligned8::new(1);
-        let marked1 = MarkedPtr3N::compose(&mut reference, 0b01);
-        let marked2 = MarkedPtr3N::compose(&mut reference, 0b11);
+        let mut aligned = Aligned8(1);
+        let marked1 = MarkedPtr3N::compose(&mut aligned, 0b01);
+        let marked2 = MarkedPtr3N::compose(&mut aligned, 0b11);
 
         assert_ne!(marked1, marked2);
         assert!(marked1 < marked2);
@@ -365,7 +364,7 @@ mod test {
 
     #[test]
     fn convert() {
-        let mut aligned = Aligned8::new(1);
+        let mut aligned = Aligned8(1);
 
         let marked = MarkedPtr1N::compose(&mut aligned, 0b1);
         let convert = MarkedPtr3N::convert(marked);
