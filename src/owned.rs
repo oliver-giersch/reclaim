@@ -13,16 +13,6 @@ use typenum::Unsigned;
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, MarkedPtr, NonNullable};
 use crate::{LocalReclaim, Owned, Record, Shared};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl Internal, Clone, Copy
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl<T, R: LocalReclaim, N: Unsigned> NonNullable for Owned<T, R, N> {}
-
-impl<T, R: LocalReclaim, N: Unsigned> Internal for Owned<T, R, N> {}
-impl<T, R: LocalReclaim, N: Unsigned> Internal for Option<Owned<T, R, N>> {}
-impl<T, R: LocalReclaim, N: Unsigned> Internal for Marked<Owned<T, R, N>> {}
-
 impl<T: Clone, R: LocalReclaim, N: Unsigned> Clone for Owned<T, R, N> {
     #[inline]
     fn clone(&self) -> Self {
@@ -75,6 +65,7 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
         Self { inner: MarkedNonNull::new_unchecked(marked), _marker: PhantomData }
     }
 
+    #[inline]
     unsafe fn from_marked_non_null(marked: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self {
         Self { inner: marked, _marker: PhantomData }
     }
@@ -173,6 +164,10 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// AsRef & AsMut
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<T, R: LocalReclaim, N: Unsigned> AsRef<T> for Owned<T, R, N> {
     #[inline]
     fn as_ref(&self) -> &T {
@@ -187,6 +182,10 @@ impl<T, R: LocalReclaim, N: Unsigned> AsMut<T> for Owned<T, R, N> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Borrow & BorrowMut
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<T, R: LocalReclaim, N: Unsigned> Borrow<T> for Owned<T, R, N> {
     #[inline]
     fn borrow(&self) -> &T {
@@ -200,6 +199,21 @@ impl<T, R: LocalReclaim, N: Unsigned> BorrowMut<T> for Owned<T, R, N> {
         &mut **self
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Default
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T: Default, R: LocalReclaim, N: Unsigned> Default for Owned<T, R, N> {
+    #[inline]
+    fn default() -> Self {
+        Owned::new(T::default())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Deref & DerefMut
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> Deref for Owned<T, R, N> {
     type Target = T;
@@ -217,6 +231,10 @@ impl<T, R: LocalReclaim, N: Unsigned> DerefMut for Owned<T, R, N> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Drop
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<T, R: LocalReclaim, N: Unsigned> Drop for Owned<T, R, N> {
     #[inline]
     fn drop(&mut self) {
@@ -229,12 +247,9 @@ impl<T, R: LocalReclaim, N: Unsigned> Drop for Owned<T, R, N> {
     }
 }
 
-impl<T: Default, R: LocalReclaim, N: Unsigned> Default for Owned<T, R, N> {
-    #[inline]
-    fn default() -> Self {
-        Owned::new(T::default())
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// From
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> From<T> for Owned<T, R, N> {
     #[inline]
@@ -242,6 +257,10 @@ impl<T, R: LocalReclaim, N: Unsigned> From<T> for Owned<T, R, N> {
         Owned::new(owned)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Debug & Pointer
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> fmt::Debug for Owned<T, R, N>
 where
@@ -260,6 +279,20 @@ impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Owned<T, R, N> {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Internal
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, R: LocalReclaim, N: Unsigned> Internal for Owned<T, R, N> {}
+impl<T, R: LocalReclaim, N: Unsigned> Internal for Option<Owned<T, R, N>> {}
+impl<T, R: LocalReclaim, N: Unsigned> Internal for Marked<Owned<T, R, N>> {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// NonNullable
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, R: LocalReclaim, N: Unsigned> NonNullable for Owned<T, R, N> {}
 
 #[cfg(test)]
 mod test {

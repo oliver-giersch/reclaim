@@ -1,7 +1,7 @@
 use core::mem;
 
 use crate::pointer::{
-    Marked::{self, Null, OnlyTag, Value},
+    Marked::{self, Null, OnlyTag, Pointer},
     NonNullable,
 };
 
@@ -10,7 +10,7 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn is_value(&self) -> bool {
         match *self {
-            Value(_) => true,
+            Pointer(_) => true,
             _ => false,
         }
     }
@@ -37,7 +37,7 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn as_ref(&self) -> Marked<&T> {
         match *self {
-            Value(ref value) => Value(value),
+            Pointer(ref value) => Pointer(value),
             OnlyTag(ref tag) => OnlyTag(*tag),
             Null => Null,
         }
@@ -47,7 +47,7 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn as_mut(&mut self) -> Marked<&mut T> {
         match *self {
-            Value(ref mut value) => Value(value),
+            Pointer(ref mut value) => Pointer(value),
             OnlyTag(ref tag) => OnlyTag(*tag),
             Null => Null,
         }
@@ -57,7 +57,7 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn unwrap_value(self) -> T {
         match self {
-            Value(ptr) => ptr,
+            Pointer(ptr) => ptr,
             _ => panic!("called `Marked::unwrap_value()` on a `Null` or `OnlyTag` value"),
         }
     }
@@ -66,7 +66,7 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn unwrap_value_or_else<F: FnOnce() -> T>(self, f: F) -> T {
         match self {
-            Value(ptr) => ptr,
+            Pointer(ptr) => ptr,
             _ => f(),
         }
     }
@@ -84,7 +84,7 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn map<U: NonNullable>(self, func: impl (FnOnce(T) -> U)) -> Marked<U> {
         match self {
-            Value(ptr) => Value(func(ptr)),
+            Pointer(ptr) => Pointer(func(ptr)),
             OnlyTag(tag) => OnlyTag(tag),
             Null => Null,
         }
@@ -95,7 +95,7 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn into_option(self) -> Option<T> {
         match self {
-            Value(ptr) => Some(ptr),
+            Pointer(ptr) => Some(ptr),
             _ => None,
         }
     }
@@ -109,7 +109,7 @@ impl<T: NonNullable> Marked<T> {
     /// TODO: Doc...
     #[inline]
     pub fn replace(&mut self, value: T) -> Self {
-        mem::replace(self, Value(value))
+        mem::replace(self, Pointer(value))
     }
 }
 

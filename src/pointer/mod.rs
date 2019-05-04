@@ -23,14 +23,14 @@ pub trait MarkedPointer: Sized + Internal {
     /// Number of bits available for tagging.
     const MARK_BITS: usize;
 
+    /// Returns the equivalent raw marked pointer.
+    fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits>;
+
     /// Returns the tag value of the marked pointer.
     fn tag(&self) -> usize;
 
     /// Consumes `self` and returns the same value but without any tag.
     fn clear_tag(self) -> Self;
-
-    /// Returns the equivalent raw marked pointer.
-    fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits>;
 
     /// Consumes `self` and returns the equivalent raw marked pointer.
     fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits>;
@@ -110,7 +110,7 @@ pub struct AtomicMarkedPtr<T, N> {
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Marked<T: NonNullable> {
     /// TODO:
-    Value(T),
+    Pointer(T),
     /// TODO: Doc...
     OnlyTag(usize),
     /// TODO: Doc...
@@ -190,56 +190,50 @@ mod test {
 
     use typenum::{Unsigned, U0, U1, U2, U3, U6};
 
-    use crate::align;
-
-    type Align1 = crate::align::Aligned1<u8>;
-    type Align2 = crate::align::Aligned2<u8>;
-    type Align4 = crate::align::Aligned4<u8>;
-    type Align8 = crate::align::Aligned8<u8>;
-    type Align16 = crate::align::Aligned16<u8>;
-    type Align32 = crate::align::Aligned32<u8>;
-    type Align64 = crate::align::Aligned64<u8>;
-    type Align1024 = crate::align::Aligned128<u8>;
-    type Align4096 = crate::align::Aligned256<u8>;
+    use crate::align::{
+        Aligned1, Aligned1024, Aligned16, Aligned2, Aligned32, Aligned4, Aligned4096, Aligned64,
+        Aligned8,
+    };
 
     #[test]
     fn lower_bits() {
-        assert_eq!(0, super::lower_bits::<Align1>());
-        assert_eq!(1, super::lower_bits::<Align2>());
-        assert_eq!(2, super::lower_bits::<Align4>());
-        assert_eq!(3, super::lower_bits::<Align8>());
-        assert_eq!(4, super::lower_bits::<Align16>());
-        assert_eq!(5, super::lower_bits::<Align32>());
-        assert_eq!(6, super::lower_bits::<Align64>());
-        assert_eq!(10, super::lower_bits::<Align1024>());
-        assert_eq!(12, super::lower_bits::<Align4096>());
+        assert_eq!(0, super::lower_bits::<Aligned1<u8>>());
+        assert_eq!(1, super::lower_bits::<Aligned2<u8>>());
+        assert_eq!(2, super::lower_bits::<Aligned4<u8>>());
+        assert_eq!(3, super::lower_bits::<Aligned8<u8>>());
+        assert_eq!(4, super::lower_bits::<Aligned16<u8>>());
+        assert_eq!(5, super::lower_bits::<Aligned32<u8>>());
+        assert_eq!(6, super::lower_bits::<Aligned64<u8>>());
+        assert_eq!(10, super::lower_bits::<Aligned1024<u8>>());
+        assert_eq!(12, super::lower_bits::<Aligned4096<u8>>());
     }
 
     #[test]
     fn mark_mask() {
-        assert_eq!(0b000, super::mark_mask::<Align8>(U0::USIZE));
-        assert_eq!(0b001, super::mark_mask::<Align8>(U1::USIZE));
-        assert_eq!(0b011, super::mark_mask::<Align8>(U2::USIZE));
-        assert_eq!(0b111, super::mark_mask::<Align8>(U3::USIZE));
+        assert_eq!(0b000, super::mark_mask::<Aligned8<u8>>(U0::USIZE));
+        assert_eq!(0b001, super::mark_mask::<Aligned8<u8>>(U1::USIZE));
+        assert_eq!(0b011, super::mark_mask::<Aligned8<u8>>(U2::USIZE));
+        assert_eq!(0b111, super::mark_mask::<Aligned8<u8>>(U3::USIZE));
     }
 
     #[test]
     fn compose() {
-        let ptr: *mut Align4 = &Align4(0) as *const _ as *mut _;
+        let reference = &mut Aligned4(0u8);
+        let ptr = reference as *mut _ as usize;
 
-        assert_eq!(super::compose::<Align4, U2>(ptr::null_mut(), 0), ptr::null_mut());
-        assert_eq!(super::compose::<_, U2>(ptr, 0), ptr);
-        assert_eq!(super::compose::<_, U2>(ptr, 0b11), ((ptr as usize) | 0b11) as *mut _);
-        assert_eq!(super::compose::<_, U2>(ptr, 0b1111), ((ptr as usize) | 0b11) as *mut _);
+        assert_eq!(super::compose::<Aligned8<u8>, U2>(ptr::null_mut(), 0), ptr::null_mut());
+        assert_eq!(super::compose::<_, U2>(reference, 0), ptr as *mut _);
+        assert_eq!(super::compose::<_, U2>(reference, 0b11), (ptr | 0b11) as *mut _);
+        assert_eq!(super::compose::<_, U2>(reference, 0b1111), (ptr | 0b11) as *mut _);
         assert_eq!(
-            super::compose::<Align64, U6>(ptr::null_mut(), 0b110101),
-            0b110101 as *mut Align64
+            super::compose::<Aligned64<u8>, U6>(ptr::null_mut(), 0b110101),
+            0b110101 as *mut Aligned64<u8>
         );
     }
 
     #[test]
     fn decompose() {
-        let mut aligned = Align8(0);
+        let mut aligned = Aligned8(0);
 
         let composed = super::compose::<_, U3>(&mut aligned, 0b0);
         assert_eq!(super::decompose(composed as usize, U3::USIZE), (&mut aligned as *mut _, 0b0));
@@ -255,8 +249,8 @@ mod test {
 
     #[test]
     fn marked_null() {
-        let ptr: *mut Align4 = ptr::null_mut();
+        let ptr: *mut Aligned4<u8> = ptr::null_mut();
         let marked = super::compose::<_, U1>(ptr, 1);
-        assert_eq!(super::decompose::<Align4>(marked as usize, 1), (ptr::null_mut(), 1));
+        assert_eq!(super::decompose::<Aligned4<u8>>(marked as usize, 1), (ptr::null_mut(), 1));
     }
 }

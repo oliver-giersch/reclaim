@@ -6,6 +6,10 @@ use typenum::Unsigned;
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
 use crate::{LocalReclaim, Reclaim, Unlinked};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// MarkedPointer
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unlinked<T, R, N> {
     impl_trait!();
 }
@@ -17,6 +21,10 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Unlinked<T, R, N>
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Unlinked<T, R, N>> {
     impl_trait_marked!();
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// inherent
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     impl_inherent!();

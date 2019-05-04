@@ -309,7 +309,7 @@ mod test {
 
         let value = Aligned8(1);
         let marked = MarkedPtr3N::compose(&value as *const Aligned8<i32> as *mut _, 0b11);
-        assert_eq!((Some(&Aligned8(value)), 0b11), unsafe { marked.decompose_ref() });
+        assert_eq!((Some(&value), 0b11), unsafe { marked.decompose_ref() });
     }
 
     #[test]
@@ -322,7 +322,7 @@ mod test {
 
         let mut value = Aligned8(1);
         let marked = MarkedPtr3N::compose(&mut value, 0b11);
-        assert_eq!((Some(&mut Aligned8(value)), 0b11), unsafe { marked.decompose_mut() });
+        assert_eq!((Some(&mut value), 0b11), unsafe { marked.decompose_mut() });
     }
 
     #[test]
@@ -331,8 +331,11 @@ mod test {
             let unmarked = UnmarkedMarkedPtr::from_usize(&Aligned8(1) as *const _ as usize);
             assert_matches!(unmarked.as_ref(), Some(&Aligned8(1)));
 
-            let tagged = (&1i32 as *const _ as usize) | 0b1;
-            assert_eq!((Some(&1), 0b1), MarkedPtr1N::from_usize(tagged).decompose_ref());
+            let tagged = (&Aligned8(1i32) as *const _ as usize) | 0b1;
+            assert_eq!(
+                (Some(&Aligned8(1i32)), 0b1),
+                MarkedPtr1N::from_usize(tagged).decompose_ref()
+            );
         }
     }
 

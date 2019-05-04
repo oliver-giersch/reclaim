@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     fn new() {
-        let reference = &Aligned8::new(1usize);
+        let reference = &Aligned8(1usize);
         let marked = AtomicMarkedPtr::new(MarkedPtr::from(reference));
         let from = AtomicMarkedPtr::from(reference as *const _ as *mut Aligned8<usize>);
         assert_eq!(marked.load(Ordering::Relaxed).into_usize(), reference as *const _ as usize);
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn store() {
-        let raw = MarkedPtr::from(&Aligned8::new(1usize));
+        let raw = MarkedPtr::from(&Aligned8(1usize));
         let atomic = AtomicMarkedPtr::null();
 
         atomic.store(raw, Ordering::Relaxed);

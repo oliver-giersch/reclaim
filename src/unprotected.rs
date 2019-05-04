@@ -42,7 +42,7 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Unprotected<T, R,
 impl<T, R: LocalReclaim, N: Unsigned> Unprotected<T, R, N> {
     impl_inherent!();
 
-    /// TODO: Doc...
+    /// Dereferences the **unprotected** pointer.
     ///
     /// # Safety
     ///
