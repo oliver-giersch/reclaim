@@ -32,7 +32,7 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Shared<'g, T,
 }
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Shared<'g, T, R, N>> {
-    impl_trait_marked!();
+    impl_trait_marked!(Shared);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,7 +58,7 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
     ///
     /// ...
     #[inline]
-    pub unsafe fn decompose(self) -> (&'g T, usize) {
+    pub unsafe fn decompose_ref(self) -> (&'g T, usize) {
         let (ptr, tag) = self.inner.decompose();
         (&*ptr.as_ptr(), tag)
     }

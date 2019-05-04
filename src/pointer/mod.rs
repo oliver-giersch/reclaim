@@ -181,6 +181,9 @@ fn compose<T, N: Unsigned>(ptr: *mut T, tag: usize) -> *mut T {
 /// An internal marker trait for non-nullable pointer types.
 pub trait NonNullable {}
 
+impl<'a, T> NonNullable for &'a T {}
+impl<'a, T> NonNullable for &'a mut T {}
+
 /// A marker trait for internal traits.
 pub trait Internal {}
 

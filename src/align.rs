@@ -1,6 +1,8 @@
 //! Thin wrapper types for adjusting a type's alignment to increase the number of markable lower
 //! bits.
 
+pub use self::Aligned64 as CacheAligned;
+
 use core::borrow::{Borrow, BorrowMut};
 use core::ops::{Deref, DerefMut};
 
@@ -92,9 +94,6 @@ impl_align! {
     struct align(0x10000000) Aligned512M;
 }
 
-/// A wrapper type that is aligned to the size of a cache line (commonly 64 bytes).
-pub type CacheAligned<T> = Aligned64<T>;
-
 #[cfg(test)]
 mod tests {
     use std::mem;
@@ -113,5 +112,14 @@ mod tests {
         assert_eq!(mem::align_of::<Aligned1024<u8>>(), 1024);
         assert_eq!(mem::align_of::<Aligned2048<u8>>(), 2048);
         assert_eq!(mem::align_of::<Aligned4096<u8>>(), 4096);
+    }
+
+    #[test]
+    fn construct_and_deref() {
+        let value = Aligned8(255u8);
+        assert_eq!(*value, 255);
+
+        let value = CacheAligned(1u8);
+        assert_eq!(*value, 1);
     }
 }

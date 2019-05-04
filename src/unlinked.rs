@@ -19,7 +19,7 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Unlinked<T, R, N>
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Unlinked<T, R, N>> {
-    impl_trait_marked!();
+    impl_trait_marked!(Unlinked);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

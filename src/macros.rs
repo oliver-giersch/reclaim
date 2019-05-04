@@ -92,7 +92,7 @@ macro_rules! impl_trait_option {
 }
 
 macro_rules! impl_trait_marked {
-    () => {
+    ($pointer:ident) => {
         type Item = T;
         type MarkBits = N;
         const MARK_BITS: usize = N::USIZE;
@@ -140,12 +140,12 @@ macro_rules! impl_trait_marked {
 
         #[inline]
         unsafe fn from_marked_ptr(marked: crate::pointer::MarkedPtr<T, N>) -> Self {
-            crate::pointer::MarkedNonNull::new(marked).map(|ptr| core::mem::transmute(ptr))
+            crate::pointer::MarkedNonNull::new(marked).map(|ptr| $pointer::from_marked_non_null(ptr))
         }
 
         #[inline]
         unsafe fn from_marked_non_null(marked: crate::pointer::MarkedNonNull<T, N>) -> Self {
-            Marked::Pointer(core::mem::transmute(marked))
+            Marked::Pointer($pointer::from_marked_non_null(marked))
         }
     };
 }

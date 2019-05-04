@@ -307,14 +307,22 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// values behave like [`Boxes`](std::boxed::Box) when they are dropped.
     ///
     /// [owned]: crate::Owned
+    ///
+    /// # Safety
+    ///
+    /// ...
     #[inline]
-    pub fn take(&mut self) -> Option<Owned<T, R, N>> {
+    pub unsafe fn take(&mut self) -> Option<Owned<T, R, N>> {
         // this is safe because the mutable reference ensures no concurrent access is possible
         MarkedNonNull::new(self.inner.swap(MarkedPtr::null(), Ordering::Relaxed))
-            .map(|ptr| unsafe { Owned::from_marked_non_null(ptr) })
+            .map(|ptr| Owned::from_marked_non_null(ptr))
             .into_option()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Default
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> Default for Atomic<T, R, N> {
     #[inline]
@@ -322,6 +330,10 @@ impl<T, R: LocalReclaim, N: Unsigned> Default for Atomic<T, R, N> {
         Self::null()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// From
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> From<T> for Atomic<T, R, N> {
     #[inline]
@@ -336,6 +348,10 @@ impl<T, R: LocalReclaim, N: Unsigned> From<Owned<T, R, N>> for Atomic<T, R, N> {
         Self { inner: AtomicMarkedPtr::from(Owned::into_marked_ptr(owned)), _marker: PhantomData }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Debug & Pointer
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> fmt::Debug for Atomic<T, R, N> {
     #[inline]
@@ -425,20 +441,20 @@ pub trait Compare: MarkedPointer + Sized {
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> Compare for Shared<'g, T, R, N> {
     type Reclaimer = R;
-    type Unlinked = Unlinked<T, R, N>;
+    type Unlinked = Self;
 }
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> Compare for Option<Shared<'g, T, R, N>> {
     type Reclaimer = R;
-    type Unlinked = Option<Unlinked<T, R, N>>;
+    type Unlinked = Self;
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> Compare for Unprotected<T, R, N> {
     type Reclaimer = R;
-    type Unlinked = Unlinked<T, R, N>;
+    type Unlinked = Self;
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> Compare for Option<Unprotected<T, R, N>> {
     type Reclaimer = R;
-    type Unlinked = Option<Unlinked<T, R, N>>;
+    type Unlinked = Self;
 }

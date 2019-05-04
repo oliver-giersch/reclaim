@@ -32,7 +32,7 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Unprotected<T, R,
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Unprotected<T, R, N>> {
-    impl_trait_marked!();
+    impl_trait_marked!(Unprotected);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
