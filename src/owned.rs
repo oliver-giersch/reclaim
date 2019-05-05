@@ -125,7 +125,11 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
         unsafe { Record::<T, R>::get_header_mut(self.inner.decompose_non_null()) }
     }
 
-    /// TODO: Doc...
+    /// Consumes and leaks the `Owned`, returning a mutable reference
+    /// `&'a mut T`.
+    /// Note that the type `T` must outlive the chosen lifetime `'a`.
+    /// If the type has only static references, or none at all, then this may
+    /// chosen to be `'static`.
     #[inline]
     pub fn leak<'a>(owned: Self) -> &'a mut T
     where
