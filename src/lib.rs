@@ -69,7 +69,7 @@ pub mod leak;
 pub mod prelude {
     //! Useful and/or required types and traits for this crate.
     pub use crate::pointer::{
-        Marked::{self, Null, OnlyTag, Pointer},
+        Marked::{self, Null, OnlyTag, Ptr},
         MarkedPointer,
     };
     pub use crate::Protect;
@@ -180,9 +180,9 @@ where
     type Local: Sized;
 
     /// Every record allocates this type alongside itself to store additional
-    /// reclamation scheme specific data. When no such data is necessary, `()`
-    /// is the recommended choice.
-    type RecordHeader: Default + Sized;
+    /// reclamation scheme specific data.
+    /// When no such data is required, `()` is the recommended choice.
+    type RecordHeader: Default + Sync + Sized;
 
     /// Retires a record and caches it **at least** until it is safe to
     /// deallocate it, i.e. when no other threads can possibly have any live
@@ -243,7 +243,7 @@ where
     /// Gets a shared reference to the protected value that is tied to the
     /// lifetime of self.
     fn shared(&self) -> Option<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>> {
-        self.marked().into_option()
+        self.marked().ptr()
     }
 
     /// Gets a shared reference wrapped in a [`Marked`][marked] for the
@@ -304,8 +304,12 @@ where
         order: Ordering,
     ) -> AcquireResult<Self::Item, Self::Reclaimer, Self::MarkBits>;
 
-    /// Releases the currently protected value, which is no longer guaranteed to
-    /// be protected afterwards.
+    /// Clears the current internal state.
+    ///
+    /// Any previously protected values are no longer guaranteed to be protected
+    /// and consecutive calls to [`shared`][Protect::shared] and [`marked`][Protect::marked]
+    /// must return [`None`][core::option::Option::None] and [`Null`][Marked::Null],
+    /// respectively.
     fn release(&mut self);
 }
 

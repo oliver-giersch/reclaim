@@ -28,7 +28,7 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unprotected<T, R, N> {
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Unprotected<T, R, N>> {
-    impl_trait_option!();
+    impl_trait_option!(Unprotected);
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Unprotected<T, R, N>> {
@@ -41,19 +41,6 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Unprotected<T, R,
 
 impl<T, R: LocalReclaim, N: Unsigned> Unprotected<T, R, N> {
     impl_inherent!();
-
-    /// Dereferences the **unprotected** pointer.
-    ///
-    /// # Safety
-    ///
-    /// This is generally unsound to call. Only when the caller is able to ensure no memory
-    /// reclamation is happening concurrently can it be considered to be safe to dereference an
-    /// unprotected pointer loaded from a concurrent data structure. This is e.g. the case when
-    /// there are mutable references involved (e.g. during `drop`).
-    #[inline]
-    pub unsafe fn deref_unprotected<'a>(self) -> &'a T {
-        &*self.inner.decompose_ptr()
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

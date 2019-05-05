@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use typenum::Unsigned;
 
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
-use crate::{LocalReclaim, Reclaim, Unlinked};
+use crate::{LocalReclaim, Reclaim, Record, Unlinked};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // MarkedPointer
@@ -15,7 +15,7 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unlinked<T, R, N> {
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Unlinked<T, R, N>> {
-    impl_trait_option!();
+    impl_trait_option!(Unlinked);
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Unlinked<T, R, N>> {
@@ -28,6 +28,12 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Unlinked<T, R, N>
 
 impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     impl_inherent!();
+
+    /// TODO: Doc...
+    #[inline]
+    pub unsafe fn header(&self) -> &R::RecordHeader {
+        Record::<T, R>::get_header(self.inner.decompose_non_null())
+    }
 
     /// TODO: Doc...
     #[inline]

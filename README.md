@@ -26,27 +26,19 @@ reclaim = "0.1.0"
 
 The minimum supported rust version for this crate is 1.35.0
 
-## Memory Management in Rust
+## Features
 
-Rust's ownership model in combination with the standard library's smart pointer
-types `Box`, `Rc` and `Arc` are perfectly well suited for a wide range of the
-most common use cases. Consequently, there is usually little need for
-automated memory management like *Garbage Collection* (GC). However, ...
+...
 
-## Reclaim API
+## Reclamation Scheme Implementations
 
-The abstract interface exposed by this crate is formed by a number of traits and concrete but generic types. The most
-important of these traits is the `Reclaim` trait, which provides functionality to **retire**
+The following lists the currently available reclamation scheme implementations
+using this crate:
 
-```rust
-pub struct Atomic<T, const N: usize, R: Reclaim> { /* ... */ } 
-```
+- hazptr
+- arc-reclaim
+- debra
 
-## Unified Concurrent Memory Reclamation Interface
+## Down the Road
 
-- How does Rust manage memory
-- why is GC necessary for lock-free concurrent data structures
-
-## Approaches for Protecting Memory from Reclamation
-
-## Memory Allocation and Custom Allocators
+...

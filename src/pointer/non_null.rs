@@ -8,7 +8,7 @@ use typenum::{IsGreaterOrEqual, True, Unsigned};
 
 use crate::pointer::{
     self, InvalidNullError,
-    Marked::{self, Null, OnlyTag, Pointer},
+    Marked::{self, Null, OnlyTag, Ptr},
     MarkedNonNull, MarkedPtr, NonNullable,
 };
 
@@ -64,7 +64,7 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// if `ptr` is non-null.
     pub fn new(ptr: MarkedPtr<T, N>) -> Marked<Self> {
         match ptr.decompose() {
-            (raw, _) if !raw.is_null() => unsafe { Pointer(Self::new_unchecked(ptr)) },
+            (raw, _) if !raw.is_null() => unsafe { Ptr(Self::new_unchecked(ptr)) },
             (_, 0) => Null,
             (_, tag) => OnlyTag(tag),
         }
@@ -267,15 +267,31 @@ impl<T, N> NonNullable for MarkedNonNull<T, N> {}
 
 #[cfg(test)]
 mod tests {
-    use crate::pointer::{MarkedNonNull, MarkedPtr};
+    use std::ptr;
+
+    use typenum::U2;
+
+    use crate::align::Aligned4;
+
+    type MarkedPtr<T> = crate::pointer::MarkedPtr<T, U2>;
+    type MarkedNonNull<T> = crate::pointer::MarkedNonNull<T, U2>;
 
     #[test]
     fn new() {
-        let ptr = &mut 1;
-        let val = ptr as *mut _ as usize;
+        let reference = &mut Aligned4(1);
+        let unmarked = MarkedPtr::new(reference);
 
-        //let unmarked = MarkedPtr::new(ptr);
-        //let marked = MarkedNonNull::new(unmarked);
-        //assert!(marked.is_value());
+        let marked = MarkedNonNull::new(unmarked);
+        assert_eq!(unsafe { marked.unwrap_ptr().decompose_ref() }, (&Aligned4(1), 0));
+
+        let marked = MarkedNonNull::new(MarkedPtr::compose(reference, 0b11));
+        assert_eq!(unsafe { marked.unwrap_ptr().decompose_ref() }, (&Aligned4(1), 0b11));
+
+        let null: *mut Aligned4<i32> = ptr::null_mut();
+        let marked = MarkedNonNull::new(MarkedPtr::compose(null, 0b11));
+        assert_eq!(marked.unwrap_tag(), 0b11);
+
+        let marked = MarkedNonNull::new(MarkedPtr::compose(null, 0));
+        assert!(marked.is_null());
     }
 }

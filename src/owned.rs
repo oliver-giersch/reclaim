@@ -38,18 +38,18 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
     const MARK_BITS: usize = N::USIZE;
 
     #[inline]
-    fn tag(&self) -> usize {
+    fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        self.inner.into_marked_ptr()
+    }
+
+    #[inline]
+    fn decompose_tag(&self) -> usize {
         self.inner.decompose_tag()
     }
 
     #[inline]
     fn clear_tag(self) -> Self {
         self.with_tag(0)
-    }
-
-    #[inline]
-    fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
-        self.inner.into_marked_ptr()
     }
 
     #[inline]
@@ -72,7 +72,7 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Owned<T, R, N>> {
-    impl_trait_option!();
+    impl_trait_option!(Owned);
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
@@ -319,7 +319,7 @@ mod test {
         let owned = Owned::new(1);
         let marked = Owned::into_marked_ptr(owned);
 
-        let from = unsafe { Owned::try_from_marked(marked).unwrap_value() };
+        let from = unsafe { Owned::try_from_marked(marked).unwrap_ptr() };
         assert_eq!((&1, 0), from.decompose_ref());
     }
 

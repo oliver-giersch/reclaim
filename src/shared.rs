@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use typenum::Unsigned;
 
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
-use crate::{LocalReclaim, Shared};
+use crate::{LocalReclaim, Record, Shared};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Copy & Clone
@@ -28,7 +28,7 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Shared<'g, T, R, N> 
 }
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Shared<'g, T, R, N>> {
-    impl_trait_option!();
+    impl_trait_option!(Shared);
 }
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Shared<'g, T, R, N>> {
@@ -41,6 +41,12 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Shared<'g, T,
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
     impl_inherent!();
+
+    /// TODO: Doc...
+    #[inline]
+    pub unsafe fn header(self) -> &'g R::RecordHeader {
+        Record::<T, R>::get_header(self.inner.decompose_non_null())
+    }
 
     /// TODO: Doc...
     ///

@@ -225,6 +225,7 @@ impl<T, N: Unsigned> From<MarkedPtr<T, N>> for AtomicMarkedPtr<T, N> {
 
 #[cfg(test)]
 mod tests {
+    use core::ptr;
     use core::sync::atomic::Ordering;
 
     use typenum::U3;
@@ -261,10 +262,22 @@ mod tests {
 
     #[test]
     fn swap() {
-        let reference: &i32 = &1;
+        let reference = &1i32;
         let atomic: AtomicMarkedPtr<i32> = AtomicMarkedPtr::from(reference as *const _);
         let swap = atomic.swap(MarkedPtr::null(), Ordering::Relaxed);
         assert_eq!(swap.into_usize(), reference as *const _ as usize);
         assert_eq!(atomic.load(Ordering::Relaxed).into_usize(), 0);
+    }
+
+    #[test]
+    fn compare_exchange() {
+        let marked = MarkedPtr::compose(&mut Aligned8(1), 0b11);
+        let swap = MarkedPtr::compose(ptr::null_mut(), 0b100);
+        let atomic = AtomicMarkedPtr::new(marked);
+        let prev =
+            atomic.compare_exchange(marked, swap, Ordering::Relaxed, Ordering::Relaxed).unwrap();
+
+        assert_eq!(prev, marked);
+        assert_eq!(atomic.load(Ordering::Relaxed), swap);
     }
 }

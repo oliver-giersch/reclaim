@@ -70,8 +70,8 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// from reclamation for as long as it is stored within `guard`. This method
     /// internally relies on [`acquire`](crate::Protect::acquire).
     ///
-    /// `load` takes an [`Ordering`][ordering] argument, which describes the memory ordering
-    /// of this operation.
+    /// `load` takes an [`Ordering`][ordering] argument, which describes the
+    /// memory ordering of this operation.
     ///
     /// # Panics
     ///
@@ -86,10 +86,23 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Option<Shared<'g, T, R, N>> {
-        guard.acquire(&self, order).into_option()
+        guard.acquire(&self, order).ptr()
     }
 
-    /// TODO: Doc...
+    /// Loads a value from the pointer and stores it within `guard`.
+    /// The protected [`Shared`][crate::Shared] value is wrapped in a
+    /// [`Marked][crate::pointer::Marked].
+    ///
+    /// `load_marked` takes an [`Ordering`][ordering] argument, which describes
+    /// the memory ordering of this operation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: std::sync::atomic::Ordering
+    /// [release]: std::sync::atomic::Ordering::Release
+    /// [acq_rel]: std::sync::atomic::Ordering::AcqRel
     #[inline]
     pub fn load_marked<'g>(
         &self,
@@ -123,7 +136,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Result<Option<Shared<'g, T, R, N>>, NotEqual> {
-        guard.acquire_if_equal(self, compare, order).map(|marked| marked.into_option())
+        guard.acquire_if_equal(self, compare, order).map(|marked| marked.ptr())
     }
 
     /// Loads a value from the pointer that is explicitly **not** protected from reclamation,
@@ -140,7 +153,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, R, N>> {
         MarkedNonNull::new(self.inner.load(order))
             .map(|ptr| Unprotected { inner: ptr, _marker: PhantomData })
-            .into_option()
+            .ptr()
     }
 
     /// Stores either `null` or a valid pointer to an owned heap allocated value
@@ -189,7 +202,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         let res = self.inner.swap(ptr.into_marked_ptr(), order);
         // this is safe because the pointer is no longer accessible by other threads
         // (there can still be outstanding references that were loaded before the swap)
-        unsafe { Unlinked::try_from_marked(res).into_option() }
+        unsafe { Unlinked::try_from_marked(res).ptr() }
     }
 
     /// Stores a value (either null or valid) into the pointer if the current value
@@ -316,7 +329,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         // this is safe because the mutable reference ensures no concurrent access is possible
         MarkedNonNull::new(self.inner.swap(MarkedPtr::null(), Ordering::Relaxed))
             .map(|ptr| Owned::from_marked_non_null(ptr))
-            .into_option()
+            .ptr()
     }
 }
 

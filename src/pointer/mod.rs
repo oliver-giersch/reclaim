@@ -27,7 +27,7 @@ pub trait MarkedPointer: Sized + Internal {
     fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits>;
 
     /// Returns the tag value of the marked pointer.
-    fn tag(&self) -> usize;
+    fn decompose_tag(&self) -> usize;
 
     /// Consumes `self` and returns the same value but without any tag.
     fn clear_tag(self) -> Self;
@@ -106,14 +106,14 @@ pub struct AtomicMarkedPtr<T, N> {
 // Marked
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Doc...
+/// A value that represents the possible states of a nullable marked pointer.
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Marked<T: NonNullable> {
-    /// TODO:
-    Pointer(T),
-    /// TODO: Doc...
+    /// A marked, non-null pointer value.
+    Ptr(T),
+    /// A marked null pointer (i.e. only the tag).
     OnlyTag(usize),
-    /// TODO: Doc...
+    /// A pure null pointer (all-zero bits).
     Null,
 }
 
@@ -121,6 +121,8 @@ pub enum Marked<T: NonNullable> {
 // InvalidNullError
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// An error type for representing failed conversions from nullable to
+/// non-nullable pointer types.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub struct InvalidNullError;
 
