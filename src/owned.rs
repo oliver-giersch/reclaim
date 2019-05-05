@@ -82,7 +82,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     /// This does only allocate memory if at least one of
     /// [`RecordHeader`][header] or `T` are not zero-sized.
     /// If the [`RecordHeader`][header] is a ZST, this behaves
-    /// identically to [`Box::new`](std::boxed::Box::new)
+    /// identically to `Box::new`.
     ///
     /// [header]: crate::Reclaim::RecordHeader
     #[inline]
