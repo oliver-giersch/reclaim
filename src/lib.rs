@@ -101,39 +101,27 @@ where
     Self: LocalReclaim,
 {
     /// Retires a record and caches it **at least** until it is safe to
-    /// deallocate it, i.e. when no other threads can possibly have any live
-    /// references to it.
+    /// deallocate it.
+    ///
+    /// For further information, refer to the documentation of
+    /// [`retire_local`][`LocalReclaim::retire_local`].
     ///
     /// # Safety
     ///
-    /// The caller has to guarantee that the record is *actually* unlinked from
-    /// its data structure, i.e. there is no way for another thread to acquire a
-    /// new reference to it.
-    /// While an `Unlinked` can only be safely obtained by atomic operations
-    /// that do in fact unlink a value, it is still possible to enter the same
-    /// record twice into the same data structure using only safe code.
+    /// The same caveats as with [`retire_local`][`LocalReclaim::retire_local`]
+    /// apply.
     unsafe fn retire<T: 'static, N: Unsigned>(unlinked: Unlinked<T, Self, N>);
 
     /// Retires a record and caches it **at least** until it is safe to
-    /// deallocate it, i.e. when no other threads can possibly have any live
-    /// references to it.
+    /// deallocate it.
+    ///
+    /// For further information, refer to the documentation of
+    /// [`retire_local_unchecked`][`LocalReclaim::retire_local_unchecked`].
     ///
     /// # Safety
     ///
-    /// The caller has to guarantee that the record is *actually* unlinked from
-    /// its data structure, i.e. there is no way for another thread to acquire a
-    /// new reference to it.
-    /// While an `Unlinked` can only be safely obtained by atomic operations
-    /// that do in fact unlink a value, it is still possible to enter the same
-    /// record twice into the same data structure using only safe code.
-    ///
-    /// In addition to these invariant, this method additionally requires the
-    /// caller to ensure the `Drop` implementation for `T` (if any) does not
-    /// access any **non-static** references.
-    /// The `Reclaim` interface makes no guarantees about the precise time a
-    /// retired record is actually reclaimed.
-    /// Hence it is not possible to ensure any references stored within the
-    /// record have not become invalid.
+    /// The same caveats as with [`retire_local`][`LocalReclaim::retire_local`]
+    /// apply.
     unsafe fn retire_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, Self, N>);
 }
 
@@ -196,6 +184,39 @@ where
     /// While an `Unlinked` can only be safely obtained by atomic operations
     /// that do in fact unlink a value, it is still possible to enter the same
     /// record twice into the same data structure using only safe code.
+    ///
+    /// This variant also mandates, that correct synchronization of atomic
+    /// operations around calls to functions that retire records is ensured.
+    /// Consider the following (incorrect) example:
+    ///
+    /// ```ignore
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// let g = Atomic::from(Owned::new(1));
+    ///
+    /// // thread 1
+    /// if let Some(shared) = g.load(Ordering::Relaxed, &mut guard) {
+    ///     assert_eq!(*shared, &1);
+    /// }
+    ///
+    /// // thread 2
+    /// let expected = g.load_unprotected(Ordering::Relaxed); // reads &1
+    /// let unlinked = g.compare_exchange(
+    ///     expected,
+    ///     Owned::null(),
+    ///     Ordering::Relaxed,
+    ///     Ordering::Relaxed
+    /// ).unwrap();
+    ///
+    /// unsafe { unlinked.retire() };
+    /// ```
+    ///
+    /// In this example, the invariant can not be guaranteed to be maintained,
+    /// due to the incorrect (relaxed) memory orderings.
+    /// Thread 2 can potentially unlink the shared value, retire and reclaim it,
+    /// without the `compare_exchange` operation ever becoming visible to
+    /// thread 1. The thread could then proceed to load and read the previous
+    /// value instead of the inserted `null`, accessing freed memory.
     unsafe fn retire_local<T: 'static, N: Unsigned>(
         local: &Self::Local,
         unlinked: Unlinked<T, Self, N>,
@@ -284,8 +305,6 @@ where
     /// protected value will be overwritten and be no longer protected,
     /// regardless of the loaded value. In case of a unsuccessful load, the
     /// previously protected value does not change.
-    ///
-    ///
     ///
     /// # Errors
     ///
@@ -417,9 +436,11 @@ impl<T, R: LocalReclaim> Record<T, R> {
 // Owned
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A pointer type for heap allocation like `Box` that can be marked and is
-/// guaranteed to allocate the appropriate [`Record`] type for its generic
-/// [`Reclaim`] type parameter alongside its owned value.
+/// A pointer type for heap allocated values like `Box`.
+///
+/// `Owned` values function like marked pointers and are also guaranteed to
+/// allocate the appropriate [`RecordHeader`][LocalReclaim::RecordHeader] type
+/// for its generic [`LocalReclaim`] parameter alongside its actual content.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
 pub struct Owned<T, R: LocalReclaim, N: Unsigned> {
     inner: MarkedNonNull<T, N>,
@@ -434,7 +455,7 @@ pub struct Owned<T, R: LocalReclaim, N: Unsigned> {
 /// other threads.
 ///
 /// Valid `Shared` values are always borrowed from guard values implementing the
-/// [`Protect`](Protect) trait.
+/// [`Protect`] trait.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
 pub struct Shared<'g, T, R, N> {
     inner: MarkedNonNull<T, N>,
@@ -450,12 +471,15 @@ pub struct Shared<'g, T, R, N> {
 ///
 /// `Unlinked` values are the result of (successful) atomic *swap* or
 /// *compare-and-swap* operations on [`Atomic`](Atomic) values.
+/// They are move-only types, but don't have full ownership semantics.
+/// Dropping an `Unlinked` value without explicitly retiring it leads to a
+/// memory leak.
 ///
 /// Concurrent data structure implementations have to maintain the invariant
 /// that no unique value (pointer) can exist more than once within any data
 /// structure.
-/// Only then is it safe to `retire` unlinked values, enabling them to be
-/// eventually reclaimed.
+/// Only then is it safe to [`retire`][Reclaim::retire] unlinked values,
+/// enabling them to be eventually reclaimed.
 /// Note that, while it must be impossible for other threads to create new
 /// references to an already unlinked value, it is possible and explicitly
 /// allowed for other threads to still have live references that have been
@@ -471,7 +495,7 @@ pub struct Unlinked<T, R, N> {
 // Unprotected
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A non-null value loaded from an [`Atomic`](Atomic), but without any
+/// A non-null pointer value loaded from an [`Atomic`](Atomic), but without any
 /// guarantees protecting it from reclamation.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
 pub struct Unprotected<T, R, N> {

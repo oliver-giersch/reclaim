@@ -130,8 +130,8 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
         pointer::decompose_tag::<T>(self.inner.as_ptr() as usize, Self::MARK_BITS)
     }
 
-    /// Decomposes the marked pointer, dereferences the the raw pointer and returns both the
-    /// reference and the separated tag.
+    /// Decomposes the marked pointer, dereferences the the raw pointer and
+    /// returns both the reference and the separated tag.
     ///
     /// The resulting lifetime is bound to self so this behaves "as if"
     /// it were actually an instance of T that is getting borrowed. If a longer
@@ -142,8 +142,8 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
         (&*ptr.as_ptr(), tag)
     }
 
-    /// Decomposes the marked pointer, mutably dereferences the the raw pointer and returns both the
-    /// mutable reference and the separated tag.
+    /// Decomposes the marked pointer, mutably dereferences the the raw pointer
+    /// and returns both the mutable reference and the separated tag.
     ///
     /// The resulting lifetime is bound to self so this behaves "as if"
     /// it were actually an instance of T that is getting borrowed. If a longer

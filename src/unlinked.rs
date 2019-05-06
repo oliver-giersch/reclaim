@@ -1,5 +1,6 @@
 use core::fmt;
 use core::marker::PhantomData;
+use core::ops::Deref;
 
 use typenum::Unsigned;
 
@@ -34,12 +35,6 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     #[inline]
     pub unsafe fn header(&self) -> &R::RecordHeader {
         Record::<T, R>::get_header(self.inner.decompose_non_null())
-    }
-
-    /// TODO: Doc...
-    #[inline]
-    pub unsafe fn deref(&self) -> &T {
-        self.inner.as_ref()
     }
 
     /// TODO: Doc...
@@ -95,6 +90,17 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// AsRef
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, R: LocalReclaim, N: Unsigned> AsRef<T> for Unlinked<T, R, N> {
+    #[inline]
+    fn as_ref(&self) -> &T {
+        unsafe { self.inner.as_ref() }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Debug & Pointer
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -110,6 +116,19 @@ impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Unlinked<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Deref
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, R: LocalReclaim, N: Unsigned> Deref for Unlinked<T, R, N> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.inner.as_ref() }
     }
 }
 

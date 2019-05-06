@@ -317,7 +317,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     ///
     /// This is similar to [`Option::take`](std::option::Option::take) and is useful for
     /// manually dropping the value pointed-to by the `Atomic`, since [`Owned`][owned]
-    /// values behave like [`Boxes`](std::boxed::Box) when they are dropped.
+    /// values behave like `Boxes` when they are dropped.
     ///
     /// [owned]: crate::Owned
     ///
@@ -325,10 +325,10 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     ///
     /// ...
     #[inline]
-    pub unsafe fn take(&mut self) -> Option<Owned<T, R, N>> {
+    pub fn take(&mut self) -> Option<Owned<T, R, N>> {
         // this is safe because the mutable reference ensures no concurrent access is possible
         MarkedNonNull::new(self.inner.swap(MarkedPtr::null(), Ordering::Relaxed))
-            .map(|ptr| Owned::from_marked_non_null(ptr))
+            .map(|ptr| unsafe { Owned::from_marked_non_null(ptr) })
             .ptr()
     }
 }

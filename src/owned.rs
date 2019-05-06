@@ -107,14 +107,16 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
 
     impl_inherent!();
 
-    /// TODO: Doc...
+    /// Decomposes the internal marked pointer, returning a reference and the
+    /// separated tag.
     #[inline]
     pub fn decompose_ref(&self) -> (&T, usize) {
         // this is safe because is `inner` is guaranteed to be backed by a valid allocation
         unsafe { self.inner.decompose_ref() }
     }
 
-    /// TODO: Doc...
+    /// Decomposes the internal marked pointer, returning a mutable reference
+    /// and the separated tag.
     #[inline]
     pub fn decompose_mut(&mut self) -> (&mut T, usize) {
         // this is safe because is `inner` is guaranteed to be backed by a valid allocation
@@ -143,7 +145,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     #[inline]
     pub fn leak<'a>(owned: Self) -> (&'a mut T, usize)
     where
-        T: 'a
+        T: 'a,
     {
         let (ptr, tag) = owned.inner.decompose();
         mem::forget(owned);
@@ -153,12 +155,13 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     /// Leaks the `owned` value and turns it into a "protected" [`Shared`][shared]
     /// value with arbitrary lifetime `'a`.
     ///
-    /// Note, that the protection in this case stems from the fact, the given `owned` can
-    /// not have been part of a concurrent data structure (barring unsafe construction) and
-    /// can not possibly be reclaimed by another thread.
-    /// Once the resulting [`Shared`][shared] has been successfully inserted into a data
-    /// structure, this protection ceases to hold and calling [`deref`][deref] is no longer
-    /// safe to call.
+    /// Note, that the protection in this case stems from the fact, the given
+    /// `owned` can not have been part of a concurrent data structure (barring
+    /// unsafe construction) and can thus not possibly have already been
+    /// reclaimed by another thread.
+    /// Once the resulting [`Shared`][shared] has been successfully inserted
+    /// into a data structure, this protection ceases to hold and the [`Shared`][shared]
+    /// would be no longer safe to dereference.
     ///
     /// [shared]: crate::Shared
     /// [deref]: crate::Shared::deref
