@@ -240,25 +240,25 @@ where
     /// Number of bits available for storing additional information
     type MarkBits: Unsigned;
 
-    /// Gets a shared reference to the protected value that is tied to the
-    /// lifetime of self.
+    /// Gets a [`Shared`][Shared] reference to the protected value, which is
+    /// tied to the lifetime of `self`.
     fn shared(&self) -> Option<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>> {
         self.marked().ptr()
     }
 
-    /// Gets a shared reference wrapped in a [`Marked`][marked] for the
-    /// protected value, which is tied to the lifetime of self.
+    /// Gets a [`Shared`][Shared] reference wrapped in a [`Marked`][marked] for
+    /// the protected value, which is tied to the lifetime of `self`.
     ///
     /// [marked]: crate::pointer::Marked
     fn marked(&self) -> Marked<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>;
 
-    /// Atomically takes a snapshot of `atomic`'s value and returns a shared and
-    /// protected reference wrapped in a [`Marked`][marked] to it.
+    /// Atomically takes a snapshot of `atomic` and returns a protected
+    /// [`Shared`][Shared] reference wrapped in a [`Marked`][marked] to it.
     ///
-    /// The loaded value is stored within self. If the value of `atomic` is
-    /// null, no protection occurs.
-    /// Any previously protected value is no longer protected, regardless of the
-    /// loaded value.
+    /// The loaded value is stored within `self`. If the value of `atomic` is
+    /// `null` or a pure tag (marked `null` pointer), no protection has to be
+    /// established. Any previously protected value will be overwritten and be
+    /// no longer protected, regardless of the loaded value.
     ///
     /// [marked]: crate::pointer::Marked
     ///
@@ -274,20 +274,20 @@ where
         order: Ordering,
     ) -> Marked<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>;
 
-    /// Atomically takes a snapshot of `atomic`'s value and returns a shared and
-    /// protected reference wrapped in a [`Marked`] to it, if the loaded value
-    /// is equal to `expected`.
+    /// Atomically takes a snapshot of `atomic` and returns a protected
+    /// [`Shared`][Shared] reference wrapped in a [`Marked`][marked] to it, if
+    /// the loaded value is equal to `expected`.
     ///
-    /// A successfully loaded value is stored within self. If the value of
-    /// `atomic` is null, no protection occurs.
-    /// After a successful load, any previously protected value is no longer
-    /// protected, regardless of the loaded value.
-    /// In case of a unsuccessful load, the previously protected value does not
-    /// change.
+    /// A *successfully* loaded value is stored within `self`. If the value of
+    /// `atomic` is `null` or a pure tag (marked `null` pointer), no protection
+    /// has to be established. After a *successful* load, any previously
+    /// protected value will be overwritten and be no longer protected,
+    /// regardless of the loaded value. In case of a unsuccessful load, the
+    /// previously protected value does not change.
     ///
     /// # Errors
     ///
-    /// This method returns an error result ([`NotEqual`](NotEqual)) if the
+    /// This method returns an [`Err(NotEqual)`](NotEqual) result, if the
     /// atomically loaded snapshot from `atomic` does not match the `expected`
     /// value.
     ///
@@ -304,10 +304,9 @@ where
         order: Ordering,
     ) -> AcquireResult<Self::Item, Self::Reclaimer, Self::MarkBits>;
 
-    /// Clears the current internal state.
+    /// Clears the current internal value and its protected state.
     ///
-    /// Any previously protected values are no longer guaranteed to be protected
-    /// and consecutive calls to [`shared`][Protect::shared] and [`marked`][Protect::marked]
+    /// Consecutive calls to [`shared`][Protect::shared] and [`marked`][Protect::marked]
     /// must return [`None`][core::option::Option::None] and [`Null`][Marked::Null],
     /// respectively.
     fn release(&mut self);

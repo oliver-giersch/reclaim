@@ -42,13 +42,15 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Shared<'g, T,
 impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
     impl_inherent!();
 
-    /// TODO: Doc...
+    /// Returns a reference to the header type that is automatically
+    /// allocated alongside every new record.
     #[inline]
     pub unsafe fn header(self) -> &'g R::RecordHeader {
         Record::<T, R>::get_header(self.inner.decompose_non_null())
     }
 
-    /// TODO: Doc...
+    /// Dereferences the `Shared` and returns the resulting reference, which is bound to the
+    /// lifetime of the guard, from which `self` was originally retrieved.
     ///
     /// # Safety
     ///

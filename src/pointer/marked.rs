@@ -6,7 +6,7 @@ use crate::pointer::{
 };
 
 impl<T: NonNullable> Marked<T> {
-    /// Returns `true` if the marked contains a `Value`.
+    /// Returns `true` if the marked value contains a [`Ptr`][crate::pointer::Marked::Ptr].
     #[inline]
     pub fn is_ptr(&self) -> bool {
         match *self {
@@ -15,7 +15,7 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// Returns `true` if the marked contains a `OnlyTag` value.
+    /// Returns `true` if the marked value contains a [`OnlyTag`][crate::pointer::Marked::OnlyTag].
     #[inline]
     pub fn is_tag(&self) -> bool {
         match *self {
@@ -24,7 +24,7 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// Returns `true` if the marked contains a `OnlyTag` value.
+    /// Returns `true` if the marked value contains a [`Null`][crate::pointer::Marked::Null].
     #[inline]
     pub fn is_null(&self) -> bool {
         match *self {
@@ -33,7 +33,7 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// TODO: Doc...
+    /// Converts from `Marked<T>` to `Marked<&T>`.
     #[inline]
     pub fn as_ref(&self) -> Marked<&T> {
         match *self {
@@ -43,7 +43,7 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// TODO: Doc...
+    /// Converts from `Marked<T>` to `Marked<&mut T>`.
     #[inline]
     pub fn as_mut(&mut self) -> Marked<&mut T> {
         match *self {
@@ -53,7 +53,7 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// Moves the value out of the `Marked` if it is `Value(ptr)`.
+    /// Moves the pointer out of the `Marked` if it is [`Ptr(ptr)`][crate::pointer::Marked::Ptr].
     #[inline]
     pub fn unwrap_ptr(self) -> T {
         match self {
@@ -71,7 +71,8 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// Moves the value out of the `Marked` if it is `Value(ptr)`.
+    /// Moves the pure tag out of the `Marked` if it is
+    /// [`OnlyTag(tag)`][crate::pointer::Marked::Ptr].
     #[inline]
     pub fn unwrap_tag(self) -> usize {
         match self {

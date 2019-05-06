@@ -109,7 +109,7 @@ pub struct AtomicMarkedPtr<T, N> {
 /// A value that represents the possible states of a nullable marked pointer.
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Marked<T: NonNullable> {
-    /// A marked, non-null pointer value.
+    /// A marked, non-nullable pointer or reference value.
     Ptr(T),
     /// A marked null pointer (i.e. only the tag).
     OnlyTag(usize),

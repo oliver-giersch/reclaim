@@ -75,6 +75,14 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Owned<T, R, N>> {
     impl_trait_option!(Owned);
 }
 
+impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Owned<T, R, N>> {
+    impl_trait_marked!(Owned);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// inherent
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     /// Allocates memory for a [`Record<T>`](Record) on the heap and then
     /// places a record with a default header and `owned` into it.
@@ -113,31 +121,33 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
         unsafe { self.inner.decompose_mut() }
     }
 
-    /// TODO: Doc...
+    /// Returns a reference to the header type that is automatically
+    /// allocated alongside every new record.
     #[inline]
     pub fn header(&self) -> &R::RecordHeader {
         unsafe { Record::<T, R>::get_header(self.inner.decompose_non_null()) }
     }
 
-    /// TODO: Doc...
+    /// Returns a mutable reference to the header type that is automatically
+    /// allocated alongside every new record.
     #[inline]
     pub fn header_mut(&mut self) -> &mut R::RecordHeader {
         unsafe { Record::<T, R>::get_header_mut(self.inner.decompose_non_null()) }
     }
 
     /// Consumes and leaks the `Owned`, returning a mutable reference
-    /// `&'a mut T`.
+    /// `&'a mut T` and the decomposed tag.
     /// Note that the type `T` must outlive the chosen lifetime `'a`.
     /// If the type has only static references, or none at all, then this may
     /// chosen to be `'static`.
     #[inline]
-    pub fn leak<'a>(owned: Self) -> &'a mut T
+    pub fn leak<'a>(owned: Self) -> (&'a mut T, usize)
     where
-        T: 'a,
+        T: 'a
     {
-        let inner = owned.inner;
+        let (ptr, tag) = owned.inner.decompose();
         mem::forget(owned);
-        unsafe { &mut *inner.decompose_ptr() }
+        unsafe { (&mut *ptr.as_ptr(), tag) }
     }
 
     /// Leaks the `owned` value and turns it into a "protected" [`Shared`][shared]

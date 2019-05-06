@@ -29,7 +29,8 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Unlinked<T, R, N>
 impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     impl_inherent!();
 
-    /// TODO: Doc...
+    /// Returns a reference to the header type that is automatically
+    /// allocated alongside every new record.
     #[inline]
     pub unsafe fn header(&self) -> &R::RecordHeader {
         Record::<T, R>::get_header(self.inner.decompose_non_null())
@@ -47,7 +48,13 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
         self.inner.decompose_ref()
     }
 
-    /// TODO: Doc...
+    /// Retires a record by calling [`retire_local`][retire] on the generic reclamation parameter `R`.
+    ///
+    /// # Safety
+    ///
+    /// The same caveats as with [`LocalReclaim::retire_local`][retire] apply.
+    ///
+    /// [retire]: crate::LocalReclaim::retire_local
     #[inline]
     pub unsafe fn retire_local(self, local: &R::Local)
     where
@@ -56,7 +63,14 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
         R::retire_local(local, self)
     }
 
-    /// TODO: Doc...
+    /// Retires a record by calling [`retire_local_unchecked`][retire_unchecked] on the generic
+    /// reclamation parameter `R`.
+    ///
+    /// # Safety
+    ///
+    /// The same caveats as with [`LocalReclaim::retire_local_unchecked`][retire_unchecked] apply.
+    ///
+    /// [retire_unchecked]: crate::LocalReclaim::retire_local_unchecked
     #[inline]
     pub unsafe fn retire_local_unchecked(self, local: &R::Local) {
         R::retire_local_unchecked(local, self)
