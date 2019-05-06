@@ -275,8 +275,8 @@ where
     ) -> Marked<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>;
 
     /// Atomically takes a snapshot of `atomic` and returns a protected
-    /// [`Shared`][Shared] reference wrapped in a [`Marked`][marked] to it, if
-    /// the loaded value is equal to `expected`.
+    /// [`Shared`] reference wrapped in a [`Marked`] to it, if the loaded value
+    /// is equal to `expected`.
     ///
     /// A *successfully* loaded value is stored within `self`. If the value of
     /// `atomic` is `null` or a pure tag (marked `null` pointer), no protection
@@ -284,6 +284,8 @@ where
     /// protected value will be overwritten and be no longer protected,
     /// regardless of the loaded value. In case of a unsuccessful load, the
     /// previously protected value does not change.
+    ///
+    ///
     ///
     /// # Errors
     ///
@@ -324,12 +326,12 @@ pub struct NotEqual;
 // Record
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Record type that is managed by a specific reclamation scheme.
+/// A Record type that is associated to a specific reclamation scheme.
 ///
-/// Whenever a new `Owned` or (non-null) `Atomic` is created a value of this
-/// type is allocated on the heap.
-/// The record and its header is never exposed to the data structure using a
-/// given memory reclamation scheme and should only be accessed by the
+/// Whenever a new [`Owned`] or (non-null) [`Atomic`] is created, a value of
+/// this type is allocated on the heap as a wrapper for the desired record.
+/// The record and its header are never directly exposed to the data structure
+/// using a given memory reclamation scheme and should only be accessed by the
 /// reclamation scheme itself.
 pub struct Record<T, R: LocalReclaim> {
     header: R::RecordHeader,

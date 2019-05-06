@@ -92,7 +92,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     /// If the [`RecordHeader`][header] is a ZST, this behaves
     /// identically to `Box::new`.
     ///
-    /// [header]: crate::Reclaim::RecordHeader
+    /// [header]: crate::LocalReclaim::RecordHeader
     #[inline]
     pub fn new(owned: T) -> Self {
         Self { inner: MarkedNonNull::from(Self::alloc_record(owned)), _marker: PhantomData }

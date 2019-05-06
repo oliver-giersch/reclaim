@@ -36,7 +36,7 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     /// The bitmask for the (higher) pointer bits.
     pub const POINTER_MASK: usize = !Self::MARK_MASK;
 
-    /// Consumes `self` and returns the inner [`MarkedPtr`](crate::marked::MarkedPtr)
+    /// Consumes `self` and returns the inner [`MarkedPtr`](crate::pointer::MarkedPtr)
     #[inline]
     pub fn into_inner(self) -> MarkedPtr<T, N> {
         MarkedPtr::new(self.inner.into_inner())

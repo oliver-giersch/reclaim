@@ -144,7 +144,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     ///
     /// This method is similar to [`load_raw`](Atomic::load_raw), but the resulting
     /// [`Unprotected`](crate::Unprotected) type has stronger guarantees than a raw
-    /// [`MarkedPtr`](crate::marked::MarkedPtr). It can be useful to load an unprotected
+    /// [`MarkedPtr`](crate::pointer::MarkedPtr). It can be useful to load an unprotected
     /// pointer if that pointer does not need to be dereferenced, but is only used to
     /// reinsert it in a different spot, which is e.g. done when removing a value from
     /// a linked list or a stack.
