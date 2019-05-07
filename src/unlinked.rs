@@ -33,14 +33,15 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     /// Returns a reference to the header type that is automatically
     /// allocated alongside every new record.
     #[inline]
-    pub unsafe fn header(&self) -> &R::RecordHeader {
-        Record::<T, R>::get_header(self.inner.decompose_non_null())
+    pub fn header(&self) -> &R::RecordHeader {
+        unsafe { Record::<T, R>::get_header(self.inner.decompose_non_null()) }
     }
 
-    /// TODO: Doc...
+    /// Decomposes the marked reference, returning the reference itself and the
+    /// separated tag.
     #[inline]
-    pub unsafe fn decompose_ref(&self) -> (&T, usize) {
-        self.inner.decompose_ref()
+    pub fn decompose_ref(&self) -> (&T, usize) {
+        unsafe { self.inner.decompose_ref() }
     }
 
     /// Retires a record by calling [`retire_local`][retire] on the generic reclamation parameter `R`.
@@ -73,7 +74,14 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
 }
 
 impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
-    /// TODO: Doc...
+    /// Retires a record by calling [`retire`][retire] on the generic
+    /// reclamation parameter `R`.
+    ///
+    /// # Safety
+    ///
+    /// The same caveats as with [`Reclaim::retire`][retire] apply.
+    ///
+    /// [retire]: crate::Reclaim::retire
     #[inline]
     pub unsafe fn retire(self)
     where
@@ -82,7 +90,14 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
         R::retire(self)
     }
 
-    /// TODO: Doc...
+    /// Retires a record by calling [`retire_unchecked`][retire_unchecked] on
+    /// the generic reclamation parameter `R`.
+    ///
+    /// # Safety
+    ///
+    /// The same caveats as with [`Reclaim::retire_unchecked`][retire_unchecked] apply.
+    ///
+    /// [retire_unchecked]: crate::Reclaim::retire_unchecked
     #[inline]
     pub unsafe fn retire_unchecked(self) {
         R::retire_unchecked(self)

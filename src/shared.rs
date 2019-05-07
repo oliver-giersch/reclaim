@@ -46,19 +46,16 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
     /// Returns a reference to the header type that is automatically
     /// allocated alongside every new record.
     #[inline]
-    pub unsafe fn header(self) -> &'g R::RecordHeader {
-        Record::<T, R>::get_header(self.inner.decompose_non_null())
+    pub fn header(self) -> &'g R::RecordHeader {
+        unsafe { Record::<T, R>::get_header(self.inner.decompose_non_null()) }
     }
 
-    /// TODO: Doc...
-    ///
-    /// # Safety
-    ///
-    /// ...
+    /// Decomposes the marked reference, returning the reference itself and the
+    /// separated tag.
     #[inline]
-    pub unsafe fn decompose_ref(self) -> (&'g T, usize) {
+    pub fn decompose_ref(self) -> (&'g T, usize) {
         let (ptr, tag) = self.inner.decompose();
-        (&*ptr.as_ptr(), tag)
+        unsafe { (&*ptr.as_ptr(), tag) }
     }
 }
 

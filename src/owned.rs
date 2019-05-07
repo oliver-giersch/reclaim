@@ -155,25 +155,28 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     /// Leaks the `owned` value and turns it into a "protected" [`Shared`][shared]
     /// value with arbitrary lifetime `'a`.
     ///
-    /// Note, that the protection in this case stems from the fact, the given
-    /// `owned` can not have been part of a concurrent data structure (barring
-    /// unsafe construction) and can thus not possibly have already been
-    /// reclaimed by another thread.
-    /// Once the resulting [`Shared`][shared] has been successfully inserted
-    /// into a data structure, this protection ceases to hold and the [`Shared`][shared]
-    /// would be no longer safe to dereference.
+    /// Note, that the protection of the [`Shared`][shared] value in this case
+    /// stems from the fact, that the given `owned` could not have previously
+    /// been part of a concurrent data structure (barring unsafe construction).
+    /// This rules out concurrent reclamation by other threads.
+    ///
+    /// # Safety
+    ///
+    /// Once a leaked [`Shared`][shared] has been successfully inserted into a
+    /// concurrent data structure, it must not be accessed any more, if there is
+    /// the possibility for concurrent reclamation of the record.
     ///
     /// [shared]: crate::Shared
-    /// [deref]: crate::Shared::deref
     #[inline]
-    pub fn leak_shared<'a>(owned: Self) -> Shared<'a, T, R, N> {
+    pub unsafe fn leak_shared<'a>(owned: Self) -> Shared<'a, T, R, N> {
         let inner = owned.inner;
         mem::forget(owned);
 
         Shared { inner, _marker: PhantomData }
     }
 
-    /// Allocates a records wrapping `owned` and returns the pointer to the wrapped value.
+    /// Allocates a records wrapping `owned` and returns the pointer to the
+    /// wrapped value.
     #[inline]
     fn alloc_record(owned: T) -> NonNull<T> {
         let record = Box::leak(Box::new(Record::<_, R>::new(owned)));

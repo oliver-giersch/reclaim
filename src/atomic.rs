@@ -320,10 +320,6 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// values behave like `Boxes` when they are dropped.
     ///
     /// [owned]: crate::Owned
-    ///
-    /// # Safety
-    ///
-    /// ...
     #[inline]
     pub fn take(&mut self) -> Option<Owned<T, R, N>> {
         // this is safe because the mutable reference ensures no concurrent access is possible
@@ -396,7 +392,7 @@ where
 {
     /// The actually loaded value
     pub loaded: MarkedPtr<T, N>,
-    /// The value for which the failed swap was attempted
+    /// The value with which the failed swap was attempted
     pub input: S,
     // prevents construction outside of the current module
     _marker: PhantomData<R>,
