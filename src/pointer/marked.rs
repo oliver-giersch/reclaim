@@ -6,7 +6,7 @@ use crate::pointer::{
 };
 
 impl<T: NonNullable> Marked<T> {
-    /// Returns `true` if the marked value contains a [`Value`][Value].
+    /// Returns `true` if the marked value contains a [`Value`].
     #[inline]
     pub fn is_value(&self) -> bool {
         match *self {
@@ -15,7 +15,7 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// Returns `true` if the marked value contains a [`OnlyTag`][OnlyTag].
+    /// Returns `true` if the marked value contains a [`OnlyTag`].
     #[inline]
     pub fn is_tag(&self) -> bool {
         match *self {
@@ -24,7 +24,7 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// Returns `true` if the marked value contains a [`Null`][Null].
+    /// Returns `true` if the marked value contains a [`Null`].
     #[inline]
     pub fn is_null(&self) -> bool {
         match *self {
@@ -62,11 +62,12 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
+    /// Returns the contained value or the result of the given `func`.
     #[inline]
-    pub fn unwrap_value_or_else<F: FnOnce() -> T>(self, f: F) -> T {
+    pub fn unwrap_value_or_else(self, func: impl (FnOnce() -> T)) -> T {
         match self {
             Value(ptr) => ptr,
-            _ => f(),
+            _ => func(),
         }
     }
 
@@ -80,6 +81,8 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
+    /// Maps a `Marked<T>` to `Marked<U>` by applying a function to a contained
+    /// value.
     #[inline]
     pub fn map<U: NonNullable>(self, func: impl (FnOnce(T) -> U)) -> Marked<U> {
         match self {
@@ -89,6 +92,8 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
+    /// Applies a function to the contained value (if any), or computes a
+    /// default value using `func`, if no value is contained.
     #[inline]
     pub fn map_or_else<U: NonNullable>(
         self,
@@ -110,6 +115,8 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
+    /// Converts `self` from `Marked<T>` to [`Option<usize>`][Option], which
+    /// will only be [`Some`][Option::Some], if `self` is a [`OnlyTag`] variant.
     #[inline]
     pub fn only_tag(self) -> Option<usize> {
         match self {
@@ -118,11 +125,15 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
+    /// Takes the value of the [`Marked`], leaving a [`Null`] variant in its
+    /// place.
     #[inline]
     pub fn take(&mut self) -> Self {
         mem::replace(self, Null)
     }
 
+    /// Replaces the actual value in the [`Marked`] with the given `value`,
+    /// returning the old value.
     #[inline]
     pub fn replace(&mut self, value: T) -> Self {
         mem::replace(self, Value(value))

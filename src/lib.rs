@@ -330,7 +330,7 @@ where
     fn release(&mut self);
 }
 
-/// Result type for [`acquire_if_equal`](Protect::acquire_if_equal) operations.
+/// Result type for [`acquire_if_equal`][Protect::acquire_if_equal] operations.
 pub type AcquireResult<'g, T, R, N> = Result<Marked<Shared<'g, T, R, N>>, NotEqual>;
 
 /// A zero-size marker type that represents the failure state of an

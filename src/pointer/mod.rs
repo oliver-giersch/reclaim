@@ -34,6 +34,8 @@ pub trait MarkedPointer: Sized + Internal {
     /// Consumes `self` and returns the same value but without any tag.
     fn clear_tag(self) -> Self;
 
+    /// Consumes `self` and returns the same value wrapped in a
+    /// [`Marked`][crate::Marked] with the given `tag`.
     fn marked_with_tag(self, tag: usize) -> Marked<Self::Pointer>;
 
     /// Consumes `self` and returns the equivalent raw marked pointer.
