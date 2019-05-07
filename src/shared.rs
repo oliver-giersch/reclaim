@@ -47,7 +47,7 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
     /// allocated alongside every new record.
     #[inline]
     pub fn header(self) -> &'g R::RecordHeader {
-        unsafe { Record::<T, R>::get_header(self.inner.decompose_non_null()) }
+        unsafe { Record::<T, R>::get_header_non_null(self.inner.decompose_non_null()) }
     }
 
     /// Decomposes the marked reference, returning the reference itself and the

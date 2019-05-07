@@ -34,7 +34,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     /// allocated alongside every new record.
     #[inline]
     pub fn header(&self) -> &R::RecordHeader {
-        unsafe { Record::<T, R>::get_header(self.inner.decompose_non_null()) }
+        unsafe { Record::<T, R>::get_header_non_null(self.inner.decompose_non_null()) }
     }
 
     /// Decomposes the marked reference, returning the reference itself and the

@@ -352,7 +352,8 @@ pub struct NotEqual;
 /// using a given memory reclamation scheme and should only be accessed by the
 /// reclamation scheme itself.
 pub struct Record<T, R: LocalReclaim> {
-    header: R::RecordHeader,
+    /// The record's header
+    pub header: R::RecordHeader,
     elem: T,
 }
 
@@ -369,38 +370,6 @@ impl<T, R: LocalReclaim> Record<T, R> {
         Self { header, elem }
     }
 
-    /// Gets a reference to header for the record at the pointed-to location of
-    /// `elem`.
-    ///
-    /// # Safety
-    ///
-    /// The pointer `elem` must be a valid pointer to an instance of `T` that
-    /// was allocated as part of a `Record`. Otherwise, the pointer arithmetic
-    /// used to calculate the header's address will be incorrect and lead to
-    /// undefined behavior.
-    #[inline]
-    pub unsafe fn get_header<'a>(elem: NonNull<T>) -> &'a R::RecordHeader {
-        let header = (elem.as_ptr() as usize) - Self::offset_elem() + Self::offset_header();
-        &*(header as *mut _)
-    }
-
-    /// Gets mutable a reference to header for the record at the pointed-to
-    /// location of `elem`.
-    ///
-    /// # Safety
-    ///
-    /// The pointer `elem` must be a valid pointer to an instance of `T` that
-    /// was allocated as part of a `Record`.
-    /// Otherwise, the pointer arithmetic used to calculate the header's address
-    /// will be incorrect and lead to undefined behavior.
-    /// Additionally the caller has to ensure the aliasing rules are not
-    /// violated by creating a mutable record.
-    #[inline]
-    pub unsafe fn get_header_mut<'a>(elem: NonNull<T>) -> &'a mut R::RecordHeader {
-        let header = (elem.as_ptr() as usize) - Self::offset_elem() + Self::offset_header();
-        &mut *(header as *mut _)
-    }
-
     /// Gets the pointer to the record belonging to the element pointed to by
     /// `elem`.
     ///
@@ -411,9 +380,30 @@ impl<T, R: LocalReclaim> Record<T, R> {
     /// Otherwise, the pointer arithmetic used to calculate the header's address
     /// will be incorrect and lead to undefined behavior.
     #[inline]
-    pub unsafe fn get_record(elem: NonNull<T>) -> NonNull<Self> {
-        let record = (elem.as_ptr() as usize) - Self::offset_elem();
-        NonNull::new_unchecked(record as *mut _)
+    pub unsafe fn get_record(elem: *mut T) -> *mut T {
+        let record = (elem as usize) - Self::offset_elem();
+        record as *mut _
+    }
+
+    #[inline]
+    pub unsafe fn get_header(elem: *mut T) -> *mut R::RecordHeader {
+        let header = (elem as usize) - Self::offset_elem() + Self::offset_header();
+        &*(header as *mut _)
+    }
+
+    /// Gets a reference to header for the record at the pointed-to location of
+    /// `elem`.
+    ///
+    /// # Safety
+    ///
+    /// The pointer `elem` must be a valid pointer to an instance of `T` that
+    /// was allocated as part of a `Record`. Otherwise, the pointer arithmetic
+    /// used to calculate the header's address will be incorrect and lead to
+    /// undefined behavior.
+    #[inline]
+    pub unsafe fn get_header_non_null<'a>(elem: NonNull<T>) -> &'a R::RecordHeader {
+        let header = (elem.as_ptr() as usize) - Self::offset_elem() + Self::offset_header();
+        &*(header as *mut _)
     }
 
     /// Gets the offset in bytes from the address of a record to its header

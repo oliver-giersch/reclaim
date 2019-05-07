@@ -134,14 +134,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     /// allocated alongside every new record.
     #[inline]
     pub fn header(&self) -> &R::RecordHeader {
-        unsafe { Record::<T, R>::get_header(self.inner.decompose_non_null()) }
-    }
-
-    /// Returns a mutable reference to the header type that is automatically
-    /// allocated alongside every new record.
-    #[inline]
-    pub fn header_mut(&mut self) -> &mut R::RecordHeader {
-        unsafe { Record::<T, R>::get_header_mut(self.inner.decompose_non_null()) }
+        unsafe { Record::<T, R>::get_header_non_null(self.inner.decompose_non_null()) }
     }
 
     /// Consumes and leaks the `Owned`, returning a mutable reference
@@ -266,10 +259,8 @@ impl<T, R: LocalReclaim, N: Unsigned> Drop for Owned<T, R, N> {
     #[inline]
     fn drop(&mut self) {
         unsafe {
-            let elem = self.inner.decompose_non_null();
-            let record = Record::<_, R>::get_record(elem);
-
-            mem::drop(Box::from_raw(record.as_ptr()));
+            let record = Record::<_, R>::get_record(self.inner.decompose_ptr());
+            mem::drop(Box::from_raw(record));
         }
     }
 }
