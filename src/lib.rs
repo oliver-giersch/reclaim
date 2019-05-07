@@ -68,6 +68,7 @@ pub mod align;
 pub mod leak;
 pub mod prelude {
     //! Useful and/or required types and traits for this crate.
+
     pub use crate::pointer::{
         Marked::{self, Null, OnlyTag, Value},
         MarkedPointer,
@@ -93,9 +94,9 @@ pub use crate::pointer::{AtomicMarkedPtr, Marked, MarkedNonNull, MarkedPointer, 
 /// A trait for retiring and reclaiming entries removed from concurrent
 /// collections and data structures.
 ///
-/// Implementing this trait requires first implementing the
-/// [`LocalReclaim`][LocalReclaim] trait for the same type and is usually only
-/// possible in `std` environments with access to thread local storage.
+/// Implementing this trait requires first implementing the [`LocalReclaim`]
+/// trait for the same type and is usually only possible in `std` environments
+/// with access to thread local storage.
 pub unsafe trait Reclaim
 where
     Self: LocalReclaim,
@@ -144,8 +145,8 @@ where
 // RetireLocal (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A trait, which constitutes the foundation for the [`Reclaim`][Reclaim] trait
-/// and requires explicit references to thread local storage for caching retired
+/// A trait, which constitutes the foundation for the [`Reclaim`] trait and
+/// requires explicit references to thread local storage for caching retired
 /// records.
 ///
 /// This type is specifically designed to be compatible with `#[no_std]`
@@ -261,27 +262,23 @@ where
     /// Number of bits available for storing additional information
     type MarkBits: Unsigned;
 
-    /// Gets a [`Shared`][Shared] reference to the protected value, which is
-    /// tied to the lifetime of `self`.
+    /// Gets a [`Shared`] reference to the protected value, which is tied to the
+    /// lifetime of `self`.
     fn shared(&self) -> Option<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>> {
-        self.marked().ptr()
+        self.marked().value()
     }
 
-    /// Gets a [`Shared`][Shared] reference wrapped in a [`Marked`][marked] for
-    /// the protected value, which is tied to the lifetime of `self`.
-    ///
-    /// [marked]: crate::pointer::Marked
+    /// Gets a [`Shared`] reference wrapped in a [`Marked`] for the protected
+    /// value, which is tied to the lifetime of `self`.
     fn marked(&self) -> Marked<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>;
 
     /// Atomically takes a snapshot of `atomic` and returns a protected
-    /// [`Shared`][Shared] reference wrapped in a [`Marked`][marked] to it.
+    /// [`Shared`] reference wrapped in a [`Marked`] to it.
     ///
     /// The loaded value is stored within `self`. If the value of `atomic` is
     /// `null` or a pure tag (marked `null` pointer), no protection has to be
     /// established. Any previously protected value will be overwritten and be
     /// no longer protected, regardless of the loaded value.
-    ///
-    /// [marked]: crate::pointer::Marked
     ///
     /// # Panics
     ///
@@ -308,7 +305,7 @@ where
     ///
     /// # Errors
     ///
-    /// This method returns an [`Err(NotEqual)`](NotEqual) result, if the
+    /// This method returns an [`Err(NotEqual)`][NotEqual] result, if the
     /// atomically loaded snapshot from `atomic` does not match the `expected`
     /// value.
     ///
@@ -327,8 +324,8 @@ where
 
     /// Clears the current internal value and its protected state.
     ///
-    /// Consecutive calls to [`shared`][Protect::shared] and [`marked`][Protect::marked]
-    /// must return [`None`][core::option::Option::None] and [`Null`][Marked::Null],
+    /// Subsequent calls to [`shared`][Protect::shared] and [`marked`][Protect::marked]
+    /// must return [`None`][Option::None] and [`Null`][Marked::Null],
     /// respectively.
     fn release(&mut self);
 }

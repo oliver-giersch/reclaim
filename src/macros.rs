@@ -177,7 +177,8 @@ macro_rules! impl_trait_marked {
 
 macro_rules! impl_inherent {
     () => {
-        /// Gets a `None` for an [`Option<Self>`](core::option::Option).
+        /// Creates a `None` variant for an
+        /// [`Option<Self>`](core::option::Option).
         ///
         /// This is useful for calls to [`store`][store], [`swap`][swap] or
         /// [`compare_exchange_*`][compare_exchange], when a `null` pointer
@@ -185,13 +186,13 @@ macro_rules! impl_inherent {
         /// These methods accept values of various non-nullable pointer types
         /// ([`Shared`][Shared], [`Owned`][Owned], [`Unlinked`][Unlinked] and
         /// [`Unprotected`][Unprotected]) and `Option` thereof as argument.
-        /// However, the compiler is usually not able to infer the concrete type,
-        /// when a `None` is inserted, and this function is intended for these
-        /// cases.
+        /// However, the compiler is usually not able to infer the concrete
+        /// type, when a `None` is inserted, and this function is intended for
+        /// these cases.
         ///
-        /// [store]: crate::atomic::Atomic::store
-        /// [swap]: crate::atomic::Atomic::swap
-        /// [compare_exchange]: crate::atomic::Atomic::compare_exchange
+        /// [store]: crate::Atomic::store
+        /// [swap]: crate::Atomic::swap
+        /// [compare_exchange]: crate::Atomic::compare_exchange
         /// [Shared]: crate::Shared
         /// [Owned]: crate::Owned
         /// [Unlinked]: crate::Unlinked
@@ -216,22 +217,26 @@ macro_rules! impl_inherent {
             None
         }
 
+        /// Creates a `Null` variant for a [`Marked<Self>`][crate::Marked]
         #[inline]
         pub fn null() -> crate::pointer::Marked<Self> {
             Marked::Null
         }
 
+        /// Creates an `OnlyTag` variant for a [`Marked<Self>`][crate::Marked]
+        /// with the given `tag`.
         #[inline]
         pub fn only_tag(tag: usize) -> crate::pointer::Marked<Self> {
             Marked::OnlyTag(tag)
         }
 
-        /// Creates a new [`Option<Self>`](std::option::Option) from a marked pointer.
+        /// Creates a new [`Option<Self>`](core::option::Option) from a marked
+        /// pointer.
         ///
         /// # Safety
         ///
-        /// The caller has to ensure `marked` is either `null` or a valid pointer to a heap
-        /// allocated value of the appropriate `Self` type.
+        /// The caller has to ensure `marked` is either `null` or a valid
+        /// pointer to a heap allocated value of the appropriate `Self` type.
         #[inline]
         pub unsafe fn try_from_marked(
             marked: crate::pointer::MarkedPtr<T, N>
@@ -245,7 +250,8 @@ macro_rules! impl_inherent {
             self.inner
         }
 
-        /// Consumes `self` and returns the same value but with the specified `tag`.
+        /// Consumes `self` and returns the same value but with the
+        /// specified `tag`.
         #[inline]
         pub fn with_tag(self, tag: usize) -> Self {
             debug_assert!(!self.as_marked_ptr().is_null());

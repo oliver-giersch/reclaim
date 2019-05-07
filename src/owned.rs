@@ -346,7 +346,7 @@ mod test {
         let owned = Owned::new(1);
         let marked = Owned::into_marked_ptr(owned);
 
-        let from = unsafe { Owned::try_from_marked(marked).unwrap_ptr() };
+        let from = unsafe { Owned::try_from_marked(marked).unwrap_value() };
         assert_eq!((&1, 0), from.decompose_ref());
     }
 

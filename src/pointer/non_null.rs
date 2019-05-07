@@ -282,10 +282,10 @@ mod tests {
         let unmarked = MarkedPtr::new(reference);
 
         let marked = MarkedNonNull::new(unmarked);
-        assert_eq!(unsafe { marked.unwrap_ptr().decompose_ref() }, (&Aligned4(1), 0));
+        assert_eq!(unsafe { marked.unwrap_value().decompose_ref() }, (&Aligned4(1), 0));
 
         let marked = MarkedNonNull::new(MarkedPtr::compose(reference, 0b11));
-        assert_eq!(unsafe { marked.unwrap_ptr().decompose_ref() }, (&Aligned4(1), 0b11));
+        assert_eq!(unsafe { marked.unwrap_value().decompose_ref() }, (&Aligned4(1), 0b11));
 
         let null: *mut Aligned4<i32> = ptr::null_mut();
         let marked = MarkedNonNull::new(MarkedPtr::compose(null, 0b11));

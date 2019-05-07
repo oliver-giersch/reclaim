@@ -86,7 +86,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Option<Shared<'g, T, R, N>> {
-        guard.acquire(&self, order).ptr()
+        guard.acquire(&self, order).value()
     }
 
     /// Loads a value from the pointer and stores it within `guard`.
@@ -136,7 +136,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Result<Option<Shared<'g, T, R, N>>, NotEqual> {
-        guard.acquire_if_equal(self, compare, order).map(|marked| marked.ptr())
+        guard.acquire_if_equal(self, compare, order).map(|marked| marked.value())
     }
 
     /// Loads a value from the pointer that is explicitly **not** protected from reclamation,
@@ -153,7 +153,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, R, N>> {
         MarkedNonNull::new(self.inner.load(order))
             .map(|ptr| Unprotected { inner: ptr, _marker: PhantomData })
-            .ptr()
+            .value()
     }
 
     /// Stores either `null` or a valid pointer to an owned heap allocated value
@@ -202,7 +202,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         let res = self.inner.swap(ptr.into_marked_ptr(), order);
         // this is safe because the pointer is no longer accessible by other threads
         // (there can still be outstanding references that were loaded before the swap)
-        unsafe { Unlinked::try_from_marked(res).ptr() }
+        unsafe { Unlinked::try_from_marked(res).value() }
     }
 
     /// Stores a value (either null or valid) into the pointer if the current value
@@ -325,7 +325,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         // this is safe because the mutable reference ensures no concurrent access is possible
         MarkedNonNull::new(self.inner.swap(MarkedPtr::null(), Ordering::Relaxed))
             .map(|ptr| unsafe { Owned::from_marked_non_null(ptr) })
-            .ptr()
+            .value()
     }
 }
 

@@ -6,16 +6,16 @@ use crate::pointer::{
 };
 
 impl<T: NonNullable> Marked<T> {
-    /// Returns `true` if the marked value contains a [`Ptr`][crate::pointer::Marked::Ptr].
+    /// Returns `true` if the marked value contains a [`Value`][Value].
     #[inline]
-    pub fn is_ptr(&self) -> bool {
+    pub fn is_value(&self) -> bool {
         match *self {
             Value(_) => true,
             _ => false,
         }
     }
 
-    /// Returns `true` if the marked value contains a [`OnlyTag`][crate::pointer::Marked::OnlyTag].
+    /// Returns `true` if the marked value contains a [`OnlyTag`][OnlyTag].
     #[inline]
     pub fn is_tag(&self) -> bool {
         match *self {
@@ -24,7 +24,7 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// Returns `true` if the marked value contains a [`Null`][crate::pointer::Marked::Null].
+    /// Returns `true` if the marked value contains a [`Null`][Null].
     #[inline]
     pub fn is_null(&self) -> bool {
         match *self {
@@ -53,9 +53,9 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// Moves the pointer out of the `Marked` if it is [`Ptr(ptr)`][crate::pointer::Marked::Ptr].
+    /// Moves the pointer out of the `Marked` if it is [`Value(ptr)`][Value].
     #[inline]
-    pub fn unwrap_ptr(self) -> T {
+    pub fn unwrap_value(self) -> T {
         match self {
             Value(ptr) => ptr,
             _ => panic!("called `Marked::unwrap_value()` on a `Null` or `OnlyTag` value"),
@@ -63,7 +63,7 @@ impl<T: NonNullable> Marked<T> {
     }
 
     #[inline]
-    pub fn unwrap_ptr_or_else<F: FnOnce() -> T>(self, f: F) -> T {
+    pub fn unwrap_value_or_else<F: FnOnce() -> T>(self, f: F) -> T {
         match self {
             Value(ptr) => ptr,
             _ => f(),
@@ -71,7 +71,7 @@ impl<T: NonNullable> Marked<T> {
     }
 
     /// Moves the pure tag out of the `Marked` if it is
-    /// [`OnlyTag(tag)`][crate::pointer::Marked::Ptr].
+    /// [`OnlyTag(tag)`][OnlyTag].
     #[inline]
     pub fn unwrap_tag(self) -> usize {
         match self {
@@ -101,10 +101,9 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// Converts `self` into an option, returning `Some` if a `Value` is
-    /// contained.
+    /// Converts `self` from `Marked<T>` to [`Option<T>`][Option].
     #[inline]
-    pub fn ptr(self) -> Option<T> {
+    pub fn value(self) -> Option<T> {
         match self {
             Value(ptr) => Some(ptr),
             _ => None,
