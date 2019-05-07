@@ -4,7 +4,7 @@
 //! # Memory Management in Rust
 //!
 //! Unlike garbage-collected languages such as *Go* and *Java*, memory
-//! management in *Rust* is ultimately manual and akin to *C++*.
+//! management in *Rust* is ultimately manual and more akin to *C++*.
 //! Rust's ownership model in combination with standard library's smart pointer
 //! types `Box`, `Rc` and `Arc` make memory management as painless as possible
 //! and are able to handle the vast majority of use-cases.
