@@ -73,6 +73,8 @@ pub mod prelude {
         Marked::{self, Null, OnlyTag, Value},
         MarkedPointer,
     };
+
+    pub use crate::LocalReclaim;
     pub use crate::Protect;
     pub use crate::Reclaim;
 }
