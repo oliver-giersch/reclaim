@@ -415,11 +415,19 @@ impl<T, R: LocalReclaim, N: Unsigned> Store for Option<Owned<T, R, N>> {
     type Reclaimer = R;
 }
 
+impl<T, R: LocalReclaim, N: Unsigned> Store for Marked<Owned<T, R, N>> {
+    type Reclaimer = R;
+}
+
 impl<'g, T, R: LocalReclaim, N: Unsigned> Store for Shared<'g, T, R, N> {
     type Reclaimer = R;
 }
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> Store for Option<Shared<'g, T, R, N>> {
+    type Reclaimer = R;
+}
+
+impl<'g, T, R: LocalReclaim, N: Unsigned> Store for Marked<Shared<'g, T, R, N>> {
     type Reclaimer = R;
 }
 
@@ -431,11 +439,19 @@ impl<T, R: LocalReclaim, N: Unsigned> Store for Option<Unlinked<T, R, N>> {
     type Reclaimer = R;
 }
 
+impl<T, R: LocalReclaim, N: Unsigned> Store for Marked<Unlinked<T, R, N>> {
+    type Reclaimer = R;
+}
+
 impl<T, R: LocalReclaim, N: Unsigned> Store for Unprotected<T, R, N> {
     type Reclaimer = R;
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> Store for Option<Unprotected<T, R, N>> {
+    type Reclaimer = R;
+}
+
+impl<T, R: LocalReclaim, N: Unsigned> Store for Marked<Unprotected<T, R, N>> {
     type Reclaimer = R;
 }
 
@@ -450,20 +466,30 @@ pub trait Compare: MarkedPointer + Sized {
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> Compare for Shared<'g, T, R, N> {
     type Reclaimer = R;
-    type Unlinked = Self;
+    type Unlinked = Unlinked<T, R, N>;
 }
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> Compare for Option<Shared<'g, T, R, N>> {
     type Reclaimer = R;
-    type Unlinked = Self;
+    type Unlinked = Option<Unlinked<T, R, N>>;
+}
+
+impl<'g, T, R: LocalReclaim, N: Unsigned> Compare for Marked<Shared<'g, T, R, N>> {
+    type Reclaimer = R;
+    type Unlinked = Marked<Unlinked<T, R, N>>;
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> Compare for Unprotected<T, R, N> {
     type Reclaimer = R;
-    type Unlinked = Self;
+    type Unlinked = Unlinked<T, R, N>;
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> Compare for Option<Unprotected<T, R, N>> {
     type Reclaimer = R;
-    type Unlinked = Self;
+    type Unlinked = Option<Unlinked<T, R, N>>;
+}
+
+impl<T, R: LocalReclaim, N: Unsigned> Compare for Marked<Unprotected<T, R, N>> {
+    type Reclaimer = R;
+    type Unlinked = Marked<Unlinked<T, R, N>>;
 }
