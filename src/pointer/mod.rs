@@ -18,6 +18,8 @@ mod raw;
 pub trait MarkedPointer: Sized + Internal {
     /// The pointed-to type.
     type Item: Sized;
+    /// The pointer type.
+    type Pointer: NonNullable + Sized;
     /// Number of bits available for tagging.
     type MarkBits: Unsigned;
     /// Number of bits available for tagging.
@@ -31,6 +33,8 @@ pub trait MarkedPointer: Sized + Internal {
 
     /// Consumes `self` and returns the same value but without any tag.
     fn clear_tag(self) -> Self;
+
+    fn marked_with_tag(self, tag: usize) -> Marked<Self::Pointer>;
 
     /// Consumes `self` and returns the equivalent raw marked pointer.
     fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits>;
@@ -110,7 +114,7 @@ pub struct AtomicMarkedPtr<T, N> {
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Marked<T: NonNullable> {
     /// A marked, non-nullable pointer or reference value.
-    Ptr(T),
+    Value(T),
     /// A marked null pointer (i.e. only the tag).
     OnlyTag(usize),
     /// A pure null pointer (all-zero bits).

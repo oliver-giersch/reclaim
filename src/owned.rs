@@ -12,6 +12,7 @@ use typenum::Unsigned;
 
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, MarkedPtr, NonNullable};
 use crate::{LocalReclaim, Owned, Record, Shared};
+use crate::pointer::Marked::Value;
 
 impl<T: Clone, R: LocalReclaim, N: Unsigned> Clone for Owned<T, R, N> {
     #[inline]
@@ -34,6 +35,7 @@ unsafe impl<T, R: LocalReclaim, N: Unsigned> Sync for Owned<T, R, N> where T: Sy
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
     type Item = T;
+    type Pointer = Self;
     type MarkBits = N;
     const MARK_BITS: usize = N::USIZE;
 
@@ -50,6 +52,11 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
     #[inline]
     fn clear_tag(self) -> Self {
         self.with_tag(0)
+    }
+
+    #[inline]
+    fn marked_with_tag(self, tag: usize) -> Marked<Self::Pointer> {
+        Value(self.with_tag(tag))
     }
 
     #[inline]
@@ -72,11 +79,11 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Owned<T, R, N>> {
-    impl_trait_option!(Owned);
+    impl_trait_option!(Owned<T, R, N>);
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Owned<T, R, N>> {
-    impl_trait_marked!(Owned);
+    impl_trait_marked!(Owned<T, R, N>);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

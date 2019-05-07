@@ -1,6 +1,7 @@
 macro_rules! impl_trait {
     () => {
         type Item = T;
+        type Pointer = Self;
         type MarkBits = N;
         const MARK_BITS: usize = N::USIZE;
 
@@ -18,6 +19,11 @@ macro_rules! impl_trait {
         fn clear_tag(self) -> Self {
             let ptr = self.into_marked_ptr().decompose_ptr();
             unsafe { Self::from_marked_ptr(crate::pointer::MarkedPtr::new(ptr)) }
+        }
+
+        #[inline]
+        fn marked_with_tag(self, tag: usize) -> crate::pointer::Marked<Self::Pointer> {
+            Marked::Value(self.with_tag(tag))
         }
 
         #[inline]
@@ -45,8 +51,9 @@ macro_rules! impl_trait {
 }
 
 macro_rules! impl_trait_option {
-    ($pointer:ident) => {
+    ($pointer:ty) => {
         type Item = T;
+        type Pointer = $pointer;
         type MarkBits = N;
         const MARK_BITS: usize = N::USIZE;
 
@@ -72,6 +79,14 @@ macro_rules! impl_trait_option {
         }
 
         #[inline]
+        fn marked_with_tag(self, tag: usize) -> crate::pointer::Marked<Self::Pointer> {
+            match self {
+                Some(ptr) => Marked::Value(ptr.with_tag(tag)),
+                None => Marked::OnlyTag(tag),
+            }
+        }
+
+        #[inline]
         fn into_marked_ptr(self) -> crate::pointer::MarkedPtr<T, N> {
             match self {
                 Some(ptr) => ptr.into_marked_ptr(),
@@ -86,21 +101,22 @@ macro_rules! impl_trait_option {
 
         #[inline]
         unsafe fn from_marked_non_null(marked: crate::pointer::MarkedNonNull<T, N>) -> Self {
-            Some($pointer::from_marked_non_null(marked))
+            Some(Self::Pointer::from_marked_non_null(marked))
         }
     };
 }
 
 macro_rules! impl_trait_marked {
-    ($pointer:ident) => {
+    ($pointer:ty) => {
         type Item = T;
+        type Pointer = $pointer;
         type MarkBits = N;
         const MARK_BITS: usize = N::USIZE;
 
         #[inline]
         fn as_marked_ptr(&self) -> crate::pointer::MarkedPtr<T, N> {
             match *self {
-                Marked::Ptr(ref ptr) => ptr.as_marked_ptr(),
+                Marked::Value(ref ptr) => ptr.as_marked_ptr(),
                 Marked::OnlyTag(ref tag) => crate::pointer::MarkedPtr::compose(
                     core::ptr::null_mut(),
                     *tag
@@ -112,7 +128,7 @@ macro_rules! impl_trait_marked {
         #[inline]
         fn decompose_tag(&self) -> usize {
             match *self {
-                Marked::Ptr(ref ptr) => ptr.decompose_tag(),
+                Marked::Value(ref ptr) => ptr.decompose_tag(),
                 Marked::OnlyTag(ref tag) => *tag,
                 Marked::Null => 0,
             }
@@ -121,15 +137,23 @@ macro_rules! impl_trait_marked {
         #[inline]
         fn clear_tag(self) -> Self {
             match self {
-                Marked::Ptr(ptr) => Marked::Ptr(ptr.with_tag(0)),
+                Marked::Value(ptr) => Marked::Value(ptr.with_tag(0)),
                 _ => Marked::Null,
+            }
+        }
+
+        #[inline]
+        fn marked_with_tag(self, tag: usize) -> crate::pointer::Marked<Self::Pointer> {
+            match self {
+                Marked::Value(ptr) => Marked::Value(ptr.with_tag(tag)),
+                _ => Marked::OnlyTag(tag),
             }
         }
 
         #[inline]
         fn into_marked_ptr(self) -> crate::pointer::MarkedPtr<T, N> {
             match self {
-                Marked::Ptr(ptr) => ptr.into_marked_ptr(),
+                Marked::Value(ptr) => ptr.into_marked_ptr(),
                 Marked::OnlyTag(tag) => crate::pointer::MarkedPtr::compose(
                     core::ptr::null_mut(),
                     tag
@@ -140,12 +164,13 @@ macro_rules! impl_trait_marked {
 
         #[inline]
         unsafe fn from_marked_ptr(marked: crate::pointer::MarkedPtr<T, N>) -> Self {
-            crate::pointer::MarkedNonNull::new(marked).map(|ptr| $pointer::from_marked_non_null(ptr))
+            crate::pointer::MarkedNonNull::new(marked)
+                .map(|ptr| Self::Pointer::from_marked_non_null(ptr))
         }
 
         #[inline]
         unsafe fn from_marked_non_null(marked: crate::pointer::MarkedNonNull<T, N>) -> Self {
-            Marked::Ptr($pointer::from_marked_non_null(marked))
+            Marked::Value(Self::Pointer::from_marked_non_null(marked))
         }
     };
 }
@@ -189,6 +214,16 @@ macro_rules! impl_inherent {
         #[inline]
         pub fn none() -> Option<Self> {
             None
+        }
+
+        #[inline]
+        pub fn null() -> crate::pointer::Marked<Self> {
+            Marked::Null
+        }
+
+        #[inline]
+        pub fn only_tag(tag: usize) -> crate::pointer::Marked<Self> {
+            Marked::OnlyTag(tag)
         }
 
         /// Creates a new [`Option<Self>`](std::option::Option) from a marked pointer.

@@ -29,11 +29,11 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Shared<'g, T, R, N> 
 }
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Shared<'g, T, R, N>> {
-    impl_trait_option!(Shared);
+    impl_trait_option!(Shared<'g, T, R, N>);
 }
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Shared<'g, T, R, N>> {
-    impl_trait_marked!(Shared);
+    impl_trait_marked!(Shared<'g, T, R, N>);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

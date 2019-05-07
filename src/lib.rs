@@ -69,7 +69,7 @@ pub mod leak;
 pub mod prelude {
     //! Useful and/or required types and traits for this crate.
     pub use crate::pointer::{
-        Marked::{self, Null, OnlyTag, Ptr},
+        Marked::{self, Null, OnlyTag, Value},
         MarkedPointer,
     };
     pub use crate::Protect;

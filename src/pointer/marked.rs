@@ -1,7 +1,7 @@
 use core::mem;
 
 use crate::pointer::{
-    Marked::{self, Null, OnlyTag, Ptr},
+    Marked::{self, Null, OnlyTag, Value},
     NonNullable,
 };
 
@@ -10,7 +10,7 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn is_ptr(&self) -> bool {
         match *self {
-            Ptr(_) => true,
+            Value(_) => true,
             _ => false,
         }
     }
@@ -37,7 +37,7 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn as_ref(&self) -> Marked<&T> {
         match *self {
-            Ptr(ref value) => Ptr(value),
+            Value(ref value) => Value(value),
             OnlyTag(ref tag) => OnlyTag(*tag),
             Null => Null,
         }
@@ -47,7 +47,7 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn as_mut(&mut self) -> Marked<&mut T> {
         match *self {
-            Ptr(ref mut value) => Ptr(value),
+            Value(ref mut value) => Value(value),
             OnlyTag(ref tag) => OnlyTag(*tag),
             Null => Null,
         }
@@ -57,16 +57,15 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn unwrap_ptr(self) -> T {
         match self {
-            Ptr(ptr) => ptr,
+            Value(ptr) => ptr,
             _ => panic!("called `Marked::unwrap_value()` on a `Null` or `OnlyTag` value"),
         }
     }
 
-    /// TODO: Doc...
     #[inline]
     pub fn unwrap_ptr_or_else<F: FnOnce() -> T>(self, f: F) -> T {
         match self {
-            Ptr(ptr) => ptr,
+            Value(ptr) => ptr,
             _ => f(),
         }
     }
@@ -81,17 +80,15 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// TODO: Doc...
     #[inline]
     pub fn map<U: NonNullable>(self, func: impl (FnOnce(T) -> U)) -> Marked<U> {
         match self {
-            Ptr(ptr) => Ptr(func(ptr)),
+            Value(ptr) => Value(func(ptr)),
             OnlyTag(tag) => OnlyTag(tag),
             Null => Null,
         }
     }
 
-    /// TODO
     #[inline]
     pub fn map_or_else<U: NonNullable>(
         self,
@@ -99,7 +96,7 @@ impl<T: NonNullable> Marked<T> {
         func: impl FnOnce(T) -> U,
     ) -> U {
         match self {
-            Ptr(ptr) => func(ptr),
+            Value(ptr) => func(ptr),
             _ => default(),
         }
     }
@@ -109,12 +106,11 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn ptr(self) -> Option<T> {
         match self {
-            Ptr(ptr) => Some(ptr),
+            Value(ptr) => Some(ptr),
             _ => None,
         }
     }
 
-    /// TODO: Doc...
     #[inline]
     pub fn only_tag(self) -> Option<usize> {
         match self {
@@ -123,15 +119,13 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// TODO: Doc...
     #[inline]
     pub fn take(&mut self) -> Self {
         mem::replace(self, Null)
     }
 
-    /// TODO: Doc...
     #[inline]
     pub fn replace(&mut self, value: T) -> Self {
-        mem::replace(self, Ptr(value))
+        mem::replace(self, Value(value))
     }
 }
