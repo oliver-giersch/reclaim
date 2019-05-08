@@ -37,7 +37,8 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
         unsafe { self.inner.decompose_ref() }
     }
 
-    /// Retires a record by calling [`retire_local`][retire] on the generic reclamation parameter `R`.
+    /// Retires a record by calling [`retire_local`][retire] on the generic
+    /// reclamation parameter `R`.
     ///
     /// # Safety
     ///
@@ -52,12 +53,13 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
         R::retire_local(local, self)
     }
 
-    /// Retires a record by calling [`retire_local_unchecked`][retire_unchecked] on the generic
-    /// reclamation parameter `R`.
+    /// Retires a record by calling [`retire_local_unchecked`][retire_unchecked]
+    /// on the generic reclamation parameter `R`.
     ///
     /// # Safety
     ///
-    /// The same caveats as with [`LocalReclaim::retire_local_unchecked`][retire_unchecked] apply.
+    /// The same caveats as with [`LocalReclaim::retire_local_unchecked`][retire_unchecked]
+    /// apply.
     ///
     /// [retire_unchecked]: crate::LocalReclaim::retire_local_unchecked
     #[inline]
@@ -88,7 +90,8 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
     ///
     /// # Safety
     ///
-    /// The same caveats as with [`Reclaim::retire_unchecked`][retire_unchecked] apply.
+    /// The same caveats as with [`Reclaim::retire_unchecked`][retire_unchecked]
+    /// apply.
     ///
     /// [retire_unchecked]: crate::Reclaim::retire_unchecked
     #[inline]
