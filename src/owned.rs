@@ -130,13 +130,6 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
         unsafe { self.inner.decompose_mut() }
     }
 
-    /// Returns a reference to the header type that is automatically
-    /// allocated alongside every new record.
-    #[inline]
-    pub fn header(&self) -> &R::RecordHeader {
-        unsafe { Record::<T, R>::get_header_non_null(self.inner.decompose_non_null()) }
-    }
-
     /// Consumes and leaks the `Owned`, returning a mutable reference
     /// `&'a mut T` and the decomposed tag.
     /// Note that the type `T` must outlive the chosen lifetime `'a`.
@@ -259,8 +252,8 @@ impl<T, R: LocalReclaim, N: Unsigned> Drop for Owned<T, R, N> {
     #[inline]
     fn drop(&mut self) {
         unsafe {
-            let record = Record::<_, R>::get_record(self.inner.decompose_ptr());
-            mem::drop(Box::from_raw(record));
+            let record = Record::<_, R>::from_raw(self.inner.decompose_ptr());
+            mem::drop(Box::from_raw(record.as_ptr()));
         }
     }
 }
@@ -319,7 +312,8 @@ mod test {
     use crate::leak::Leaking;
     use crate::pointer::MarkedPointer;
 
-    type Owned<T> = super::Owned<T, Leaking, U2>;
+    type Owned<T> = crate::Owned<T, Leaking, U2>;
+    type Record<T> = crate::Record<T, Leaking>;
 
     #[test]
     fn new() {
@@ -352,12 +346,9 @@ mod test {
     #[test]
     fn header() {
         let owned = Owned::new(1);
-        assert_eq!(owned.header().checksum, 0xDEAD_BEEF);
-    }
+        let header =
+            unsafe { Record::get_header_from_raw_non_null(owned.inner.decompose_non_null()) };
 
-    #[test]
-    fn header_mut() {
-        let mut owned = Owned::new(1);
-        assert_eq!(owned.header_mut().checksum, 0xDEAD_BEEF);
+        assert_eq!(header.checksum, 0xDEAD_BEEF);
     }
 }

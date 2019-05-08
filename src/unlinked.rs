@@ -5,7 +5,7 @@ use core::ops::Deref;
 use typenum::Unsigned;
 
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
-use crate::{LocalReclaim, Reclaim, Record, Unlinked};
+use crate::{LocalReclaim, Reclaim, Unlinked};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // MarkedPointer
@@ -29,13 +29,6 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Unlinked<T, R, N>
 
 impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     impl_inherent!();
-
-    /// Returns a reference to the header type that is automatically
-    /// allocated alongside every new record.
-    #[inline]
-    pub fn header(&self) -> &R::RecordHeader {
-        unsafe { Record::<T, R>::get_header_non_null(self.inner.decompose_non_null()) }
-    }
 
     /// Decomposes the marked reference, returning the reference itself and the
     /// separated tag.
