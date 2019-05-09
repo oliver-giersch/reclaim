@@ -8,7 +8,7 @@ use typenum::{IsGreaterOrEqual, True, Unsigned};
 
 use crate::pointer::{
     self, InvalidNullError,
-    Marked::{self, Null, OnlyTag, Value},
+    Marked::{self, Null, Value},
     MarkedNonNull, MarkedPtr, NonNullable,
 };
 
@@ -65,8 +65,7 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     pub fn new(ptr: MarkedPtr<T, N>) -> Marked<Self> {
         match ptr.decompose() {
             (raw, _) if !raw.is_null() => unsafe { Value(Self::new_unchecked(ptr)) },
-            (_, 0) => Null,
-            (_, tag) => OnlyTag(tag),
+            (_, tag) => Null(tag),
         }
     }
 
@@ -289,6 +288,7 @@ mod tests {
 
         let null: *mut Aligned4<i32> = ptr::null_mut();
         let marked = MarkedNonNull::new(MarkedPtr::compose(null, 0b11));
+        assert!(marked.is_null());
         assert_eq!(marked.unwrap_tag(), 0b11);
 
         let marked = MarkedNonNull::new(MarkedPtr::compose(null, 0));

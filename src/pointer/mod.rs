@@ -117,10 +117,9 @@ pub struct AtomicMarkedPtr<T, N> {
 pub enum Marked<T: NonNullable> {
     /// A marked, non-nullable pointer or reference value.
     Value(T),
-    /// A marked null pointer (i.e. only the tag).
-    OnlyTag(usize),
-    /// A pure null pointer (all-zero bits).
-    Null,
+    /// A null pointer that may be marked, in which case the `usize` is
+    /// non-zero.
+    Null(usize),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

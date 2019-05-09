@@ -70,7 +70,7 @@ pub mod prelude {
     //! Useful and/or required types and traits for this crate.
 
     pub use crate::pointer::{
-        Marked::{self, Null, OnlyTag, Value},
+        Marked::{self, Null, Value},
         MarkedPointer,
     };
 
@@ -425,10 +425,7 @@ impl<T, R: LocalReclaim> Record<T, R> {
     /// Otherwise, the pointer arithmetic used to calculate the header's address
     /// will be incorrect and lead to undefined behavior.
     #[inline]
-    pub unsafe fn get_header_from_raw_non_null<'a>(
-        elem: NonNull<T>
-    ) -> &'a R::RecordHeader
-    {
+    pub unsafe fn get_header_from_raw_non_null<'a>(elem: NonNull<T>) -> &'a R::RecordHeader {
         let header = (elem.as_ptr() as usize) - Self::offset_elem() + Self::offset_header();
         &*(header as *mut _)
     }
