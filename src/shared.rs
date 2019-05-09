@@ -50,6 +50,13 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
         let (ptr, tag) = self.inner.decompose();
         unsafe { (&*ptr.as_ptr(), tag) }
     }
+
+    /// Consumes and decomposes the marked reference, returning only the
+    /// reference itself.
+    #[inline]
+    pub fn into_ref(self) -> &'g T {
+        unsafe { &*self.inner.decompose_ptr() }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
