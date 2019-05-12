@@ -5,7 +5,7 @@ use core::sync::atomic::Ordering;
 use typenum::Unsigned;
 
 use crate::pointer::{AtomicMarkedPtr, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
-use crate::{LocalReclaim, NotEqual, Owned, Protect, Shared, Unlinked, Unprotected};
+use crate::{LocalReclaim, NotEqualError, Owned, Protect, Shared, Unlinked, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Atomic
@@ -135,7 +135,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         compare: MarkedPtr<T, N>,
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
-    ) -> Result<Option<Shared<'g, T, R, N>>, NotEqual> {
+    ) -> Result<Option<Shared<'g, T, R, N>>, NotEqualError> {
         guard.acquire_if_equal(self, compare, order).map(|marked| marked.value())
     }
 
@@ -175,7 +175,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// [acq_rel]: std::sync::atomic::Ordering::AcqRel
     #[inline]
     pub fn store(&self, ptr: impl Store<Item = T, MarkBits = N, Reclaimer = R>, order: Ordering) {
-        self.inner.store(ptr.into_marked_ptr(), order);
+        self.inner.store(MarkedPointer::into_marked_ptr(ptr), order);
     }
 
     /// Stores either `null` or a valid pointer to an owned heap allocated value
@@ -199,7 +199,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         ptr: impl Store<Item = T, Reclaimer = R, MarkBits = N>,
         order: Ordering,
     ) -> Option<Unlinked<T, R, N>> {
-        let res = self.inner.swap(ptr.into_marked_ptr(), order);
+        let res = self.inner.swap(MarkedPointer::into_marked_ptr(ptr), order);
         // this is safe because the pointer is no longer accessible by other threads
         // (there can still be outstanding references that were loaded before the swap)
         unsafe { Unlinked::try_from_marked(res).value() }
@@ -244,8 +244,8 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         C: Compare<Item = T, MarkBits = N, Reclaimer = R>,
         S: Store<Item = T, MarkBits = N, Reclaimer = R>,
     {
-        let current = current.into_marked_ptr();
-        let new = new.into_marked_ptr();
+        let current = MarkedPointer::into_marked_ptr(current);
+        let new = MarkedPointer::into_marked_ptr(new);
 
         self.inner
             .compare_exchange(current, new, success, failure)
@@ -299,8 +299,8 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         C: Compare<Item = T, MarkBits = N, Reclaimer = R>,
         S: Store<Item = T, MarkBits = N, Reclaimer = R>,
     {
-        let current = current.into_marked_ptr();
-        let new = new.into_marked_ptr();
+        let current = MarkedPointer::into_marked_ptr(current);
+        let new = MarkedPointer::into_marked_ptr(new);
 
         self.inner
             .compare_exchange_weak(current, new, success, failure)

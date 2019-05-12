@@ -26,20 +26,20 @@ pub trait MarkedPointer: Sized + Internal {
     const MARK_BITS: usize;
 
     /// Returns the equivalent raw marked pointer.
-    fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits>;
+    fn as_marked_ptr(marked: &Self) -> MarkedPtr<Self::Item, Self::MarkBits>;
 
     /// Returns the tag value of the marked pointer.
-    fn decompose_tag(&self) -> usize;
+    fn decompose_tag(marked: &Self) -> usize;
 
     /// Consumes `self` and returns the same value but without any tag.
-    fn clear_tag(self) -> Self;
+    fn clear_tag(marked: Self) -> Self;
 
     /// Consumes `self` and returns the same value wrapped in a
     /// [`Marked`][crate::Marked] with the given `tag`.
-    fn marked_with_tag(self, tag: usize) -> Marked<Self::Pointer>;
+    fn marked_with_tag(marked: Self, tag: usize) -> Marked<Self::Pointer>;
 
     /// Consumes `self` and returns the equivalent raw marked pointer.
-    fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits>;
+    fn into_marked_ptr(marked: Self) -> MarkedPtr<Self::Item, Self::MarkBits>;
 
     /// Constructs a `Self` from a raw marked pointer.
     ///
@@ -48,7 +48,7 @@ pub trait MarkedPointer: Sized + Internal {
     /// The caller has to ensure that raw is a valid pointer for the respective
     /// `Self` type. If `Self` is nullable, a null pointer is a valid value.
     /// Otherwise, all values must be valid pointers.
-    unsafe fn from_marked_ptr(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self;
+    unsafe fn from_marked_ptr(ptr: MarkedPtr<Self::Item, Self::MarkBits>) -> Self;
 
     /// Constructs a `Self` from a raw non-null marked pointer
     ///
@@ -56,7 +56,7 @@ pub trait MarkedPointer: Sized + Internal {
     ///
     /// The same caveats as with [`from_marked_ptr`][MarkedPointer::from_marked_ptr]
     /// apply as well.
-    unsafe fn from_marked_non_null(marked: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self;
+    unsafe fn from_marked_non_null(ptr: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,7 +84,6 @@ pub struct MarkedPtr<T, N> {
 ///
 /// Note, that unlike [`MarkedPtr`][MarkedPtr] this also **excludes** marked
 /// null-pointers.
-#[derive(Eq, Ord)]
 pub struct MarkedNonNull<T, N> {
     inner: NonNull<T>,
     _marker: PhantomData<N>,

@@ -51,6 +51,7 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
+use core::fmt;
 use core::marker::PhantomData;
 use core::ptr::NonNull;
 use core::sync::atomic::Ordering;
@@ -307,9 +308,9 @@ where
     ///
     /// # Errors
     ///
-    /// This method returns an [`Err(NotEqual)`][NotEqual] result, if the
-    /// atomically loaded snapshot from `atomic` does not match the `expected`
-    /// value.
+    /// This method returns an [`Err(NotEqualError)`][NotEqualError] result, if
+    /// the atomically loaded snapshot from `atomic` does not match the
+    /// `expected` value.
     ///
     /// # Panics
     ///
@@ -333,12 +334,19 @@ where
 }
 
 /// Result type for [`acquire_if_equal`][Protect::acquire_if_equal] operations.
-pub type AcquireResult<'g, T, R, N> = Result<Marked<Shared<'g, T, R, N>>, NotEqual>;
+pub type AcquireResult<'g, T, R, N> = Result<Marked<Shared<'g, T, R, N>>, NotEqualError>;
 
 /// A zero-size marker type that represents the failure state of an
 /// [`acquire_if_equal`](Protect::acquire_if_equal) operation.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
-pub struct NotEqual;
+pub struct NotEqualError;
+
+impl fmt::Display for NotEqualError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "acquired value does not match `expected`.")
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Record
@@ -351,24 +359,37 @@ pub struct NotEqual;
 /// The record and its header are never directly exposed to the data structure
 /// using a given memory reclamation scheme and should only be accessed by the
 /// reclamation scheme itself.
-pub struct Record<T, R: LocalReclaim> {
+pub struct Record<H, T> {
     /// The record's header
-    pub header: R::RecordHeader,
+    header: H,
     /// The record's wrapped (inner) element
-    pub elem: T,
+    elem: T,
 }
 
-impl<T, R: LocalReclaim> Record<T, R> {
+impl<H: Default, T> Record<H, T> {
     /// Creates a new record with the specified `elem` and a default header.
-    #[inline]
     pub fn new(elem: T) -> Self {
         Self { header: Default::default(), elem }
     }
+}
 
-    /// Creates a new record with the specified `elem` and `header`.
+impl<H, T> Record<H, T> {
+    /// Creates a new record with the specified `header` and `elem`.
     #[inline]
-    pub fn with_header(elem: T, header: R::RecordHeader) -> Self {
+    pub fn with_header(header: H, elem: T) -> Self {
         Self { header, elem }
+    }
+
+    /// Returns a reference to the record's header.
+    #[inline]
+    pub fn header(&self) -> &H {
+        &self.header
+    }
+
+    /// Returns a reference to the record's element.
+    #[inline]
+    pub fn elem(&self) -> &T {
+        &self.elem
     }
 
     /// Calculates the address of the [`Record`] for the given pointer to a
@@ -410,7 +431,7 @@ impl<T, R: LocalReclaim> Record<T, R> {
     /// Otherwise, the pointer arithmetic used to calculate the header's address
     /// will be incorrect and lead to undefined behavior.
     #[inline]
-    pub unsafe fn get_header_from_raw<'a>(elem: *mut T) -> &'a R::RecordHeader {
+    pub unsafe fn header_from_raw<'a>(elem: *mut T) -> &'a H {
         let header = (elem as usize) - Self::offset_elem() + Self::offset_header();
         &*(header as *mut _)
     }
@@ -425,7 +446,7 @@ impl<T, R: LocalReclaim> Record<T, R> {
     /// Otherwise, the pointer arithmetic used to calculate the header's address
     /// will be incorrect and lead to undefined behavior.
     #[inline]
-    pub unsafe fn get_header_from_raw_non_null<'a>(elem: NonNull<T>) -> &'a R::RecordHeader {
+    pub unsafe fn header_from_raw_non_null<'a>(elem: NonNull<T>) -> &'a H {
         let header = (elem.as_ptr() as usize) - Self::offset_elem() + Self::offset_header();
         &*(header as *mut _)
     }
