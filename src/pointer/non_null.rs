@@ -248,15 +248,6 @@ impl<T, N> PartialOrd for MarkedNonNull<T, N> {
     }
 }
 
-impl<T, N> Eq for MarkedNonNull<T, N> {}
-
-impl<T, N> Ord for MarkedNonNull<T, N> {
-    #[inline]
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        self.inner.cmp(&other.inner)
-    }
-}
-
 impl<T, N> PartialEq<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
     #[inline]
     fn eq(&self, other: &MarkedPtr<T, N>) -> bool {

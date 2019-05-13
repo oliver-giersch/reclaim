@@ -10,9 +10,9 @@ use core::ptr::NonNull;
 
 use typenum::Unsigned;
 
-use crate::pointer::Marked::Value;
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, MarkedPtr, NonNullable};
 use crate::{LocalReclaim, Owned, Record, Shared};
+use crate::pointer::Marked::Value;
 
 impl<T: Clone, R: LocalReclaim, N: Unsigned> Clone for Owned<T, R, N> {
     #[inline]
@@ -40,41 +40,41 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
     const MARK_BITS: usize = N::USIZE;
 
     #[inline]
-    fn as_marked_ptr(marked: &Self) -> MarkedPtr<Self::Item, Self::MarkBits> {
-        marked.inner.into_marked_ptr()
+    fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        self.inner.into_marked_ptr()
     }
 
     #[inline]
-    fn decompose_tag(marked: &Self) -> usize {
-        marked.inner.decompose_tag()
+    fn decompose_tag(&self) -> usize {
+        self.inner.decompose_tag()
     }
 
     #[inline]
-    fn clear_tag(marked: Self) -> Self {
-        Self::with_tag(marked, 0)
+    fn clear_tag(self) -> Self {
+        self.with_tag(0)
     }
 
     #[inline]
-    fn marked_with_tag(marked: Self, tag: usize) -> Marked<Self::Pointer> {
-        Value(Self::with_tag(marked, tag))
+    fn marked_with_tag(self, tag: usize) -> Marked<Self::Pointer> {
+        Value(self.with_tag(tag))
     }
 
     #[inline]
-    fn into_marked_ptr(marked: Self) -> MarkedPtr<Self::Item, Self::MarkBits> {
-        let ptr = marked.inner.into_marked_ptr();
-        mem::forget(marked);
-        ptr
+    fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        let marked = self.inner.into_marked_ptr();
+        mem::forget(self);
+        marked
     }
 
     #[inline]
-    unsafe fn from_marked_ptr(ptr: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
-        debug_assert!(!ptr.is_null());
-        Self { inner: MarkedNonNull::new_unchecked(ptr), _marker: PhantomData }
+    unsafe fn from_marked_ptr(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
+        debug_assert!(!marked.is_null());
+        Self { inner: MarkedNonNull::new_unchecked(marked), _marker: PhantomData }
     }
 
     #[inline]
-    unsafe fn from_marked_non_null(ptr: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self {
-        Self { inner: ptr, _marker: PhantomData }
+    unsafe fn from_marked_non_null(marked: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self {
+        Self { inner: marked, _marker: PhantomData }
     }
 }
 
@@ -117,17 +117,17 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     /// Decomposes the internal marked pointer, returning a reference and the
     /// separated tag.
     #[inline]
-    pub fn decompose_ref(owned: &Self) -> (&T, usize) {
+    pub fn decompose_ref(&self) -> (&T, usize) {
         // this is safe because is `inner` is guaranteed to be backed by a valid allocation
-        unsafe { owned.inner.decompose_ref() }
+        unsafe { self.inner.decompose_ref() }
     }
 
     /// Decomposes the internal marked pointer, returning a mutable reference
     /// and the separated tag.
     #[inline]
-    pub fn decompose_mut(owned: &mut Self) -> (&mut T, usize) {
+    pub fn decompose_mut(&mut self) -> (&mut T, usize) {
         // this is safe because is `inner` is guaranteed to be backed by a valid allocation
-        unsafe { owned.inner.decompose_mut() }
+        unsafe { self.inner.decompose_mut() }
     }
 
     /// Consumes and leaks the `Owned`, returning a mutable reference
@@ -172,7 +172,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     /// wrapped value.
     #[inline]
     fn alloc_record(owned: T) -> NonNull<T> {
-        let record = Box::leak(Box::new(Record::<R::RecordHeader, _>::new(owned)));
+        let record = Box::leak(Box::new(Record::<_, R>::new(owned)));
         NonNull::from(&record.elem)
     }
 }
@@ -252,7 +252,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Drop for Owned<T, R, N> {
     #[inline]
     fn drop(&mut self) {
         unsafe {
-            let record = Record::<R::RecordHeader, _>::from_raw(self.inner.decompose_ptr());
+            let record = Record::<_, R>::from_raw(self.inner.decompose_ptr());
             mem::drop(Box::from_raw(record.as_ptr()));
         }
     }
@@ -310,10 +310,10 @@ mod test {
     use typenum::U2;
 
     use crate::leak::Leaking;
-    use crate::prelude::{LocalReclaim, MarkedPointer};
+    use crate::pointer::MarkedPointer;
 
     type Owned<T> = crate::Owned<T, Leaking, U2>;
-    type Record<T> = crate::Record<<Leaking as LocalReclaim>::RecordHeader, T>;
+    type Record<T> = crate::Record<T, Leaking>;
 
     #[test]
     fn new() {
@@ -332,21 +332,22 @@ mod test {
         let marked = Owned::into_marked_ptr(owned);
 
         let from = unsafe { Owned::try_from_marked(marked).unwrap_value() };
-        assert_eq!((&1, 0), Owned::decompose_ref(&from));
+        assert_eq!((&1, 0), from.decompose_ref());
     }
 
     #[test]
     fn compose() {
         let owned = Owned::compose(1, 0b11);
-        assert_eq!((Some(&1), 0b11), unsafe { Owned::into_marked_ptr(owned).decompose_ref() });
+        assert_eq!((Some(&1), 0b11), unsafe { owned.into_marked_ptr().decompose_ref() });
         let owned = Owned::compose(2, 0);
-        assert_eq!((Some(&2), 0), unsafe { Owned::into_marked_ptr(owned).decompose_ref() });
+        assert_eq!((Some(&2), 0), unsafe { owned.into_marked_ptr().decompose_ref() });
     }
 
     #[test]
     fn header() {
         let owned = Owned::new(1);
-        let header = unsafe { Record::header_from_raw_non_null(owned.inner.decompose_non_null()) };
+        let header =
+            unsafe { Record::get_header_from_raw_non_null(owned.inner.decompose_non_null()) };
 
         assert_eq!(header.checksum, 0xDEAD_BEEF);
     }
