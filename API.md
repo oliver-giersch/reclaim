@@ -1,6 +1,9 @@
 # API
 
-## Non-nullable Pointer Types
+## Non-nullable Pointer/Reference Types
+
+(sealed) trait:
+- `NonNullable` (marker)
 
 move-only:
 - `Owned` (`Clone` + `Drop`)
@@ -10,12 +13,28 @@ copy:
 - `Shared`
 - `Unprotected` 
 
+## Wrappers
+
+`enum Marked<T: NonNullable>`
+
+blanket implementation:
+
+```
+impl<T: NonNullable + MarkedPointer> MarkedPointer for Marked<T> { ... }
+```
+
 ## `MarkedPointer` Trait
 
 ```
-pub trait MarkedPointer: Sized {
+pub trait MarkedPointer: Sized + Internal {
     type Item: Sized;
-    type MarkBits: Unsigned;
+    const MARK_BITS: usize;
+
+    fn as_marked_ptr(_: &Self) -> MarkedPtr<Self::Item, Self::MARK_BITS>;
+    fn into_marked_ptr(_: Self) -> MarkedPtr<Self::Item, Self::MARK_BITS>;
+    fn decompose_tag(_: &Self) -> usize;
+    fn clear_tag(_: Self) -> Self;
+    
 
     fn tag(&self) -> usize { ... }
     fn strip_tag(self) -> Self { ... }

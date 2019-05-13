@@ -1,3 +1,4 @@
+use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
 use core::ptr::NonNull;
@@ -130,6 +131,13 @@ pub enum Marked<T: NonNullable> {
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub struct InvalidNullError;
 
+impl fmt::Display for InvalidNullError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        unimplemented!()
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // helper functions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -184,7 +192,7 @@ fn compose<T, N: Unsigned>(ptr: *mut T, tag: usize) -> *mut T {
 // internal traits
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// An internal marker trait for non-nullable pointer types.
+/// An sealed (internal) marker trait for non-nullable pointer types.
 pub trait NonNullable {}
 
 impl<'a, T> NonNullable for &'a T {}

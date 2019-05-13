@@ -14,6 +14,10 @@ use crate::pointer::Marked::Value;
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, MarkedPtr, NonNullable};
 use crate::{LocalReclaim, Owned, Record, Shared};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Clone
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<T: Clone, R: LocalReclaim, N: Unsigned> Clone for Owned<T, R, N> {
     #[inline]
     fn clone(&self) -> Self {
@@ -23,7 +27,7 @@ impl<T: Clone, R: LocalReclaim, N: Unsigned> Clone for Owned<T, R, N> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl Send, Sync
+// Send & Sync
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 unsafe impl<T, R: LocalReclaim, N: Unsigned> Send for Owned<T, R, N> where T: Send {}
@@ -117,17 +121,17 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     /// Decomposes the internal marked pointer, returning a reference and the
     /// separated tag.
     #[inline]
-    pub fn decompose_ref(&self) -> (&T, usize) {
+    pub fn decompose_ref(owned: &Self) -> (&T, usize) {
         // this is safe because is `inner` is guaranteed to be backed by a valid allocation
-        unsafe { self.inner.decompose_ref() }
+        unsafe { owned.inner.decompose_ref() }
     }
 
     /// Decomposes the internal marked pointer, returning a mutable reference
     /// and the separated tag.
     #[inline]
-    pub fn decompose_mut(&mut self) -> (&mut T, usize) {
+    pub fn decompose_mut(owned: &mut Self) -> (&mut T, usize) {
         // this is safe because is `inner` is guaranteed to be backed by a valid allocation
-        unsafe { self.inner.decompose_mut() }
+        unsafe { owned.inner.decompose_mut() }
     }
 
     /// Consumes and leaks the `Owned`, returning a mutable reference
@@ -332,7 +336,7 @@ mod test {
         let marked = Owned::into_marked_ptr(owned);
 
         let from = unsafe { Owned::try_from_marked(marked).unwrap_value() };
-        assert_eq!((&1, 0), from.decompose_ref());
+        assert_eq!((&1, 0), Owned::decompose_ref(&from));
     }
 
     #[test]
