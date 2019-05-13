@@ -1,6 +1,5 @@
 use core::fmt;
 use core::marker::PhantomData;
-use core::ops::Deref;
 
 use typenum::Unsigned;
 
@@ -54,7 +53,7 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
     /// Consumes and decomposes the marked reference, returning only the
     /// reference itself.
     #[inline]
-    pub fn into_ref(self) -> &'g T {
+    pub fn deref(self) -> &'g T {
         unsafe { &*self.inner.decompose_ptr() }
     }
 }
@@ -86,19 +85,6 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Shared<'g, T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Deref
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl<'g, T, R: LocalReclaim, N: Unsigned> Deref for Shared<'g, T, R, N> {
-    type Target = T;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        unsafe { self.inner.as_ref() }
     }
 }
 

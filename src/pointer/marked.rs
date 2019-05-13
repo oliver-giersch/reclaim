@@ -124,3 +124,13 @@ impl<T: NonNullable> Default for Marked<T> {
         Null(0)
     }
 }
+
+impl<T: NonNullable> From<Option<T>> for Marked<T> {
+    #[inline]
+    fn from(opt: Option<T>) -> Self {
+        match opt {
+            Some(ptr) => Value(ptr),
+            None => Null(0),
+        }
+    }
+}

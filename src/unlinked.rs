@@ -1,6 +1,5 @@
 use core::fmt;
 use core::marker::PhantomData;
-use core::ops::Deref;
 
 use typenum::Unsigned;
 
@@ -35,6 +34,13 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     #[inline]
     pub fn decompose_ref(&self) -> (&T, usize) {
         unsafe { self.inner.decompose_ref() }
+    }
+
+    /// Decomposes the marked reference, returning only the
+    /// reference itself.
+    #[inline]
+    pub fn deref(&self) -> &T {
+        unsafe { &*self.inner.as_ref() }
     }
 
     /// Retires a record by calling [`retire_local`][retire] on the generic
@@ -127,19 +133,6 @@ impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Unlinked<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Deref
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl<T, R: LocalReclaim, N: Unsigned> Deref for Unlinked<T, R, N> {
-    type Target = T;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        unsafe { self.inner.as_ref() }
     }
 }
 

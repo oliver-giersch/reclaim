@@ -84,7 +84,6 @@ pub struct MarkedPtr<T, N> {
 ///
 /// Note, that unlike [`MarkedPtr`][MarkedPtr] this also **excludes** marked
 /// null-pointers.
-#[derive(Eq, Ord)]
 pub struct MarkedNonNull<T, N> {
     inner: NonNull<T>,
     _marker: PhantomData<N>,

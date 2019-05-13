@@ -10,9 +10,9 @@ use core::ptr::NonNull;
 
 use typenum::Unsigned;
 
+use crate::pointer::Marked::Value;
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, MarkedPtr, NonNullable};
 use crate::{LocalReclaim, Owned, Record, Shared};
-use crate::pointer::Marked::Value;
 
 impl<T: Clone, R: LocalReclaim, N: Unsigned> Clone for Owned<T, R, N> {
     #[inline]
@@ -346,8 +346,7 @@ mod test {
     #[test]
     fn header() {
         let owned = Owned::new(1);
-        let header =
-            unsafe { Record::get_header_from_raw_non_null(owned.inner.decompose_non_null()) };
+        let header = unsafe { Record::header_from_raw_non_null(owned.inner.decompose_non_null()) };
 
         assert_eq!(header.checksum, 0xDEAD_BEEF);
     }

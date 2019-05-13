@@ -5,7 +5,7 @@ use core::sync::atomic::Ordering;
 use typenum::Unsigned;
 
 use crate::pointer::{AtomicMarkedPtr, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
-use crate::{LocalReclaim, NotEqual, Owned, Protect, Shared, Unlinked, Unprotected};
+use crate::{LocalReclaim, NotEqualError, Owned, Protect, Shared, Unlinked, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Atomic
@@ -135,7 +135,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         compare: MarkedPtr<T, N>,
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
-    ) -> Result<Option<Shared<'g, T, R, N>>, NotEqual> {
+    ) -> Result<Option<Shared<'g, T, R, N>>, NotEqualError> {
         guard.acquire_if_equal(self, compare, order).map(|marked| marked.value())
     }
 

@@ -107,7 +107,7 @@ unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
                 self.0 = marked;
                 unsafe { Ok(Shared::try_from_marked(marked)) }
             }
-            _ => Err(crate::NotEqual),
+            _ => Err(crate::NotEqualError),
         }
     }
 
