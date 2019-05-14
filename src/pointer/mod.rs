@@ -1,7 +1,7 @@
 use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
-use core::ptr::NonNull;
+use core::ptr::{self, NonNull};
 use core::sync::atomic::AtomicPtr;
 
 use typenum::Unsigned;
@@ -11,54 +11,7 @@ mod marked;
 mod non_null;
 mod raw;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// MarkedPointer (trait)
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Trait for nullable and non-nullable *markable* pointer types.
-pub trait MarkedPointer: Sized + Internal {
-    /// The pointed-to type.
-    type Item: Sized;
-    /// The pointer type.
-    type Pointer: NonNullable + Sized;
-    /// Number of bits available for tagging.
-    type MarkBits: Unsigned;
-    /// Number of bits available for tagging.
-    const MARK_BITS: usize;
-
-    /// Returns the equivalent raw marked pointer.
-    fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits>;
-
-    /// Returns the tag value of the marked pointer.
-    fn decompose_tag(&self) -> usize;
-
-    /// Consumes `self` and returns the same value but without any tag.
-    fn clear_tag(self) -> Self;
-
-    /// Consumes `self` and returns the same value wrapped in a
-    /// [`Marked`][crate::Marked] with the given `tag`.
-    fn marked_with_tag(self, tag: usize) -> Marked<Self::Pointer>;
-
-    /// Consumes `self` and returns the equivalent raw marked pointer.
-    fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits>;
-
-    /// Constructs a `Self` from a raw marked pointer.
-    ///
-    /// # Safety
-    ///
-    /// The caller has to ensure that raw is a valid pointer for the respective
-    /// `Self` type. If `Self` is nullable, a null pointer is a valid value.
-    /// Otherwise, all values must be valid pointers.
-    unsafe fn from_marked_ptr(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self;
-
-    /// Constructs a `Self` from a raw non-null marked pointer
-    ///
-    /// # Safety
-    ///
-    /// The same caveats as with [`from_marked_ptr`][MarkedPointer::from_marked_ptr]
-    /// apply as well.
-    unsafe fn from_marked_non_null(marked: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self;
-}
+use self::Marked::{Value, Null};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // MarkedPtr
@@ -134,9 +87,205 @@ pub struct InvalidNullError;
 impl fmt::Display for InvalidNullError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        unimplemented!()
+        write!(f, "failed conversion of null pointer to non-nullable type")
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// MarkedPointer (trait)
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Trait for nullable and non-nullable *markable* pointer types.
+pub trait MarkedPointer: Sized + Internal {
+    /// The pointer type.
+    type Pointer: NonNullable<Item = Self::Item, MarkBits = Self::MarkBits>;
+    /// The pointed-to type.
+    type Item: Sized;
+    /// Number of bits available for tagging.
+    type MarkBits: Unsigned;
+
+    /// Returns the equivalent raw marked pointer.
+    fn as_marked_ptr(_: &Self) -> MarkedPtr<Self::Item, Self::MarkBits>;
+
+    /// Consumes `self` and returns the equivalent raw marked pointer.
+    fn into_marked_ptr(_: Self) -> MarkedPtr<Self::Item, Self::MarkBits>;
+
+    /// Consumes the `Self` and returns the same value with the specified tag
+    /// wrapped in a [`Marked`].
+    fn with_tag(_: Self, tag: usize) -> Marked<Self::Pointer>;
+
+    /// Consumes the `Self` and returns the same value but without any tag.
+    fn clear_tag(_: Self) -> Self;
+
+    /// Constructs a `Self` from a raw marked pointer.
+    ///
+    /// # Safety
+    ///
+    /// The caller has to ensure that raw is a valid pointer for the respective
+    /// `Self` type. If `Self` is nullable, a null pointer is a valid value.
+    /// Otherwise, all values must be valid pointers.
+    unsafe fn from_marked_ptr(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self;
+
+    /// Constructs a `Self` from a raw non-null marked pointer
+    ///
+    /// # Safety
+    ///
+    /// The same caveats as with [`from_marked_ptr`][MarkedPointer::from_marked_ptr]
+    /// apply as well.
+    unsafe fn from_marked_non_null(marked: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// blanket implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<U, T, N: Unsigned> MarkedPointer for Option<U>
+where
+    U: MarkedPointer<Pointer = U, Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>
+{
+    type Pointer = U;
+    type Item = T;
+    type MarkBits = N;
+
+    #[inline]
+    fn as_marked_ptr(opt: &Self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        match opt {
+            Some(ptr) => Self::Pointer::as_marked_ptr(ptr),
+            None => MarkedPtr::null()
+        }
+    }
+
+    #[inline]
+    fn into_marked_ptr(opt: Self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        match opt {
+            Some(ptr) => Self::Pointer::into_marked_ptr(ptr),
+            None => MarkedPtr::null()
+        }
+    }
+
+    #[inline]
+    fn with_tag(opt: Self, tag: usize) -> Marked<Self::Pointer> {
+        match opt {
+            Some(ptr) => Self::Pointer::with_tag(ptr, tag),
+            None => Null(tag),
+        }
+    }
+
+    #[inline]
+    fn clear_tag(opt: Self) -> Self {
+        opt.map(|ptr| Self::Pointer::clear_tag(ptr))
+    }
+
+    #[inline]
+    unsafe fn from_marked_ptr(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
+        match !marked.is_null() {
+            true => Some(Self::Pointer::from_marked_non_null(MarkedNonNull::new_unchecked(marked))),
+            false => None
+        }
+    }
+
+    #[inline]
+    unsafe fn from_marked_non_null(marked: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self {
+        Some(Self::Pointer::from_marked_non_null(marked))
+    }
+}
+
+impl<U, T, N: Unsigned> MarkedPointer for Marked<U>
+where
+    U: MarkedPointer<Pointer = U, Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>
+{
+    type Pointer = U;
+    type Item = T;
+    type MarkBits = N;
+
+    #[inline]
+    fn as_marked_ptr(marked: &Self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        match marked {
+            Value(ptr) => Self::Pointer::as_marked_ptr(ptr),
+            Null(tag) => MarkedPtr::compose(ptr::null_mut(), *tag)
+        }
+    }
+
+    #[inline]
+    fn into_marked_ptr(marked: Self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        match marked {
+            Value(ptr) => Self::Pointer::into_marked_ptr(ptr),
+            Null(tag) => MarkedPtr::compose(ptr::null_mut(), tag)
+        }
+    }
+
+    #[inline]
+    fn with_tag(marked: Self, tag: usize) -> Marked<Self::Pointer> {
+        match marked {
+            Value(ptr) => Self::Pointer::with_tag(ptr, tag),
+            Null(_) => Null(tag)
+        }
+    }
+
+    #[inline]
+    fn clear_tag(marked: Self) -> Self {
+        match marked {
+            Value(ptr) => Value(Self::Pointer::clear_tag(ptr)),
+            Null(_) => Null(0),
+        }
+    }
+
+    #[inline]
+    unsafe fn from_marked_ptr(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
+        MarkedNonNull::new(marked).map(|ptr| Self::Pointer::from_marked_non_null(ptr))
+    }
+
+    #[inline]
+    unsafe fn from_marked_non_null(marked: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self {
+        Value(Self::Pointer::from_marked_non_null(marked))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// internal traits
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An sealed (internal) marker trait for non-nullable pointer types.
+pub trait NonNullable: Sized {
+    /// The pointed-to type.
+    type Item: Sized;
+    /// Number of bits available for tagging.
+    type MarkBits: Unsigned;
+
+    /// Converts the given `Self` into a equivalent marked non-null pointer.
+    fn into_marked_non_null(_: Self) -> MarkedNonNull<Self::Item, Self::MarkBits>;
+}
+
+impl<'a, T> NonNullable for &'a T {
+    type Item = T;
+    type MarkBits = typenum::U0;
+
+    #[inline]
+    fn into_marked_non_null(reference: Self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
+        MarkedNonNull::from(reference)
+    }
+}
+
+impl<'a, T> NonNullable for &'a mut T {
+    type Item = T;
+    type MarkBits = typenum::U0;
+
+    #[inline]
+    fn into_marked_non_null(reference: Self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
+        MarkedNonNull::from(reference)
+    }
+}
+
+/// A marker trait for internal traits.
+pub trait Internal {}
+
+impl<U, T, N: Unsigned> Internal for Option<U>
+where
+    U: MarkedPointer<Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N> {}
+
+impl<U, T, N: Unsigned> Internal for Marked<U>
+where
+    U: MarkedPointer<Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N> {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // helper functions
@@ -187,19 +336,6 @@ fn compose<T, N: Unsigned>(ptr: *mut T, tag: usize) -> *mut T {
     debug_assert_eq!(ptr as usize & mark_mask::<T>(N::USIZE), 0);
     ((ptr as usize) | (mark_mask::<T>(N::USIZE) & tag)) as *mut _
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// internal traits
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// An sealed (internal) marker trait for non-nullable pointer types.
-pub trait NonNullable {}
-
-impl<'a, T> NonNullable for &'a T {}
-impl<'a, T> NonNullable for &'a mut T {}
-
-/// A marker trait for internal traits.
-pub trait Internal {}
 
 #[cfg(test)]
 mod test {

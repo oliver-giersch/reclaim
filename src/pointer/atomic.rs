@@ -81,9 +81,9 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
 
     /// Stores a value into the pointer.
     ///
-    /// `store` takes an [`Ordering`][ordering] argument which describes the memory
-    /// ordering of this operation. Possible values are [`SeqCst`][seq_cst],
-    /// [`Release`][release] and [`Relaxed`][relaxed].
+    /// `store` takes an [`Ordering`][ordering] argument which describes the
+    /// memory ordering of this operation. Possible values are
+    /// [`SeqCst`][seq_cst], [`Release`][release] and [`Relaxed`][relaxed].
     ///
     /// # Panics
     ///

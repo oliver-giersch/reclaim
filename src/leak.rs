@@ -7,15 +7,15 @@ use typenum::Unsigned;
 use crate::pointer::{Marked, MarkedPointer, MarkedPtr};
 use crate::{AcquireResult, LocalReclaim, Protect};
 
-/// An [`Atomic`](../struct.Atomic.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme
+/// An [`Atomic`][crate::Atomic] type that uses the no-op [`Leaking`] "reclamation" scheme.
 pub type Atomic<T, N> = crate::Atomic<T, Leaking, N>;
-/// A [`Shared`](../struct.Shared.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme
+/// A [`Shared`][crate::Shared] type that uses the no-op [`Leaking`] "reclamation" scheme.
 pub type Shared<'g, T, N> = crate::Shared<'g, T, Leaking, N>;
-/// An [`Owned`](../struct.Owned.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme
+/// An [`Owned`][crate::Owned] type that uses the no-op [`Leaking`] "reclamation" scheme.
 pub type Owned<T, N> = crate::Owned<T, Leaking, N>;
-/// An [`Unlinked`](../struct.Unlinked.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme
+/// An [`Unlinked`][crate::Unlinked] type that uses the no-op [`Leaking`] "reclamation" scheme.
 pub type Unlinked<T, N> = crate::Unlinked<T, Leaking, N>;
-/// An [`Unprotected`](../struct.Unprotected.html) type that uses the no-op [`Leaking`](struct.Leaking.html) "reclamation" scheme
+/// An [`Unprotected`][crate::Unprotected] type that uses the no-op [`Leaking`] "reclamation" scheme.
 pub type Unprotected<T, N> = crate::Unprotected<T, Leaking, N>;
 
 /// A no-op memory "reclamation" scheme that deliberately leaks all memory.
@@ -64,9 +64,19 @@ unsafe impl LocalReclaim for Leaking {
     type RecordHeader = ();
 
     /// Leaks the given value.
+    ///
+    /// # Safety
+    ///
+    /// Contrary to the specifications of the trait methods, this particular specialization is
+    /// always safe to call.
     #[inline]
     unsafe fn retire_local<T: 'static, N: Unsigned>(_: &(), _: Unlinked<T, N>) {}
     /// Leaks the given value.
+    ///
+    /// # Safety
+    ///
+    /// Contrary to the specifications of the trait methods, this particular specialization is
+    /// always safe to call.
     #[inline]
     unsafe fn retire_local_unchecked<T, N: Unsigned>(_: &(), _: Unlinked<T, N>) {}
 }
@@ -91,7 +101,7 @@ unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
         order: Ordering,
     ) -> Marked<Shared<Self::Item, Self::MarkBits>> {
         self.0 = atomic.load_raw(order);
-        unsafe { Shared::try_from_marked(self.0) }
+        unsafe { Marked::from_marked_ptr(self.0) }
     }
 
     /// Acquires a value from shared memory if it equals `expected`.
@@ -105,7 +115,7 @@ unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
         match atomic.load_raw(order) {
             marked if marked == expected => {
                 self.0 = marked;
-                unsafe { Ok(Shared::try_from_marked(marked)) }
+                unsafe { Ok(Marked::from_marked_ptr(marked)) }
             }
             _ => Err(crate::NotEqualError),
         }

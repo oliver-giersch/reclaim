@@ -5,6 +5,10 @@ use crate::pointer::{
     NonNullable,
 };
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// inherent
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<T: NonNullable> Marked<T> {
     /// Returns `true` if the marked value contains a [`Value`].
     #[inline]
@@ -51,10 +55,9 @@ impl<T: NonNullable> Marked<T> {
         }
     }
 
-    /// Moves the pure tag out of the `Marked` if it is
-    /// [`OnlyTag(tag)`][OnlyTag].
+    /// Extracts the tag out of the `Marked` if it is [`Null(tag)`][Null].
     #[inline]
-    pub fn unwrap_tag(self) -> usize {
+    pub fn unwrap_null(self) -> usize {
         match self {
             Null(tag) => tag,
             _ => panic!("called `Marked::unwrap_tag()` on a `Value`"),
@@ -118,12 +121,20 @@ impl<T: NonNullable> Marked<T> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Default
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl<T: NonNullable> Default for Marked<T> {
     #[inline]
     fn default() -> Self {
         Null(0)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// From
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T: NonNullable> From<Option<T>> for Marked<T> {
     #[inline]

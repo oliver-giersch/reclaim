@@ -73,6 +73,7 @@ pub mod prelude {
     pub use crate::pointer::{
         Marked::{self, Null, Value},
         MarkedPointer,
+        NonNullable,
     };
 
     pub use crate::LocalReclaim;
@@ -352,7 +353,7 @@ impl fmt::Display for NotEqualError {
 // Record
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A Record type that is associated to a specific reclamation scheme.
+/// A record type that is associated to a specific reclamation scheme.
 ///
 /// Whenever a new [`Owned`] or (non-null) [`Atomic`] is created, a value of
 /// this type is allocated on the heap as a wrapper for the desired record.

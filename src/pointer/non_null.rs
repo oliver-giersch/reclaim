@@ -83,6 +83,18 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
         Self { inner: NonNull::dangling(), _marker: PhantomData }
     }
 
+    /// Clears the tag of `self` and returns the same but untagged pointer.
+    #[inline]
+    pub fn clear_tag(self) -> Self {
+        Self::from(self.decompose_non_null())
+    }
+
+    /// Clears the tag of `self` and replaces it with `tag`.
+    #[inline]
+    pub fn with_tag(self, tag: usize) -> Self {
+        Self::compose(self.decompose_non_null(), tag)
+    }
+
     /// Converts the pointer to the equivalent [`MarkedPtr`][crate::pointer::MarkedPtr].
     #[inline]
     pub fn into_marked_ptr(self) -> MarkedPtr<T, N> {
@@ -271,7 +283,19 @@ impl<T, N> PartialOrd<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
     }
 }
 
-impl<T, N> NonNullable for MarkedNonNull<T, N> {}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// NonNullable
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, N: Unsigned> NonNullable for MarkedNonNull<T, N> {
+    type Item = T;
+    type MarkBits = N;
+
+    #[inline]
+    fn into_marked_non_null(ptr: Self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
+        ptr
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -298,7 +322,7 @@ mod tests {
         let null: *mut Aligned4<i32> = ptr::null_mut();
         let marked = MarkedNonNull::new(MarkedPtr::compose(null, 0b11));
         assert!(marked.is_null());
-        assert_eq!(marked.unwrap_tag(), 0b11);
+        assert_eq!(marked.unwrap_null(), 0b11);
 
         let marked = MarkedNonNull::new(MarkedPtr::compose(null, 0));
         assert!(marked.is_null());

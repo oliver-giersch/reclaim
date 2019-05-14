@@ -31,7 +31,7 @@ impl<T, N> MarkedPtr<T, N> {
         Self { inner: ptr, _marker: PhantomData }
     }
 
-    /// Creates a new  unmarked null pointer.
+    /// Creates a new & unmarked `null` pointer.
     #[inline]
     pub const fn null() -> Self {
         Self::new(ptr::null_mut())
@@ -81,6 +81,18 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
         Self::new(other.inner)
     }
 
+    /// Clears the tag of `self` and returns the same but untagged pointer.
+    #[inline]
+    pub fn clear_tag(self) -> Self {
+        Self::new(self.decompose_ptr())
+    }
+
+    /// Clears the tag of `self` and replaces it with `tag`.
+    #[inline]
+    pub fn with_tag(self, tag: usize) -> Self {
+        Self::compose(self.decompose_ptr(), tag)
+    }
+
     /// Decomposes the marked pointer, returning the separated raw pointer and
     /// its tag.
     #[inline]
@@ -103,8 +115,8 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     /// Decomposes the marked pointer, returning an optional reference and the
     /// separated tag.
     ///
-    /// In case the pointer stripped of its tag is null, `None` is returned as
-    /// part of the tuple. Otherwise, the reference is wrapped in a `Some`.
+    /// In case the pointer stripped of its tag is null, [`None`] is returned as
+    /// part of the tuple. Otherwise, the reference is wrapped in a [`Some`].
     ///
     /// # Safety
     ///
@@ -124,15 +136,16 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     /// Decomposes the marked pointer returning an optional mutable reference
     /// and the separated tag.
     ///
-    /// In case the pointer stripped of its tag is null, `None` is returned as
+    /// In case the pointer stripped of its tag is null, [`None`] is returned as
     /// part of the tuple. Otherwise, the mutable reference is wrapped in a
-    /// `Some`.
+    /// [`Some`].
     ///
     /// # Safety
     ///
-    /// As with `decompose_ref`, this is unsafe because it cannot verify the
-    /// validity of the returned pointer, nor can it ensure that the lifetime
-    /// `'a` returned is indeed a valid lifetime for the contained data.
+    /// As with [`decompose_ref`][MarkedPtr::decompose_ref], this is unsafe
+    /// because it cannot verify the validity of the returned pointer, nor can
+    /// it ensure that the lifetime `'a` returned is indeed a valid lifetime for
+    /// the contained data.
     #[inline]
     pub unsafe fn decompose_mut<'a>(self) -> (Option<&'a mut T>, usize) {
         let (ptr, tag) = self.decompose();
@@ -163,7 +176,7 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
         self.decompose_ptr().as_mut()
     }
 
-    /// Returns true if the pointer is null (regardless of the tag).
+    /// Returns true if the pointer is `null` (regardless of the tag).
     #[inline]
     pub fn is_null(self) -> bool {
         self.decompose_ptr().is_null()
@@ -275,7 +288,7 @@ impl<T, N> PartialOrd for MarkedPtr<T, N> {
 impl<T, N> PartialEq<MarkedNonNull<T, N>> for MarkedPtr<T, N> {
     #[inline]
     fn eq(&self, other: &MarkedNonNull<T, N>) -> bool {
-        self.inner == other.inner.as_ptr()
+        self.inner.eq(&other.inner.as_ptr())
     }
 }
 

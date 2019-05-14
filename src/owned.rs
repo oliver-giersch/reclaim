@@ -10,9 +10,8 @@ use core::ptr::NonNull;
 
 use typenum::Unsigned;
 
-use crate::pointer::Marked::Value;
-use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, MarkedPtr, NonNullable};
-use crate::{LocalReclaim, Owned, Record, Shared};
+use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
+use crate::{LocalReclaim, Owned, Record, Shared, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Clone
@@ -38,56 +37,7 @@ unsafe impl<T, R: LocalReclaim, N: Unsigned> Sync for Owned<T, R, N> where T: Sy
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
-    type Item = T;
-    type Pointer = Self;
-    type MarkBits = N;
-    const MARK_BITS: usize = N::USIZE;
-
-    #[inline]
-    fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
-        self.inner.into_marked_ptr()
-    }
-
-    #[inline]
-    fn decompose_tag(&self) -> usize {
-        self.inner.decompose_tag()
-    }
-
-    #[inline]
-    fn clear_tag(self) -> Self {
-        self.with_tag(0)
-    }
-
-    #[inline]
-    fn marked_with_tag(self, tag: usize) -> Marked<Self::Pointer> {
-        Value(self.with_tag(tag))
-    }
-
-    #[inline]
-    fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits> {
-        let marked = self.inner.into_marked_ptr();
-        mem::forget(self);
-        marked
-    }
-
-    #[inline]
-    unsafe fn from_marked_ptr(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
-        debug_assert!(!marked.is_null());
-        Self { inner: MarkedNonNull::new_unchecked(marked), _marker: PhantomData }
-    }
-
-    #[inline]
-    unsafe fn from_marked_non_null(marked: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self {
-        Self { inner: marked, _marker: PhantomData }
-    }
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Owned<T, R, N>> {
-    impl_trait_option!(Owned<T, R, N>);
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Owned<T, R, N>> {
-    impl_trait_marked!(Owned<T, R, N>);
+    impl_trait!(owned);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,14 +59,14 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
         Self { inner: MarkedNonNull::from(Self::alloc_record(owned)), _marker: PhantomData }
     }
 
+    impl_inherent!();
+
     /// Creates a new `Owned` like [`new`](Owned::new) but composes the
     /// returned pointer with an initial `tag` value.
     #[inline]
     pub fn compose(owned: T, tag: usize) -> Self {
         Self { inner: MarkedNonNull::compose(Self::alloc_record(owned), tag), _marker: PhantomData }
     }
-
-    impl_inherent!();
 
     /// Decomposes the internal marked pointer, returning a reference and the
     /// separated tag.
@@ -149,6 +99,15 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
         unsafe { (&mut *ptr.as_ptr(), tag) }
     }
 
+    /// Leaks the `owned` value and turns it into an [`Unprotected`] value,
+    /// which has copy semantics, but can no longer be safely dereferenced.
+    #[inline]
+    pub fn leak_unprotected(owned: Self) -> Unprotected<T, R, N> {
+        let inner = owned.inner;
+        mem::forget(owned);
+        Unprotected { inner, _marker: PhantomData }
+    }
+
     /// Leaks the `owned` value and turns it into a "protected" [`Shared`][shared]
     /// value with arbitrary lifetime `'a`.
     ///
@@ -168,7 +127,6 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     pub unsafe fn leak_shared<'a>(owned: Self) -> Shared<'a, T, R, N> {
         let inner = owned.inner;
         mem::forget(owned);
-
         Shared { inner, _marker: PhantomData }
     }
 
@@ -296,18 +254,26 @@ impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Owned<T, R, N> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// NonNullable
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, R: LocalReclaim, N: Unsigned> NonNullable for Owned<T, R, N> {
+    type Item = T;
+    type MarkBits = N;
+
+    #[inline]
+    fn into_marked_non_null(owned: Self) -> MarkedNonNull<T, N> {
+        let inner = owned.inner;
+        mem::forget(owned);
+        inner
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Internal
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> Internal for Owned<T, R, N> {}
-impl<T, R: LocalReclaim, N: Unsigned> Internal for Option<Owned<T, R, N>> {}
-impl<T, R: LocalReclaim, N: Unsigned> Internal for Marked<Owned<T, R, N>> {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// NonNullable
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl<T, R: LocalReclaim, N: Unsigned> NonNullable for Owned<T, R, N> {}
 
 #[cfg(test)]
 mod test {
@@ -331,20 +297,20 @@ mod test {
     }
 
     #[test]
-    fn try_from_marked() {
+    fn from_marked_ptr() {
         let owned = Owned::new(1);
         let marked = Owned::into_marked_ptr(owned);
 
-        let from = unsafe { Owned::try_from_marked(marked).unwrap_value() };
+        let from = unsafe { Owned::from_marked_ptr(marked) };
         assert_eq!((&1, 0), Owned::decompose_ref(&from));
     }
 
     #[test]
     fn compose() {
         let owned = Owned::compose(1, 0b11);
-        assert_eq!((Some(&1), 0b11), unsafe { owned.into_marked_ptr().decompose_ref() });
+        assert_eq!((Some(&1), 0b11), unsafe { Owned::into_marked_ptr(owned).decompose_ref() });
         let owned = Owned::compose(2, 0);
-        assert_eq!((Some(&2), 0), unsafe { owned.into_marked_ptr().decompose_ref() });
+        assert_eq!((Some(&2), 0), unsafe { Owned::into_marked_ptr(owned).decompose_ref() });
     }
 
     #[test]

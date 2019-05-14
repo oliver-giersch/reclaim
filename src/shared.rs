@@ -1,5 +1,6 @@
 use core::fmt;
 use core::marker::PhantomData;
+use core::ops::Deref;
 
 use typenum::Unsigned;
 
@@ -24,15 +25,7 @@ impl<'g, T, R, N> Copy for Shared<'g, T, R, N> {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Shared<'g, T, R, N> {
-    impl_trait!();
-}
-
-impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Shared<'g, T, R, N>> {
-    impl_trait_option!(Shared<'g, T, R, N>);
-}
-
-impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Shared<'g, T, R, N>> {
-    impl_trait_marked!(Shared<'g, T, R, N>);
+    impl_trait!(shared);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,7 +46,7 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
     /// Consumes and decomposes the marked reference, returning only the
     /// reference itself.
     #[inline]
-    pub fn deref(self) -> &'g T {
+    pub fn into_ref(self) -> &'g T {
         unsafe { &*self.inner.decompose_ptr() }
     }
 }
@@ -65,6 +58,19 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
 impl<'g, T, R: LocalReclaim, N: Unsigned> AsRef<T> for Shared<'g, T, R, N> {
     #[inline]
     fn as_ref(&self) -> &T {
+        unsafe { self.inner.as_ref() }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Deref
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'g, T, R: LocalReclaim, N: Unsigned> Deref for Shared<'g, T, R, N> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
         unsafe { self.inner.as_ref() }
     }
 }
@@ -89,15 +95,21 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Shared<'g, T, R, N> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// NonNullable
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'g, T, R, N: Unsigned> NonNullable for Shared<'g, T, R, N> {
+    type Item = T;
+    type MarkBits = N;
+
+    #[inline]
+    fn into_marked_non_null(shared: Self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
+        shared.inner
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Internal
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'g, T, R, N> Internal for Shared<'g, T, R, N> {}
-impl<'g, T, R, N> Internal for Option<Shared<'g, T, R, N>> {}
-impl<'g, T, R, N> Internal for Marked<Shared<'g, T, R, N>> {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// NonNullable
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl<'g, T, R, N> NonNullable for Shared<'g, T, R, N> {}

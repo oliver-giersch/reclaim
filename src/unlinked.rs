@@ -1,5 +1,6 @@
 use core::fmt;
 use core::marker::PhantomData;
+use core::ops::Deref;
 
 use typenum::Unsigned;
 
@@ -11,15 +12,7 @@ use crate::{LocalReclaim, Reclaim, Unlinked};
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unlinked<T, R, N> {
-    impl_trait!();
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Option<Unlinked<T, R, N>> {
-    impl_trait_option!(Unlinked<T, R, N>);
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Marked<Unlinked<T, R, N>> {
-    impl_trait_marked!(Unlinked<T, R, N>);
+    impl_trait!(unlinked);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,15 +25,8 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     /// Decomposes the marked reference, returning the reference itself and the
     /// separated tag.
     #[inline]
-    pub fn decompose_ref(&self) -> (&T, usize) {
-        unsafe { self.inner.decompose_ref() }
-    }
-
-    /// Decomposes the marked reference, returning only the
-    /// reference itself.
-    #[inline]
-    pub fn deref(&self) -> &T {
-        unsafe { &*self.inner.as_ref() }
+    pub fn decompose_ref(unlinked: &Self) -> (&T, usize) {
+        unsafe { unlinked.inner.decompose_ref() }
     }
 
     /// Retires a record by calling [`retire_local`][retire] on the generic
@@ -52,11 +38,11 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     ///
     /// [retire]: crate::LocalReclaim::retire_local
     #[inline]
-    pub unsafe fn retire_local(self, local: &R::Local)
+    pub unsafe fn retire_local(unlinked: Self, local: &R::Local)
     where
         T: 'static,
     {
-        R::retire_local(local, self)
+        R::retire_local(local, unlinked)
     }
 
     /// Retires a record by calling [`retire_local_unchecked`][retire_unchecked]
@@ -69,8 +55,8 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     ///
     /// [retire_unchecked]: crate::LocalReclaim::retire_local_unchecked
     #[inline]
-    pub unsafe fn retire_local_unchecked(self, local: &R::Local) {
-        R::retire_local_unchecked(local, self)
+    pub unsafe fn retire_local_unchecked(unlinked: Self, local: &R::Local) {
+        R::retire_local_unchecked(local, unlinked)
     }
 }
 
@@ -84,11 +70,11 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
     ///
     /// [retire]: crate::Reclaim::retire
     #[inline]
-    pub unsafe fn retire(self)
+    pub unsafe fn retire(unlinked: Self)
     where
         T: 'static,
     {
-        R::retire(self)
+        R::retire(unlinked)
     }
 
     /// Retires a record by calling [`retire_unchecked`][retire_unchecked] on
@@ -101,8 +87,8 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
     ///
     /// [retire_unchecked]: crate::Reclaim::retire_unchecked
     #[inline]
-    pub unsafe fn retire_unchecked(self) {
-        R::retire_unchecked(self)
+    pub unsafe fn retire_unchecked(unlinked: Self) {
+        R::retire_unchecked(unlinked)
     }
 }
 
@@ -113,6 +99,19 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
 impl<T, R: LocalReclaim, N: Unsigned> AsRef<T> for Unlinked<T, R, N> {
     #[inline]
     fn as_ref(&self) -> &T {
+        unsafe { self.inner.as_ref() }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Deref
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, R: LocalReclaim, N: Unsigned> Deref for Unlinked<T, R, N> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
         unsafe { self.inner.as_ref() }
     }
 }
@@ -137,15 +136,21 @@ impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Unlinked<T, R, N> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// NonNullable
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, R, N: Unsigned> NonNullable for Unlinked<T, R, N> {
+    type Item = T;
+    type MarkBits = N;
+
+    #[inline]
+    fn into_marked_non_null(unlinked: Self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
+        unlinked.inner
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Internal
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R, N> Internal for Unlinked<T, R, N> {}
-impl<T, R, N> Internal for Option<Unlinked<T, R, N>> {}
-impl<T, R, N> Internal for Marked<Unlinked<T, R, N>> {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// NonNullable
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl<T, R, N> NonNullable for Unlinked<T, R, N> {}

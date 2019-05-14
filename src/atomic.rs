@@ -12,14 +12,16 @@ use crate::{LocalReclaim, NotEqualError, Owned, Protect, Shared, Unlinked, Unpro
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// An atomic markable pointer type to an owned heap allocated value similar to
-/// [`AtomicPtr`](std::sync::atomic::AtomicPtr).
+/// [`AtomicPtr`](core::sync::atomic::AtomicPtr).
 ///
-/// The `Atomic` type has similarities to [`Option<Box>`](std::boxed::Box), in the sense that it is
-/// a pointer that is either null or otherwise points to a valid heap allocated value.
-/// Note, that the type does not implement the [`Drop`](std::ops::Drop) trait, meaning it does not
-/// automatically take care of memory deallocation when it goes out of scope.
-/// Use the [`take`](Atomic::take) method to extract an (optional) [`Owned`](crate::Owned) value,
-/// which *does* correctly deallocate memory when it goes out of scope.
+/// The `Atomic` type has similarities to [`Option<Box>`][Option], as it is a
+/// pointer that is either `null` or otherwise must point to a valid, heap
+/// allocated value.
+/// Note, that the type does not implement the [`Drop`](core::ops::Drop) trait,
+/// meaning it does not automatically take care of memory deallocation when it
+/// goes out of scope.
+/// Use the [`take`][Atomic::take] method to extract an (optional) [`Owned`]
+/// value, which *does* correctly deallocate memory when it goes out of scope.
 pub struct Atomic<T, R, N> {
     inner: AtomicMarkedPtr<T, N>,
     _marker: PhantomData<(T, R)>,
@@ -43,7 +45,7 @@ impl<T, R, N> Atomic<T, R, N> {
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
-    /// Creates a new [`Atomic`](struct.Atomic.html) by allocating specified `val` on the heap.
+    /// Creates a new [`Atomic`] by allocating specified `val` on the heap.
     #[inline]
     pub fn new(val: T) -> Self {
         Self::from(Owned::from(val))
@@ -51,14 +53,16 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
 
     /// Loads a raw marked value from the pointer.
     ///
-    /// `load_raw` takes an [`Ordering`][ordering] argument, which describes the memory ordering
-    /// of this operation.
+    /// `load_raw` takes an [`Ordering`][ordering] argument, which describes the
+    /// memory ordering of this operation.
     ///
     /// # Panics
     ///
-    /// Panics if `order` is `Release` or `AcqRel`.
+    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
     ///
-    /// [ordering]: std::sync::atomic::Ordering
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
     #[inline]
     pub fn load_raw(&self, order: Ordering) -> MarkedPtr<T, N> {
         self.inner.load(order)
@@ -77,9 +81,9 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     ///
     /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
     ///
-    /// [ordering]: std::sync::atomic::Ordering
-    /// [release]: std::sync::atomic::Ordering::Release
-    /// [acq_rel]: std::sync::atomic::Ordering::AcqRel
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
     #[inline]
     pub fn load<'g>(
         &self,
@@ -90,8 +94,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     }
 
     /// Loads a value from the pointer and stores it within `guard`.
-    /// The protected [`Shared`][crate::Shared] value is wrapped in a
-    /// [`Marked][crate::pointer::Marked].
+    /// The protected [`Shared`] value is wrapped in a [`Marked].
     ///
     /// `load_marked` takes an [`Ordering`][ordering] argument, which describes
     /// the memory ordering of this operation.
@@ -100,9 +103,9 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     ///
     /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
     ///
-    /// [ordering]: std::sync::atomic::Ordering
-    /// [release]: std::sync::atomic::Ordering::Release
-    /// [acq_rel]: std::sync::atomic::Ordering::AcqRel
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
     #[inline]
     pub fn load_marked<'g>(
         &self,
@@ -116,19 +119,19 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// the loaded value equals `expected`.
     ///
     /// If the loaded value is non-null, the value is guaranteed to be protected
-    /// from reclamation as long as it is stored within `guard`. This method
-    /// relies on [`acquire_if_equal`](crate::Protect::acquire_if_equal).
+    /// from reclamation for as long as it is stored within `guard`. This method
+    /// internally calls [`acquire_if_equal`][Protect::acquire_if_equal].
     ///
-    /// `load_if_equal` takes an [`Ordering`][ordering] argument, which describes the memory
-    /// ordering of this operation.
+    /// `load_if_equal` takes an [`Ordering`][ordering] argument, which
+    /// describes the memory ordering of this operation.
     ///
     /// # Panics
     ///
     /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
     ///
-    /// [ordering]: std::sync::atomic::Ordering
-    /// [release]: std::sync::atomic::Ordering::Release
-    /// [acq_rel]: std::sync::atomic::Ordering::AcqRel
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
     #[inline]
     pub fn load_if_equal<'g>(
         &self,
@@ -139,12 +142,13 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         guard.acquire_if_equal(self, compare, order).map(|marked| marked.value())
     }
 
-    /// Loads a value from the pointer that is explicitly **not** protected from reclamation,
-    /// meaning another thread could free the value's memory at any time.
+    /// Loads a value from the pointer that is explicitly **not** protected from
+    /// reclamation, meaning another thread could free the value's memory at any
+    /// time.
     ///
     /// This method is similar to [`load_raw`](Atomic::load_raw), but the resulting
-    /// [`Unprotected`](crate::Unprotected) type has stronger guarantees than a raw
-    /// [`MarkedPtr`](crate::pointer::MarkedPtr). It can be useful to load an unprotected
+    /// [`Unprotected`] type has stronger guarantees than a raw
+    /// [`MarkedPtr`]. It can be useful to load an unprotected
     /// pointer if that pointer does not need to be dereferenced, but is only used to
     /// reinsert it in a different spot, which is e.g. done when removing a value from
     /// a linked list or a stack.
@@ -160,7 +164,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// into the pointer.
     ///
     /// Note, that overwriting a non-null value through `store` will very likely
-    /// lead to memory leaks, since instances of [`Atomic`](Atomic) will most commonly
+    /// lead to memory leaks, since instances of [`Atomic`] will most commonly
     /// be associated wit some kind of uniqueness invariants in order to be sound.
     ///
     /// `store` takes an [`Ordering`][ordering] argument, which
@@ -170,12 +174,12 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     ///
     /// Panics if `order` is [`Acquire`][acquire] or [`AcqRel`][acq_rel]
     ///
-    /// [ordering]: std::sync::atomic::Ordering
-    /// [acquire]: std::sync::atomic::Ordering::Acquire
-    /// [acq_rel]: std::sync::atomic::Ordering::AcqRel
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [acquire]: core::sync::atomic::Ordering::Acquire
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
     #[inline]
     pub fn store(&self, ptr: impl Store<Item = T, MarkBits = N, Reclaimer = R>, order: Ordering) {
-        self.inner.store(ptr.into_marked_ptr(), order);
+        self.inner.store(MarkedPointer::into_marked_ptr(ptr), order);
     }
 
     /// Stores either `null` or a valid pointer to an owned heap allocated value
@@ -189,20 +193,20 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// [`Acquire`][acquire] makes the store part of this operation [`Relaxed`][relaxed],
     /// and using [`Release`][release] makes the load part [`Relaxed`][relaxed].
     ///
-    /// [ordering]: std::sync::atomic::Ordering
-    /// [relaxed]: std::sync::atomic::Ordering::Relaxed
-    /// [acquire]: std::sync::atomic::Ordering::Acquire
-    /// [release]: std::sync::atomic::Ordering::Release
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [relaxed]: core::sync::atomic::Ordering::Relaxed
+    /// [acquire]: core::sync::atomic::Ordering::Acquire
+    /// [release]: core::sync::atomic::Ordering::Release
     #[inline]
     pub fn swap(
         &self,
         ptr: impl Store<Item = T, Reclaimer = R, MarkBits = N>,
         order: Ordering,
     ) -> Option<Unlinked<T, R, N>> {
-        let res = self.inner.swap(ptr.into_marked_ptr(), order);
+        let res = self.inner.swap(MarkedPointer::into_marked_ptr(ptr), order);
         // this is safe because the pointer is no longer accessible by other threads
         // (there can still be outstanding references that were loaded before the swap)
-        unsafe { Unlinked::try_from_marked(res).value() }
+        unsafe { Option::from_marked_ptr(res) }
     }
 
     /// Stores a value (either null or valid) into the pointer if the current value
@@ -215,7 +219,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// On failure, a [struct](CompareExchangeFailure) is returned that contains both
     /// the actual value and the value that was previously attempted to be inserted (`new`).
     /// This is necessary, because it is possible to attempt insertion of move-only types
-    /// such as [`Owned`](crate::Owned) or [`Unlinked`](crate::Unlinked), which would
+    /// such as [`Owned`] or [`Unlinked`], which would
     /// otherwise be irretrievably lost when the `compare_exchange` fails.
     ///
     /// `compare_exchange` takes two [`Ordering`][ordering] arguments to describe the memory
@@ -227,11 +231,11 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// [`SeqCst`][seq_cst], [`Acquire`][acquire] or [`Relaxed`][relaxed] and must be
     /// equivalent to or weaker than the success ordering.
     ///
-    /// [ordering]: std::sync::atomic::Ordering
-    /// [relaxed]: std::sync::atomic::Ordering::Relaxed
-    /// [acquire]: std::sync::atomic::Ordering::Acquire
-    /// [release]: std::sync::atomic::Ordering::Release
-    /// [seq_cst]: std::sync::atomic::Ordering::SeqCst
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [relaxed]: core::sync::atomic::Ordering::Relaxed
+    /// [acquire]: core::sync::atomic::Ordering::Acquire
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [seq_cst]: core::sync::atomic::Ordering::SeqCst
     #[inline]
     pub fn compare_exchange<C, S>(
         &self,
@@ -244,8 +248,8 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         C: Compare<Item = T, MarkBits = N, Reclaimer = R>,
         S: Store<Item = T, MarkBits = N, Reclaimer = R>,
     {
-        let current = current.into_marked_ptr();
-        let new = new.into_marked_ptr();
+        let current = MarkedPointer::into_marked_ptr(current);
+        let new = MarkedPointer::into_marked_ptr(new);
 
         self.inner
             .compare_exchange(current, new, success, failure)
@@ -270,7 +274,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// On failure, a [struct](CompareExchangeFailure) is returned that contains both
     /// the actual value and the value that was previously attempted to be inserted (`new`).
     /// This is necessary, because it is possible to attempt insertion of move-only types
-    /// such as [`Owned`](crate::Owned) or [`Unlinked`](crate::Unlinked), which would
+    /// such as [`Owned`] or [`Unlinked`], which would
     /// otherwise be irretrievably lost when the `compare_exchange` fails.
     ///
     /// `compare_exchange` takes two [`Ordering`][ordering] arguments to describe the memory
@@ -282,11 +286,11 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// [`SeqCst`][seq_cst], [`Acquire`][acquire] or [`Relaxed`][relaxed] and must be
     /// equivalent to or weaker than the success ordering.
     ///
-    /// [ordering]: std::sync::atomic::Ordering
-    /// [relaxed]: std::sync::atomic::Ordering::Relaxed
-    /// [acquire]: std::sync::atomic::Ordering::Acquire
-    /// [release]: std::sync::atomic::Ordering::Release
-    /// [seq_cst]: std::sync::atomic::Ordering::SeqCst
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [relaxed]: core::sync::atomic::Ordering::Relaxed
+    /// [acquire]: core::sync::atomic::Ordering::Acquire
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [seq_cst]: core::sync::atomic::Ordering::SeqCst
     #[inline]
     pub fn compare_exchange_weak<C, S>(
         &self,
@@ -299,8 +303,8 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         C: Compare<Item = T, MarkBits = N, Reclaimer = R>,
         S: Store<Item = T, MarkBits = N, Reclaimer = R>,
     {
-        let current = current.into_marked_ptr();
-        let new = new.into_marked_ptr();
+        let current = MarkedPointer::into_marked_ptr(current);
+        let new = MarkedPointer::into_marked_ptr(new);
 
         self.inner
             .compare_exchange_weak(current, new, success, failure)
@@ -312,14 +316,12 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
             })
     }
 
-    /// Takes the value out of the pointer as an optional [`Owned`][owned], leaving a
+    /// Takes the value out of the pointer as an optional [`Owned`], leaving a
     /// `null` pointer in its place.
     ///
-    /// This is similar to [`Option::take`](std::option::Option::take) and is useful for
-    /// manually dropping the value pointed-to by the `Atomic`, since [`Owned`][owned]
-    /// values behave like `Boxes` when they are dropped.
-    ///
-    /// [owned]: crate::Owned
+    /// This is similar to [`Option::take`][Option::take] and is useful for
+    /// manually dropping the value pointed-to by the [`Atomic`], since
+    /// [`Owned`] values behave like `Box` when they are dropped.
     #[inline]
     pub fn take(&mut self) -> Option<Owned<T, R, N>> {
         // this is safe because the mutable reference ensures no concurrent access is possible
