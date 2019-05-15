@@ -4,6 +4,7 @@ use crate::pointer::{
     Marked::{self, Null, Value},
     NonNullable,
 };
+use crate::MarkedPointer;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // inherent
@@ -118,6 +119,16 @@ impl<T: NonNullable> Marked<T> {
     #[inline]
     pub fn replace(&mut self, value: T) -> Self {
         mem::replace(self, Value(value))
+    }
+}
+
+impl<T: NonNullable + MarkedPointer> Marked<T> {
+    #[inline]
+    pub fn decompose_tag(&self) -> usize {
+        match self {
+            Value(ptr) => ptr.as_marked_ptr().decompose_tag(),
+            Null(tag) => *tag
+        }
     }
 }
 

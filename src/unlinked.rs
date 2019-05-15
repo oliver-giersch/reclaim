@@ -20,7 +20,7 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unlinked<T, R, N> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
-    impl_inherent!();
+    impl_inherent!(unlinked);
 
     /// Decomposes the marked reference, returning the reference itself and the
     /// separated tag.
@@ -144,8 +144,8 @@ impl<T, R, N: Unsigned> NonNullable for Unlinked<T, R, N> {
     type MarkBits = N;
 
     #[inline]
-    fn into_marked_non_null(unlinked: Self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
-        unlinked.inner
+    fn into_marked_non_null(self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
+        self.inner
     }
 }
 

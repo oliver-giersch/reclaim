@@ -5,23 +5,23 @@ macro_rules! impl_trait {
         type MarkBits = N;
 
         #[inline]
-        fn as_marked_ptr($self: &Self) -> crate::pointer::MarkedPtr<T, N> {
-            $self.inner.into_marked_ptr()
+        fn as_marked_ptr(&self) -> crate::pointer::MarkedPtr<T, N> {
+            self.inner.into_marked_ptr()
         }
 
         #[inline]
-        fn into_marked_ptr($self: Self) -> crate::pointer::MarkedPtr<Self::Item, Self::MarkBits> {
-            Self::into_marked_non_null($self).into_marked_ptr()
+        fn into_marked_ptr(self) -> crate::pointer::MarkedPtr<Self::Item, Self::MarkBits> {
+            self.into_marked_non_null().into_marked_ptr()
         }
 
         #[inline]
-        fn with_tag($self: Self, tag: usize) -> crate::pointer::Marked<Self::Pointer> {
+        fn marked($self: Self, tag: usize) -> crate::pointer::Marked<Self::Pointer> {
             let inner = $self.inner.with_tag(tag);
             crate::pointer::Marked::Value(Self { inner, _marker: PhantomData })
         }
 
         #[inline]
-        fn clear_tag($self: Self) -> Self {
+        fn unmarked($self: Self) -> Self {
             let inner = $self.inner.clear_tag();
             Self { inner, _marker: PhantomData }
         }
@@ -46,7 +46,7 @@ macro_rules! impl_trait {
 }
 
 macro_rules! impl_inherent {
-    () => {
+    ($self:ident) => {
         /// Creates a `None` variant for an [`Option<Self>`][Option].
         ///
         /// This is useful for calls to [`store`][store], [`swap`][swap] or
@@ -100,6 +100,15 @@ macro_rules! impl_inherent {
         #[inline]
         pub fn null_with_tag(tag: usize) -> crate::pointer::Marked<Self> {
             Marked::Null(tag)
+        }
+
+        /// Consumes the given `Self` and returns the same value but with the
+        /// specified `tag`.
+        #[inline]
+        pub fn with_tag($self: Self, tag: usize) -> Self {
+            let inner = $self.inner;
+            core::mem::forget($self);
+            Self { inner: inner.with_tag(tag), _marker: PhantomData }
         }
     };
 }

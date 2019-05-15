@@ -105,17 +105,35 @@ pub trait MarkedPointer: Sized + Internal {
     type MarkBits: Unsigned;
 
     /// Returns the equivalent raw marked pointer.
-    fn as_marked_ptr(_: &Self) -> MarkedPtr<Self::Item, Self::MarkBits>;
+    ///
+    /// # Note
+    ///
+    /// For types like [`Shared`][crate::Owned], [`Shared`][crate::Shared] and
+    /// [`Unlinked`][crate::Unlinked], which implement [`Deref`][core::ops::Deref]
+    /// this method may conflict with inherent methods of the dereferenced type
+    /// and goes against Rust's API guidelines.
+    /// This is a deliberate trade-off for enabling more ergonomic usage of
+    /// this method
+    fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits>;
 
     /// Consumes `self` and returns the equivalent raw marked pointer.
-    fn into_marked_ptr(_: Self) -> MarkedPtr<Self::Item, Self::MarkBits>;
+    ///
+    /// # Note
+    ///
+    /// For types like [`Shared`][crate::Owned], [`Shared`][crate::Shared] and
+    /// [`Unlinked`][crate::Unlinked], which implement [`Deref`][core::ops::Deref]
+    /// this method may conflict with inherent methods of the dereferenced type
+    /// and goes against Rust's API guidelines.
+    /// This is a deliberate trade-off for enabling more ergonomic usage of
+    /// this method
+    fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits>;
 
     /// Consumes the `Self` and returns the same value with the specified tag
     /// wrapped in a [`Marked`].
-    fn with_tag(_: Self, tag: usize) -> Marked<Self::Pointer>;
+    fn marked(_: Self, tag: usize) -> Marked<Self::Pointer>;
 
     /// Consumes the `Self` and returns the same value but without any tag.
-    fn clear_tag(_: Self) -> Self;
+    fn unmarked(_: Self) -> Self;
 
     /// Constructs a `Self` from a raw marked pointer.
     ///
@@ -148,32 +166,32 @@ where
     type MarkBits = N;
 
     #[inline]
-    fn as_marked_ptr(opt: &Self) -> MarkedPtr<Self::Item, Self::MarkBits> {
-        match opt {
+    fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        match self {
             Some(ptr) => Self::Pointer::as_marked_ptr(ptr),
             None => MarkedPtr::null()
         }
     }
 
     #[inline]
-    fn into_marked_ptr(opt: Self) -> MarkedPtr<Self::Item, Self::MarkBits> {
-        match opt {
+    fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        match self {
             Some(ptr) => Self::Pointer::into_marked_ptr(ptr),
             None => MarkedPtr::null()
         }
     }
 
     #[inline]
-    fn with_tag(opt: Self, tag: usize) -> Marked<Self::Pointer> {
+    fn marked(opt: Self, tag: usize) -> Marked<Self::Pointer> {
         match opt {
-            Some(ptr) => Self::Pointer::with_tag(ptr, tag),
+            Some(ptr) => Self::Pointer::marked(ptr, tag),
             None => Null(tag),
         }
     }
 
     #[inline]
-    fn clear_tag(opt: Self) -> Self {
-        opt.map(|ptr| Self::Pointer::clear_tag(ptr))
+    fn unmarked(opt: Self) -> Self {
+        opt.map(|ptr| Self::Pointer::unmarked(ptr))
     }
 
     #[inline]
@@ -199,33 +217,33 @@ where
     type MarkBits = N;
 
     #[inline]
-    fn as_marked_ptr(marked: &Self) -> MarkedPtr<Self::Item, Self::MarkBits> {
-        match marked {
+    fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        match self {
             Value(ptr) => Self::Pointer::as_marked_ptr(ptr),
             Null(tag) => MarkedPtr::compose(ptr::null_mut(), *tag)
         }
     }
 
     #[inline]
-    fn into_marked_ptr(marked: Self) -> MarkedPtr<Self::Item, Self::MarkBits> {
-        match marked {
+    fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits> {
+        match self {
             Value(ptr) => Self::Pointer::into_marked_ptr(ptr),
             Null(tag) => MarkedPtr::compose(ptr::null_mut(), tag)
         }
     }
 
     #[inline]
-    fn with_tag(marked: Self, tag: usize) -> Marked<Self::Pointer> {
+    fn marked(marked: Self, tag: usize) -> Marked<Self::Pointer> {
         match marked {
-            Value(ptr) => Self::Pointer::with_tag(ptr, tag),
+            Value(ptr) => Self::Pointer::marked(ptr, tag),
             Null(_) => Null(tag)
         }
     }
 
     #[inline]
-    fn clear_tag(marked: Self) -> Self {
+    fn unmarked(marked: Self) -> Self {
         match marked {
-            Value(ptr) => Value(Self::Pointer::clear_tag(ptr)),
+            Value(ptr) => Value(Self::Pointer::unmarked(ptr)),
             Null(_) => Null(0),
         }
     }
@@ -253,7 +271,16 @@ pub trait NonNullable: Sized {
     type MarkBits: Unsigned;
 
     /// Converts the given `Self` into a equivalent marked non-null pointer.
-    fn into_marked_non_null(_: Self) -> MarkedNonNull<Self::Item, Self::MarkBits>;
+    ///
+    /// # Note
+    ///
+    /// For types like [`Shared`][crate::Owned], [`Shared`][crate::Shared] and
+    /// [`Unlinked`][crate::Unlinked], which implement [`Deref`][core::ops::Deref]
+    /// this method may conflict with inherent methods of the dereferenced type
+    /// and goes against Rust's API guidelines.
+    /// This is a deliberate trade-off for enabling more ergonomic usage of
+    /// this method
+    fn into_marked_non_null(self) -> MarkedNonNull<Self::Item, Self::MarkBits>;
 }
 
 impl<'a, T> NonNullable for &'a T {
@@ -261,8 +288,8 @@ impl<'a, T> NonNullable for &'a T {
     type MarkBits = typenum::U0;
 
     #[inline]
-    fn into_marked_non_null(reference: Self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
-        MarkedNonNull::from(reference)
+    fn into_marked_non_null(self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
+        MarkedNonNull::from(self)
     }
 }
 
@@ -271,8 +298,8 @@ impl<'a, T> NonNullable for &'a mut T {
     type MarkBits = typenum::U0;
 
     #[inline]
-    fn into_marked_non_null(reference: Self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
-        MarkedNonNull::from(reference)
+    fn into_marked_non_null(self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
+        MarkedNonNull::from(self)
     }
 }
 

@@ -60,8 +60,8 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
         Self::from(NonNull::new_unchecked(ptr.inner))
     }
 
-    /// Creates a new `MarkedNonNull` wrapped in a [`Marked`][crate::pointer::Marked]
-    /// if `ptr` is non-null.
+    /// Creates a new `MarkedNonNull` wrapped in a [`Marked`] if `ptr` is
+    /// non-null.
     pub fn new(ptr: MarkedPtr<T, N>) -> Marked<Self> {
         match ptr.decompose() {
             (raw, _) if !raw.is_null() => unsafe { Value(Self::new_unchecked(ptr)) },
@@ -95,7 +95,7 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
         Self::compose(self.decompose_non_null(), tag)
     }
 
-    /// Converts the pointer to the equivalent [`MarkedPtr`][crate::pointer::MarkedPtr].
+    /// Converts the pointer to the equivalent [`MarkedPtr`].
     #[inline]
     pub fn into_marked_ptr(self) -> MarkedPtr<T, N> {
         MarkedPtr::new(self.inner.as_ptr())
@@ -110,7 +110,7 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     }
 
     /// Decomposes the marked pointer, returning the separated raw
-    /// [`NonNull`][core::ptr::NonNull] pointer and its tag.
+    /// [`NonNull`] pointer and its tag.
     #[inline]
     pub fn decompose(self) -> (NonNull<T>, usize) {
         let (ptr, tag) = pointer::decompose(self.inner.as_ptr() as usize, Self::MARK_BITS);
@@ -124,7 +124,7 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     }
 
     /// Decomposes the marked pointer, returning only the separated raw
-    /// [`NonNull`][core::ptr::NonNull] pointer.
+    /// [`NonNull`] pointer.
     #[inline]
     pub fn decompose_non_null(self) -> NonNull<T> {
         unsafe {
@@ -292,8 +292,8 @@ impl<T, N: Unsigned> NonNullable for MarkedNonNull<T, N> {
     type MarkBits = N;
 
     #[inline]
-    fn into_marked_non_null(ptr: Self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
-        ptr
+    fn into_marked_non_null(self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
+        self
     }
 }
 

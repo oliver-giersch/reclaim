@@ -59,7 +59,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
         Self { inner: MarkedNonNull::from(Self::alloc_record(owned)), _marker: PhantomData }
     }
 
-    impl_inherent!();
+    impl_inherent!(owned);
 
     /// Creates a new `Owned` like [`new`](Owned::new) but composes the
     /// returned pointer with an initial `tag` value.
@@ -262,9 +262,9 @@ impl<T, R: LocalReclaim, N: Unsigned> NonNullable for Owned<T, R, N> {
     type MarkBits = N;
 
     #[inline]
-    fn into_marked_non_null(owned: Self) -> MarkedNonNull<T, N> {
-        let inner = owned.inner;
-        mem::forget(owned);
+    fn into_marked_non_null(self) -> MarkedNonNull<T, N> {
+        let inner = self.inner;
+        mem::forget(self);
         inner
     }
 }

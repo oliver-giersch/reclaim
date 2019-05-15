@@ -32,7 +32,7 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unprotected<T, R, N> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: LocalReclaim, N: Unsigned> Unprotected<T, R, N> {
-    impl_inherent!();
+    impl_inherent!(unprotected);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,8 +63,8 @@ impl<T, R, N: Unsigned> NonNullable for Unprotected<T, R, N> {
     type MarkBits = N;
 
     #[inline]
-    fn into_marked_non_null(unprotected: Self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
-        unprotected.inner
+    fn into_marked_non_null(self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
+        self.inner
     }
 }
 

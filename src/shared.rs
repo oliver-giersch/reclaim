@@ -33,7 +33,7 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Shared<'g, T, R, N> 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
-    impl_inherent!();
+    impl_inherent!(shared);
 
     /// Decomposes the marked reference, returning the reference itself and the
     /// separated tag.
@@ -103,8 +103,8 @@ impl<'g, T, R, N: Unsigned> NonNullable for Shared<'g, T, R, N> {
     type MarkBits = N;
 
     #[inline]
-    fn into_marked_non_null(shared: Self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
-        shared.inner
+    fn into_marked_non_null(self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
+        self.inner
     }
 }
 
