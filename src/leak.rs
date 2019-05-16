@@ -1,4 +1,5 @@
-//! A no-op memory reclamation scheme that leaks memory, mainly for exemplary and testing purposes.
+//! A no-op memory reclamation scheme that leaks memory, mainly for exemplary
+//! and testing purposes.
 
 use core::sync::atomic::Ordering;
 
@@ -7,15 +8,20 @@ use typenum::Unsigned;
 use crate::pointer::{Marked, MarkedPointer, MarkedPtr};
 use crate::{AcquireResult, LocalReclaim, Protect};
 
-/// An [`Atomic`][crate::Atomic] type that uses the no-op [`Leaking`] "reclamation" scheme.
+/// An [`Atomic`][crate::Atomic] type that uses the no-op [`Leaking`]
+/// "reclamation" scheme.
 pub type Atomic<T, N> = crate::Atomic<T, Leaking, N>;
-/// A [`Shared`][crate::Shared] type that uses the no-op [`Leaking`] "reclamation" scheme.
+/// A [`Shared`][crate::Shared] type that uses the no-op [`Leaking`]
+/// "reclamation" scheme.
 pub type Shared<'g, T, N> = crate::Shared<'g, T, Leaking, N>;
-/// An [`Owned`][crate::Owned] type that uses the no-op [`Leaking`] "reclamation" scheme.
+/// An [`Owned`][crate::Owned] type that uses the no-op [`Leaking`]
+/// "reclamation" scheme.
 pub type Owned<T, N> = crate::Owned<T, Leaking, N>;
-/// An [`Unlinked`][crate::Unlinked] type that uses the no-op [`Leaking`] "reclamation" scheme.
+/// An [`Unlinked`][crate::Unlinked] type that uses the no-op [`Leaking`]
+/// "reclamation" scheme.
 pub type Unlinked<T, N> = crate::Unlinked<T, Leaking, N>;
-/// An [`Unprotected`][crate::Unprotected] type that uses the no-op [`Leaking`] "reclamation" scheme.
+/// An [`Unprotected`][crate::Unprotected] type that uses the no-op [`Leaking`]
+/// "reclamation" scheme.
 pub type Unprotected<T, N> = crate::Unprotected<T, Leaking, N>;
 
 /// A no-op memory "reclamation" scheme that deliberately leaks all memory.
@@ -67,16 +73,16 @@ unsafe impl LocalReclaim for Leaking {
     ///
     /// # Safety
     ///
-    /// Contrary to the specifications of the trait methods, this particular specialization is
-    /// always safe to call.
+    /// Contrary to the specifications of the trait methods, this particular
+    /// specialization is always safe to call.
     #[inline]
     unsafe fn retire_local<T: 'static, N: Unsigned>(_: &(), _: Unlinked<T, N>) {}
     /// Leaks the given value.
     ///
     /// # Safety
     ///
-    /// Contrary to the specifications of the trait methods, this particular specialization is
-    /// always safe to call.
+    /// Contrary to the specifications of the trait methods, this particular
+    /// specialization is always safe to call.
     #[inline]
     unsafe fn retire_local_unchecked<T, N: Unsigned>(_: &(), _: Unlinked<T, N>) {}
 }
