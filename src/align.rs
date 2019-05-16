@@ -14,6 +14,14 @@ macro_rules! impl_align {
             #[repr(align($align))]
             pub struct $wrapper<T>(pub T);
 
+            impl<T> $wrapper<T> {
+                /// Returns a reference to the inner value.
+                #[inline]
+                pub fn get(&self) -> &T {
+                    &self.0
+                }
+            }
+
             impl<T> Deref for $wrapper<T> {
                 type Target = T;
 
