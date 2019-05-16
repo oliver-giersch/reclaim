@@ -33,6 +33,34 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unprotected<T, R, N> {
 
 impl<T, R: LocalReclaim, N: Unsigned> Unprotected<T, R, N> {
     impl_inherent!(unprotected);
+
+    /// Dereferences the `Unprotected`, returning the resulting reference which
+    /// is not bound to the lifetime of `self`.
+    ///
+    /// # Safety
+    ///
+    /// Since the pointed-to value is not protected from reclamation it could
+    /// be freed at any point (even before calling this method). Hence, this
+    /// method is only safe to call if the caller can guarantee that no
+    /// reclamation can occur, e.g. when records are never retired at all.
+    #[inline]
+    pub unsafe fn deref_unprotected<'a>(self) -> &'a T {
+        self.inner.as_ref_unbounded()
+    }
+
+    /// Decomposes the `Unprotected`, returning the reference (which is not
+    /// bound to the lifetime of `self`) itself and the separated tag.
+    ///
+    /// # Safety
+    ///
+    /// Since the pointed-to value is not protected from reclamation it could
+    /// be freed at any point (even before calling this method). Hence, this
+    /// method is only safe to call if the caller can guarantee that no
+    /// reclamation can occur, e.g. when records are never retired at all.
+    #[inline]
+    pub unsafe fn decompose_ref_unprotected<'a>(self) -> (&'a T, usize) {
+        self.inner.decompose_ref_unbounded()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

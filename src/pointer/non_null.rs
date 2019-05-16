@@ -147,8 +147,28 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// The resulting lifetime is bound to self so this behaves "as if"
     /// it were actually an instance of T that is getting borrowed. If a longer
     /// (unbound) lifetime is needed, use e.g. `&*my_ptr.decompose_ptr()`.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because it cannot verify the validity of the returned
+    /// pointer.
     #[inline]
     pub unsafe fn decompose_ref(&self) -> (&T, usize) {
+        let (ptr, tag) = self.decompose();
+        (&*ptr.as_ptr(), tag)
+    }
+
+    /// Decomposes the marked pointer, dereferences the the raw pointer and
+    /// returns both the reference and the separated tag. The returned reference
+    /// is not bound to the lifetime of the `MarkedNonNull`.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because it cannot verify the validity of the returned
+    /// pointer, nor can it ensure that the lifetime `'a` returned is indeed a
+    /// valid lifetime for the contained data.
+    #[inline]
+    pub unsafe fn decompose_ref_unbounded<'a>(self) -> (&'a T, usize) {
         let (ptr, tag) = self.decompose();
         (&*ptr.as_ptr(), tag)
     }
@@ -159,29 +179,89 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// The resulting lifetime is bound to self so this behaves "as if"
     /// it were actually an instance of T that is getting borrowed. If a longer
     /// (unbound) lifetime is needed, use e.g. `&mut *my_ptr.decompose_ptr()`.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because it cannot verify the validity of the returned
+    /// pointer.
     #[inline]
     pub unsafe fn decompose_mut(&mut self) -> (&mut T, usize) {
         let (ptr, tag) = self.decompose();
         (&mut *ptr.as_ptr(), tag)
     }
 
-    /// Decomposes the marked pointer, returning only the dereferenced raw pointer.
+    /// Decomposes the marked pointer, mutably dereferences the the raw pointer
+    /// and returns both the mutable reference and the separated tag. The
+    /// returned reference is not bound to the lifetime of the `MarkedNonNull`.
     ///
-    /// The resulting lifetime is bound to self so this behaves "as if"
-    /// it were actually an instance of T that is getting borrowed. If a longer
-    /// (unbound) lifetime is needed, use e.g. `&*my_ptr.decompose_ptr()`.
+    /// # Safety
+    ///
+    /// This is unsafe because it cannot verify the validity of the returned
+    /// pointer, nor can it ensure that the lifetime `'a` returned is indeed a
+    /// valid lifetime for the contained data.
+    #[inline]
+    pub unsafe fn decompose_mut_unbounded<'a>(&mut self) -> (&'a mut T, usize) {
+        let (ptr, tag) = self.decompose();
+        (&mut *ptr.as_ptr(), tag)
+    }
+
+    /// Decomposes the marked pointer, returning only the dereferenced raw
+    /// pointer.
+    ///
+    /// The resulting lifetime is bound to self so this behaves "as if" it were
+    /// actually an instance of T that is getting borrowed. If a longer
+    /// (unbound) lifetime is needed, use e.g. `&*my_ptr.decompose_ptr()`
+    /// or [`as_ref_unbounded`][MarkedNonNull::as_ref_unbounded].
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because it cannot verify the validity of the returned
+    /// pointer.
     #[inline]
     pub unsafe fn as_ref(&self) -> &T {
         &*self.decompose_non_null().as_ptr()
     }
 
-    /// Decomposes the marked pointer, returning only the mutably dereferenced raw pointer.
+    /// Decomposes the marked pointer, returning only the dereferenced raw
+    /// pointer, which is not bound to the lifetime of the `MarkedNonNull`.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because it cannot verify the validity of the returned
+    /// pointer, nor can it ensure that the lifetime `'a` returned is indeed a
+    /// valid lifetime for the contained data.
+    #[inline]
+    pub unsafe fn as_ref_unbounded<'a>(self) -> &'a T {
+        &*self.decompose_non_null().as_ptr()
+    }
+
+    /// Decomposes the marked pointer, returning only the mutably dereferenced
+    /// raw pointer.
     ///
     /// The resulting lifetime is bound to self so this behaves "as if"
     /// it were actually an instance of T that is getting borrowed. If a longer
-    /// (unbound) lifetime is needed, use e.g. `&mut *my_ptr.decompose_ptr()`.
+    /// (unbound) lifetime is needed, use e.g. `&mut *my_ptr.decompose_ptr()`
+    /// or [`as_mut_unbounded`][MarkedNonNull::as_ref_unbounded].
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because it cannot verify the validity of the returned
+    /// pointer.
     #[inline]
     pub unsafe fn as_mut(&mut self) -> &mut T {
+        &mut *self.decompose_non_null().as_ptr()
+    }
+
+    /// Decomposes the marked pointer, returning only the mutably dereferenced
+    /// raw pointer, which is not bound to the lifetime of the `MarkedNonNull`.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because it cannot verify the validity of the returned
+    /// pointer, nor can it ensure that the lifetime `'a` returned is indeed a
+    /// valid lifetime for the contained data.
+    #[inline]
+    pub unsafe fn as_mut_unbounded<'a>(self) -> &'a mut T {
         &mut *self.decompose_non_null().as_ptr()
     }
 }
