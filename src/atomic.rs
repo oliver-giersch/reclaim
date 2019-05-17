@@ -4,6 +4,7 @@ use core::sync::atomic::Ordering;
 
 use typenum::Unsigned;
 
+use crate::leak::Leaking;
 use crate::pointer::{AtomicMarkedPtr, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
 use crate::{LocalReclaim, NotEqualError, Owned, Protect, Shared, Unlinked, Unprotected};
 
@@ -66,6 +67,56 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     #[inline]
     pub fn load_raw(&self, order: Ordering) -> MarkedPtr<T, N> {
         self.inner.load(order)
+    }
+
+    /// Loads an [`Unprotected`] reference wrapped in a [`Marked`] from the
+    /// `Atomic`.
+    ///
+    /// The returned reference is explicitly **not** protected from reclamation,
+    /// meaning another thread could free the value's memory at any time.
+    ///
+    /// This method is similar to [`load_raw`][Atomic::load_raw], but the
+    /// resulting [`Unprotected`] type has stronger guarantees than a raw
+    /// [`MarkedPtr`].
+    /// It can be useful to load an unprotected pointer if that pointer does not
+    /// need to be dereferenced, but is only used to reinsert it in a different
+    /// spot, which is e.g. done when removing a value from a linked list.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
+    #[inline]
+    pub fn load_marked_unprotected(&self, order: Ordering) -> Marked<Unprotected<T, R, N>> {
+        MarkedNonNull::new(self.inner.load(order))
+            .map(|ptr| Unprotected { inner: ptr, _marker: PhantomData })
+    }
+
+    /// Loads an optional [`Unprotected`] reference from the `Atomic`.
+    ///
+    /// The returned reference is explicitly **not** protected from reclamation,
+    /// meaning another thread could free the value's memory at any time.
+    ///
+    /// This method is similar to [`load_raw`][Atomic::load_raw], but the
+    /// resulting [`Unprotected`] type has stronger guarantees than a raw
+    /// [`MarkedPtr`].
+    /// It can be useful to load an unprotected pointer if that pointer does not
+    /// need to be dereferenced, but is only used to reinsert it in a different
+    /// spot, which is e.g. done when removing a value from a linked list.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
+    #[inline]
+    pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, R, N>> {
+        self.load_marked_unprotected(order).value()
     }
 
     /// Loads a value from the pointer and stores it within `guard`.
@@ -142,24 +193,6 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         guard.acquire_if_equal(self, compare, order).map(|marked| marked.value())
     }
 
-    /// Loads a value from the pointer that is explicitly **not** protected from
-    /// reclamation, meaning another thread could free the value's memory at any
-    /// time.
-    ///
-    /// This method is similar to [`load_raw`](Atomic::load_raw), but the resulting
-    /// [`Unprotected`] type has stronger guarantees than a raw
-    /// [`MarkedPtr`]. It can be useful to load an unprotected
-    /// pointer if that pointer does not need to be dereferenced, but is only used to
-    /// reinsert it in a different spot, which is e.g. done when removing a value from
-    /// a linked list or a stack.
-    ///
-    #[inline]
-    pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, R, N>> {
-        MarkedNonNull::new(self.inner.load(order))
-            .map(|ptr| Unprotected { inner: ptr, _marker: PhantomData })
-            .value()
-    }
-
     /// Stores either `null` or a valid pointer to an owned heap allocated value
     /// into the pointer.
     ///
@@ -209,27 +242,31 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         unsafe { Option::from_marked_ptr(res) }
     }
 
-    /// Stores a value (either null or valid) into the pointer if the current value
-    /// is the same as `current`.
+    /// Stores a value (either null or valid) into the pointer if the current
+    /// value is the same as `current`.
     ///
-    /// The return value is a result indicating whether the `new` value was written and
-    /// containing the previous and now unlinked value.
-    /// On success this value is guaranteed to be equal to `current` and can be safely
-    /// reclaimed as long as the *uniqueness* invariant is maintained.
-    /// On failure, a [struct](CompareExchangeFailure) is returned that contains both
-    /// the actual value and the value that was previously attempted to be inserted (`new`).
-    /// This is necessary, because it is possible to attempt insertion of move-only types
-    /// such as [`Owned`] or [`Unlinked`], which would
-    /// otherwise be irretrievably lost when the `compare_exchange` fails.
+    /// The return value is a result indicating whether the `new` value was
+    /// written and containing the previous and now unlinked value.
+    /// On success this value is guaranteed to be equal to `current` and can be
+    /// safely reclaimed as long as the *uniqueness* invariant is maintained.
+    /// On failure, a [struct](CompareExchangeFailure) is returned that contains
+    /// both the actual value and the value that was previously attempted to be
+    /// inserted (`new`).
+    /// This is necessary, because it is possible to attempt insertion of
+    /// move-only types such as [`Owned`] or [`Unlinked`], which would otherwise
+    /// be irretrievably lost when the `compare_exchange` fails.
     ///
-    /// `compare_exchange` takes two [`Ordering`][ordering] arguments to describe the memory
-    /// ordering of this operation. The first describes the required ordering if the
-    /// operation succeeds while the second describes the required ordering when the
-    /// operation fails. Using [`Acquire`][acquire] as success ordering makes the store part
-    /// of this operation [`Relaxed`][relaxed], and using [`Release`][release] makes the
-    /// successful load [`Relaxed`][relaxed]. The failure ordering can only be
-    /// [`SeqCst`][seq_cst], [`Acquire`][acquire] or [`Relaxed`][relaxed] and must be
-    /// equivalent to or weaker than the success ordering.
+    /// `compare_exchange` takes two [`Ordering`][ordering] arguments to
+    /// describe the memory ordering of this operation.
+    /// The first describes the required ordering if the operation succeeds
+    /// while the second describes the required ordering when the operation
+    /// fails.
+    /// Using [`Acquire`][acquire] as success ordering makes the store part of
+    /// this operation [`Relaxed`][relaxed], and using [`Release`][release]
+    /// makes the successful load [`Relaxed`][relaxed].
+    /// The failure ordering can only be [`SeqCst`][seq_cst],
+    /// [`Acquire`][acquire] or [`Relaxed`][relaxed] and must be equivalent to
+    /// or weaker than the success ordering.
     ///
     /// [ordering]: core::sync::atomic::Ordering
     /// [relaxed]: core::sync::atomic::Ordering::Relaxed
@@ -261,30 +298,34 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
             })
     }
 
-    /// Stores a value (either null or valid) into the pointer if the current value
-    /// is the same as `current`.
+    /// Stores a value (either null or valid) into the pointer if the current
+    /// value is the same as `current`.
     ///
-    /// Unlike [`compare_exchange`](Atomic::compare_exchange), this function is allowed
-    /// to spuriously fail even when the comparision succeeds, which can result in more
-    /// efficient code on some platforms.
-    /// The return value is a result indicating whether the `new` value was written and
-    /// containing the previous and now unlinked value.
-    /// On success this value is guaranteed to be equal to `current` and can be safely
-    /// reclaimed as long as the *uniqueness* invariant is maintained.
-    /// On failure, a [struct](CompareExchangeFailure) is returned that contains both
-    /// the actual value and the value that was previously attempted to be inserted (`new`).
-    /// This is necessary, because it is possible to attempt insertion of move-only types
-    /// such as [`Owned`] or [`Unlinked`], which would
-    /// otherwise be irretrievably lost when the `compare_exchange` fails.
+    /// Unlike [`compare_exchange`](Atomic::compare_exchange), this function is
+    /// allowed to spuriously fail even when the comparision succeeds, which can
+    /// result in more efficient code on some platforms.
+    /// The return value is a result indicating whether the `new` value was
+    /// written and containing the previous and now unlinked value.
+    /// On success this value is guaranteed to be equal to `current` and can be
+    /// safely reclaimed as long as the *uniqueness* invariant is maintained.
+    /// On failure, a [struct](CompareExchangeFailure) is returned that contains
+    /// both the actual value and the value that was previously attempted to be
+    /// inserted (`new`).
+    /// This is necessary, because it is possible to attempt insertion of
+    /// move-only types such as [`Owned`] or [`Unlinked`], which would otherwise
+    /// be irretrievably lost when the `compare_exchange` fails.
     ///
-    /// `compare_exchange` takes two [`Ordering`][ordering] arguments to describe the memory
-    /// ordering of this operation. The first describes the required ordering if the
-    /// operation succeeds while the second describes the required ordering when the
-    /// operation fails. Using [`Acquire`][acquire] as success ordering makes the store part
-    /// of this operation [`Relaxed`][relaxed], and using [`Release`][release] makes the
-    /// successful load [`Relaxed`][relaxed]. The failure ordering can only be
-    /// [`SeqCst`][seq_cst], [`Acquire`][acquire] or [`Relaxed`][relaxed] and must be
-    /// equivalent to or weaker than the success ordering.
+    /// `compare_exchange` takes two [`Ordering`][ordering] arguments to
+    /// describe the memory ordering of this operation.
+    /// The first describes the required ordering if the operation succeeds
+    /// while the second describes the required ordering when the operation
+    /// fails.
+    /// Using [`Acquire`][acquire] as success ordering makes the store part of
+    /// this operation [`Relaxed`][relaxed], and using [`Release`][release]
+    /// makes the successful load [`Relaxed`][relaxed].
+    /// The failure ordering can only be [`SeqCst`][seq_cst],
+    /// [`Acquire`][acquire] or [`Relaxed`][relaxed] and must be equivalent to
+    /// or weaker than the success ordering.
     ///
     /// [ordering]: core::sync::atomic::Ordering
     /// [relaxed]: core::sync::atomic::Ordering::Relaxed
@@ -328,6 +369,43 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         MarkedNonNull::new(self.inner.swap(MarkedPtr::null(), Ordering::Relaxed))
             .map(|ptr| unsafe { Owned::from_marked_non_null(ptr) })
             .value()
+    }
+}
+
+impl<T, N: Unsigned> Atomic<T, Leaking, N> {
+    /// Loads a [`Shared`] reference wrapped in a [`Marked`] from the `Atomic`.
+    ///
+    /// Since [`Leaking`] never frees memory of retired records, this is always
+    /// safe even without any guards.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
+    #[inline]
+    pub fn load_marked_shared(&self, order: Ordering) -> Marked<Shared<T, Leaking, N>> {
+        MarkedNonNull::new(self.inner.load(order))
+            .map(|ptr| Shared { inner: ptr, _marker: PhantomData })
+    }
+
+    /// Loads an optional [`Shared`] reference from the `Atomic`.
+    ///
+    /// Since [`Leaking`] never frees memory of retired records, this is always
+    /// safe even without any guards.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
+    #[inline]
+    pub fn load_shared(&self, order: Ordering) -> Option<Shared<T, Leaking, N>> {
+        self.load_marked_shared(order).value()
     }
 }
 

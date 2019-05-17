@@ -110,5 +110,14 @@ macro_rules! impl_inherent {
             core::mem::forget($self);
             Self { inner: inner.with_tag(tag), _marker: PhantomData }
         }
+
+        /// Decomposes the given `Self`, returning the original value without
+        /// its previous tag and the separated tag.
+        #[inline]
+        pub fn decompose($self: Self) -> (Self, usize) {
+            let (inner, tag) = $self.inner.decompose();
+            core::mem::forget($self);
+            ( Self { inner: crate::pointer::MarkedNonNull::from(inner), _marker: PhantomData }, tag)
+        }
     };
 }

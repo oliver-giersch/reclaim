@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use typenum::Unsigned;
 
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
-use crate::{LocalReclaim, Unprotected};
+use crate::{LocalReclaim, Shared, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Copy & Clone
@@ -60,6 +60,19 @@ impl<T, R: LocalReclaim, N: Unsigned> Unprotected<T, R, N> {
     #[inline]
     pub unsafe fn decompose_ref_unprotected<'a>(self) -> (&'a T, usize) {
         self.inner.decompose_ref_unbounded()
+    }
+
+    /// Consumes the `unprotected` and converts it to a [`Shared`] reference
+    /// with arbitrary lifetime.
+    ///
+    /// # Safety
+    ///
+    /// The returned reference is not in fact protected and could be reclaimed
+    /// by other threads, so the caller has to ensure no concurrent reclamation
+    /// is possible.
+    #[inline]
+    pub unsafe fn into_shared<'a>(unprotected: Self) -> Shared<'a, T, R, N> {
+        Shared::from_marked_non_null(unprotected.inner)
     }
 }
 
