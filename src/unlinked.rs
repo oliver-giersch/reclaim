@@ -5,7 +5,7 @@ use core::ops::Deref;
 use typenum::Unsigned;
 
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
-use crate::{LocalReclaim, Reclaim, Unlinked};
+use crate::{LocalReclaim, Reclaim, Unlinked, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // MarkedPointer
@@ -27,6 +27,11 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     #[inline]
     pub fn decompose_ref(unlinked: &Self) -> (&T, usize) {
         unsafe { unlinked.inner.decompose_ref() }
+    }
+
+    /// Converts the `Unlinked` reference into an [`Unprotected`].
+    pub fn into_unprotected(shared: Self) -> Unprotected<T, R, N> {
+        Unprotected { inner: shared.inner, _marker: PhantomData }
     }
 
     /// Retires a record by calling [`retire_local`][retire] on the generic

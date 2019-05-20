@@ -122,13 +122,14 @@ impl<T: NonNullable> Marked<T> {
     }
 }
 
+// TODO: remove?
 impl<T: NonNullable + MarkedPointer> Marked<T> {
     /// Decomposes the inner marked pointer, returning only the separated tag.
     #[inline]
     pub fn decompose_tag(&self) -> usize {
         match self {
             Value(ptr) => ptr.as_marked_ptr().decompose_tag(),
-            Null(tag) => *tag
+            Null(tag) => *tag,
         }
     }
 }

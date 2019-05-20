@@ -21,7 +21,7 @@ impl<T: Clone, R: LocalReclaim, N: Unsigned> Clone for Owned<T, R, N> {
     #[inline]
     fn clone(&self) -> Self {
         let (reference, tag) = unsafe { self.inner.decompose_ref() };
-        Self::compose(reference.clone(), tag)
+        Self::with_tag(reference.clone(), tag)
     }
 }
 
@@ -59,14 +59,14 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
         Self { inner: MarkedNonNull::from(Self::alloc_record(owned)), _marker: PhantomData }
     }
 
-    impl_inherent!(owned);
-
     /// Creates a new `Owned` like [`new`](Owned::new) but composes the
     /// returned pointer with an initial `tag` value.
     #[inline]
-    pub fn compose(owned: T, tag: usize) -> Self {
+    pub fn with_tag(owned: T, tag: usize) -> Self {
         Self { inner: MarkedNonNull::compose(Self::alloc_record(owned), tag), _marker: PhantomData }
     }
+
+    impl_inherent!(owned);
 
     /// Decomposes the internal marked pointer, returning a reference and the
     /// separated tag.
@@ -307,9 +307,9 @@ mod test {
 
     #[test]
     fn compose() {
-        let owned = Owned::compose(1, 0b11);
+        let owned = Owned::with_tag(1, 0b11);
         assert_eq!((Some(&1), 0b11), unsafe { Owned::into_marked_ptr(owned).decompose_ref() });
-        let owned = Owned::compose(2, 0);
+        let owned = Owned::with_tag(2, 0);
         assert_eq!((Some(&2), 0), unsafe { Owned::into_marked_ptr(owned).decompose_ref() });
     }
 

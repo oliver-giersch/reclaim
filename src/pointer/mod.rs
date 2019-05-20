@@ -135,6 +135,10 @@ pub trait MarkedPointer: Sized + Internal {
     /// Consumes the `Self` and returns the same value but without any tag.
     fn unmarked(_: Self) -> Self;
 
+    /// Decomposes the `Self`, returning the original value without its previous
+    /// tag and the separated tag.
+    fn decompose(_: Self) -> (Self, usize);
+
     /// Constructs a `Self` from a raw marked pointer.
     ///
     /// # Safety
@@ -195,6 +199,17 @@ where
     }
 
     #[inline]
+    fn decompose(opt: Self) -> (Self, usize) {
+        match opt {
+            Some(ptr) => {
+                let (ptr, tag) = Self::Pointer::decompose(ptr);
+                (Some(ptr), tag)
+            }
+            None => (None, 0)
+        }
+    }
+
+    #[inline]
     unsafe fn from_marked_ptr(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
         match !marked.is_null() {
             true => Some(Self::Pointer::from_marked_non_null(MarkedNonNull::new_unchecked(marked))),
@@ -245,6 +260,17 @@ where
         match marked {
             Value(ptr) => Value(Self::Pointer::unmarked(ptr)),
             Null(_) => Null(0),
+        }
+    }
+
+    #[inline]
+    fn decompose(marked: Self) -> (Self, usize) {
+        match marked {
+            Value(ptr) => {
+                let (ptr, tag) = Self::Pointer::decompose(ptr);
+                (Value(ptr), tag)
+            }
+            Null(tag) => (Null(0), tag)
         }
     }
 

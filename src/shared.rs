@@ -5,7 +5,7 @@ use core::ops::Deref;
 use typenum::Unsigned;
 
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
-use crate::{LocalReclaim, Shared};
+use crate::{LocalReclaim, Shared, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Copy & Clone
@@ -38,16 +38,21 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
     /// Decomposes the marked reference, returning the reference itself and the
     /// separated tag.
     #[inline]
-    pub fn decompose_ref(self) -> (&'g T, usize) {
-        let (ptr, tag) = self.inner.decompose();
+    pub fn decompose_ref(shared: Self) -> (&'g T, usize) {
+        let (ptr, tag) = shared.inner.decompose();
         unsafe { (&*ptr.as_ptr(), tag) }
     }
 
     /// Consumes and decomposes the marked reference, returning only the
     /// reference itself.
     #[inline]
-    pub fn into_ref(self) -> &'g T {
-        unsafe { &*self.inner.decompose_ptr() }
+    pub fn into_ref(shared: Self) -> &'g T {
+        unsafe { &*shared.inner.decompose_ptr() }
+    }
+
+    /// Converts the `Shared` reference into an [`Unprotected`].
+    pub fn into_unprotected(shared: Self) -> Unprotected<T, R, N> {
+        Unprotected { inner: shared.inner, _marker: PhantomData }
     }
 }
 

@@ -27,6 +27,13 @@ macro_rules! impl_trait {
         }
 
         #[inline]
+        fn decompose($self: Self) -> (Self, usize) {
+            let (inner, tag) = $self.inner.decompose();
+            core::mem::forget($self);
+            ( Self { inner: crate::pointer::MarkedNonNull::from(inner), _marker: PhantomData }, tag)
+        }
+
+        #[inline]
         unsafe fn from_marked_ptr(
             marked: crate::pointer::MarkedPtr<Self::Item, Self::MarkBits>
         ) -> Self
@@ -104,20 +111,13 @@ macro_rules! impl_inherent {
 
         /// Consumes the given `Self` and returns the same value but with the
         /// specified `tag`.
+        ///
+        /// Any previous tag is overwritten.
         #[inline]
-        pub fn with_tag($self: Self, tag: usize) -> Self {
+        pub fn compose($self: Self, tag: usize) -> Self {
             let inner = $self.inner;
             core::mem::forget($self);
             Self { inner: inner.with_tag(tag), _marker: PhantomData }
-        }
-
-        /// Decomposes the given `Self`, returning the original value without
-        /// its previous tag and the separated tag.
-        #[inline]
-        pub fn decompose($self: Self) -> (Self, usize) {
-            let (inner, tag) = $self.inner.decompose();
-            core::mem::forget($self);
-            ( Self { inner: crate::pointer::MarkedNonNull::from(inner), _marker: PhantomData }, tag)
         }
     };
 }

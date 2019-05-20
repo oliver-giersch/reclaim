@@ -6,7 +6,7 @@ use core::sync::atomic::Ordering;
 use typenum::Unsigned;
 
 use crate::pointer::{Marked, MarkedPointer, MarkedPtr};
-use crate::{AcquireResult, LocalReclaim, Protect};
+use crate::{AcquireResult, LocalReclaim, Protect, Reclaim};
 
 /// An [`Atomic`][crate::Atomic] type that uses the no-op [`Leaking`]
 /// "reclamation" scheme.
@@ -27,6 +27,18 @@ pub type Unprotected<T, N> = crate::Unprotected<T, Leaking, N>;
 /// A no-op memory "reclamation" scheme that deliberately leaks all memory.
 #[derive(Debug, Default)]
 pub struct Leaking;
+
+impl Leaking {
+    /// Leaks the given `unlinked`.
+    ///
+    /// This is safe wrapper for [`retire`][Reclaim::retire], which does not
+    /// require any invariants to be maintained, because retired records are
+    /// not freed but leaked.
+    #[inline]
+    pub fn leak<T, N: Unsigned>(unlinked: Unlinked<T, N>) {
+        unsafe { Self::retire_unchecked(unlinked) };
+    }
+}
 
 /// The corresponding guard type for the [`Leaking`](Leaking) type.
 ///
