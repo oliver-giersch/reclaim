@@ -20,35 +20,40 @@
 //! when a removed entry can be actually dropped and deallocated:
 //! Just because an entry has been removed (*unlinked*) from some shared data
 //! structure does not guarantee, that no other thread could be in the process
-//! of reading that entry at the same time.
+//! of reading that same entry at the same time.
 //! This is due to the possibility of stale references that were created before
 //! the unlinking occurred.
 //! The only thing that can be ascertained, due to nature of atomic *swap* and
 //! *compare-and-swap* operations, is that other threads can not acquire *new*
 //! references after an entry has been unlinked.
 //!
-//! With atomic reference counting (as it's done by e.g. the `Arc` type), it is
-//! principally possible to determine when ...
-//!
-//! ## Concurrent & Lock-Free Garbage Collection
+//! ## Extending the Grace Period
 //!
 //! Concurrent memory reclamation schemes work by granting every value
 //! (*record*) earmarked for deletion (*retired*) a certain **grace period**
 //! before being actually dropped and deallocated, during which it is cached and
 //! can still be safely read by other threads with live references to it.
 //! How to determine the length of this grace period is up to each individual
-//! reclamation scheme
+//! reclamation scheme.
 //!
-//! # The `Reclaim` Interface
+//! # The Reclaim Interface
+//!
+//! Due to the restrictions of atomic instructions to machine-word sized chunks
+//! of memory, lock-free data structures are necessarily required to work with
+//! pointers and working with pointers is inherently unsafe.
+//! Nonetheless, this crate seeks to provide an API that hides this unsafety as
+//! much as possible exposing methods and functions that are for the most part
+//! safe to call without having to maintain numerous invariants.
+//!
+//! This is primarily achieved by shifting the burden of explicitly maintaining
+//! safety invariants to the process of actually reclaiming allocated records.
 //!
 //! ...
 //!
-//! # Pointer Types & Tagging
+//! # Pointer Tagging & Reference Types
 //!
 //! ...
 
-// TODO: remove once 1.35 is there
-#![cfg_attr(not(feature = "std"), feature(alloc))]
 #![cfg_attr(not(any(test, feature = "std")), no_std)]
 #![warn(missing_docs)]
 
@@ -93,7 +98,9 @@ mod unlinked;
 mod unprotected;
 
 pub use crate::atomic::{Atomic, CompareExchangeFailure};
-pub use crate::pointer::{AtomicMarkedPtr, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
+pub use crate::pointer::{
+    AtomicMarkedPtr, InvalidNullError, Marked, MarkedNonNull, MarkedPointer, MarkedPtr, NonNullable,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Reclaim (trait)
