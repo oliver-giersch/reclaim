@@ -130,7 +130,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     ///
     /// # Panics
     ///
-    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    /// *May* panic if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
     ///
     /// [ordering]: core::sync::atomic::Ordering
     /// [release]: core::sync::atomic::Ordering::Release
@@ -152,7 +152,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     ///
     /// # Panics
     ///
-    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    /// *May* panic if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
     ///
     /// [ordering]: core::sync::atomic::Ordering
     /// [release]: core::sync::atomic::Ordering::Release
@@ -178,7 +178,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     ///
     /// # Panics
     ///
-    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    /// *May* panic if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
     ///
     /// [ordering]: core::sync::atomic::Ordering
     /// [release]: core::sync::atomic::Ordering::Release
@@ -186,11 +186,38 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     #[inline]
     pub fn load_if_equal<'g>(
         &self,
-        compare: MarkedPtr<T, N>,
+        expected: MarkedPtr<T, N>,
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Result<Option<Shared<'g, T, R, N>>, NotEqualError> {
-        guard.acquire_if_equal(self, compare, order).map(|marked| marked.value())
+        guard.acquire_if_equal(self, expected, order).map(|marked| marked.value())
+    }
+
+    /// Loads a value wrapped in a [`Marked] from the pointer and stores it
+    /// within `guard`, but only if the loaded value equals `expected`.
+    ///
+    /// If the loaded value is non-null, the value is guaranteed to be protected
+    /// from reclamation for as long as it is stored within `guard`. This method
+    /// internally calls [`acquire_if_equal`][Protect::acquire_if_equal].
+    ///
+    /// `load_if_equal` takes an [`Ordering`][ordering] argument, which
+    /// describes the memory ordering of this operation.
+    ///
+    /// # Panics
+    ///
+    /// *May* panic if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
+    #[inline]
+    pub fn load_marked_if_equal<'g>(
+        &self,
+        expected: MarkedPtr<T, N>,
+        order: Ordering,
+        guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
+    ) -> Result<Marked<Shared<'g, T, R, N>>, NotEqualError> {
+        guard.acquire_if_equal(self, expected, order)
     }
 
     /// Stores either `null` or a valid pointer to an owned heap allocated value
@@ -255,6 +282,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// This is necessary, because it is possible to attempt insertion of
     /// move-only types such as [`Owned`] or [`Unlinked`], which would otherwise
     /// be irretrievably lost when the `compare_exchange` fails.
+    /// The actually loaded value is [`Unprotected`].
     ///
     /// `compare_exchange` takes two [`Ordering`][ordering] arguments to
     /// describe the memory ordering of this operation.
@@ -292,7 +320,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
             .compare_exchange(current, new, success, failure)
             .map(|ptr| unsafe { C::Unlinked::from_marked_ptr(ptr) })
             .map_err(|ptr| CompareExchangeFailure {
-                loaded: ptr,
+                loaded: unsafe { Option::from_marked_ptr(ptr) },
                 input: unsafe { S::from_marked_ptr(new) },
                 _marker: PhantomData,
             })
@@ -314,6 +342,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// This is necessary, because it is possible to attempt insertion of
     /// move-only types such as [`Owned`] or [`Unlinked`], which would otherwise
     /// be irretrievably lost when the `compare_exchange` fails.
+    /// The actually loaded value is [`Unprotected`].
     ///
     /// `compare_exchange` takes two [`Ordering`][ordering] arguments to
     /// describe the memory ordering of this operation.
@@ -351,7 +380,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
             .compare_exchange_weak(current, new, success, failure)
             .map(|ptr| unsafe { C::Unlinked::from_marked_ptr(ptr) })
             .map_err(|ptr| CompareExchangeFailure {
-                loaded: ptr,
+                loaded: unsafe { Option::from_marked_ptr(ptr) },
                 input: unsafe { S::from_marked_ptr(new) },
                 _marker: PhantomData,
             })
@@ -471,7 +500,7 @@ where
     N: Unsigned,
 {
     /// The actually loaded value
-    pub loaded: MarkedPtr<T, N>,
+    pub loaded: Option<Unprotected<T, R, N>>,
     /// The value with which the failed swap was attempted
     pub input: S,
     // prevents construction outside of the current module

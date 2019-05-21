@@ -85,16 +85,17 @@ unsafe impl LocalReclaim for Leaking {
     ///
     /// # Safety
     ///
-    /// Contrary to the specifications of the trait methods, this particular
-    /// specialization is always safe to call.
+    /// Contrary to the specifications of the trait's method, this particular
+    /// implementation is always safe to call.
     #[inline]
     unsafe fn retire_local<T: 'static, N: Unsigned>(_: &(), _: Unlinked<T, N>) {}
+
     /// Leaks the given value.
     ///
     /// # Safety
     ///
-    /// Contrary to the specifications of the trait methods, this particular
-    /// specialization is always safe to call.
+    /// Contrary to the specifications of the trait's method, this particular
+    /// implementation is always safe to call.
     #[inline]
     unsafe fn retire_local_unchecked<T, N: Unsigned>(_: &(), _: Unlinked<T, N>) {}
 }
@@ -104,8 +105,8 @@ unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
     type Reclaimer = Leaking;
     type MarkBits = N;
 
-    /// Gets a shared reference wrapped in a [`Marked`] for the protected value,
-    /// which is tied to the lifetime of self.
+    /// Returns a [`Shared`] reference wrapped in a [`Marked`] for the protected
+    /// value, which is tied to the lifetime of `self`.
     #[inline]
     fn marked(&self) -> Marked<Shared<Self::Item, Self::MarkBits>> {
         unsafe { Marked::from_marked_ptr(self.0) }
