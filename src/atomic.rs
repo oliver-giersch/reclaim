@@ -46,7 +46,8 @@ impl<T, R, N> Atomic<T, R, N> {
 }
 
 impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
-    /// Creates a new [`Atomic`] by allocating specified `val` on the heap.
+    /// Allocates a new [`Owned`] containing the given `val` and immediately
+    /// storing it an `Atomic`.
     #[inline]
     pub fn new(val: T) -> Self {
         Self::from(Owned::from(val))
@@ -64,6 +65,30 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// [ordering]: core::sync::atomic::Ordering
     /// [release]: core::sync::atomic::Ordering::Release
     /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
+    ///
+    /// # Example
+    ///
+    /// Commonly, this is likely going to be used in conjunction with
+    /// [`load_if_equal`][Atomic::load_if_equal] or
+    /// [`acquire_if_equal`][LocalReclaim::acquire_if_equal].
+    ///
+    /// ```
+    /// use std::sync::atomic::Ordering::Relaxed;
+    ///
+    /// use reclaim::typenum::U0;
+    ///
+    /// type Atomic<T> = reclaim::leak::Atomic<T, U0>;
+    /// type Guarded<T> = reclaim::leak::LeakingGuard<T, U0>;
+    ///
+    /// let atomic = Atomic::new("string");
+    /// let mut guarded = Guarded::default();
+    ///
+    /// let ptr = atomic.load_raw(Relaxed);
+    /// let res = atomic.load_if_equal(ptr, Relaxed, &mut guarded);
+    ///
+    /// assert!(res.is_ok());
+    /// # assert_eq!(&"string", &*res.unwrap().unwrap());
+    /// ```
     #[inline]
     pub fn load_raw(&self, order: Ordering) -> MarkedPtr<T, N> {
         self.inner.load(order)

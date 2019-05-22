@@ -46,6 +46,14 @@ impl Leaking {
 /// for a marked pointer.
 pub struct LeakingGuard<T, N: Unsigned>(MarkedPtr<T, N>);
 
+impl<T, N: Unsigned> LeakingGuard<T, N> {
+    /// Creates a new empty `LeakingGuard`.
+    #[inline]
+    pub fn new() -> Self {
+        Self(MarkedPtr::null())
+    }
+}
+
 impl<T, N: Unsigned> Clone for LeakingGuard<T, N> {
     #[inline]
     fn clone(&self) -> Self {
@@ -56,7 +64,7 @@ impl<T, N: Unsigned> Clone for LeakingGuard<T, N> {
 impl<T, N: Unsigned> Default for LeakingGuard<T, N> {
     #[inline]
     fn default() -> Self {
-        Self(MarkedPtr::null())
+        Self::new()
     }
 }
 

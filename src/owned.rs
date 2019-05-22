@@ -61,6 +61,28 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
 
     /// Creates a new `Owned` like [`new`](Owned::new) but composes the
     /// returned pointer with an initial `tag` value.
+    ///
+    /// # Example
+    ///
+    /// The primary use case for this is to pre-mark newly allocated values.
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use reclaim::typenum::U1;
+    /// use reclaim::Shared;
+    ///
+    /// type Atomic<T> = reclaim::leak::Atomic<T, U1>;
+    /// type Owned<T> = reclaim::leak::Owned<T, U1>;
+    ///
+    /// let atomic = Atomic::null();
+    /// let owned = Owned::with_tag("string", 0b1);
+    ///
+    /// atomic.store(owned, Ordering::Relaxed);
+    /// let shared = atomic.load_shared(Ordering::Relaxed);
+    ///
+    /// assert_eq!((&"string", 0b1), Shared::decompose_ref(shared.unwrap()));
+    /// ```
     #[inline]
     pub fn with_tag(owned: T, tag: usize) -> Self {
         Self { inner: MarkedNonNull::compose(Self::alloc_record(owned), tag), _marker: PhantomData }
@@ -101,6 +123,30 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
 
     /// Leaks the `owned` value and turns it into an [`Unprotected`] value,
     /// which has copy semantics, but can no longer be safely dereferenced.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering::Relaxed;
+    ///
+    /// use reclaim::typenum::U0;
+    /// use reclaim::{Owned, Shared};
+    ///
+    /// type Atomic<T> = reclaim::leak::Atomic<T, U0>;
+    ///
+    /// let atomic = Atomic::null();
+    ///
+    /// let unprotected = Owned::leak_unprotected(Owned::new("string"));
+    ///
+    /// loop {
+    ///     // `unprotected` is simply copied in every loop iteration
+    ///     if atomic.compare_exchange_weak(Shared::none(), unprotected, Relaxed, Relaxed).is_ok() {
+    ///         break;
+    ///     }
+    /// }
+    ///
+    /// # assert_eq!(&"string", &*atomic.load_shared(Relaxed).unwrap())
+    /// ```
     #[inline]
     pub fn leak_unprotected(owned: Self) -> Unprotected<T, R, N> {
         let inner = owned.inner;
@@ -123,6 +169,40 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
     /// the possibility for concurrent reclamation of the record.
     ///
     /// [shared]: crate::Shared
+    ///
+    /// # Example
+    ///
+    /// The use case for this method is similar to [`leak_unprotected`][Owned::leak_unprotected]
+    /// but the leaked value can be safely dereferenced **before** being
+    /// inserted into a shared data structure.
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering::Relaxed;
+    ///
+    /// use reclaim::typenum::U0;
+    /// use reclaim::{Owned, Shared};
+    ///
+    /// type Atomic<T> = reclaim::leak::Atomic<T, U0>;
+    ///
+    /// let atomic = Atomic::null();
+    ///
+    /// let shared = unsafe {
+    ///     Owned::leak_shared(Owned::new("string"))
+    /// };
+    ///
+    /// assert_eq!(&"string", &*shared);
+    ///
+    /// loop {
+    ///     // `shared` is simply copied in every loop iteration
+    ///     if atomic.compare_exchange_weak(Shared::none(), shared, Relaxed, Relaxed).is_ok() {
+    ///         // if (non-leaking) reclamation is going on, `shared` must not be accessed
+    ///         // anymore after successful insertion!
+    ///         break;
+    ///     }
+    /// }
+    ///
+    /// # assert_eq!(&"string", &*atomic.load_shared(Relaxed).unwrap())
+    /// ```
     #[inline]
     pub unsafe fn leak_shared<'a>(owned: Self) -> Shared<'a, T, R, N> {
         let inner = owned.inner;

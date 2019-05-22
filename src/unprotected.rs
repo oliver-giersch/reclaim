@@ -43,6 +43,10 @@ impl<T, R: LocalReclaim, N: Unsigned> Unprotected<T, R, N> {
     /// be freed at any point (even before calling this method). Hence, this
     /// method is only safe to call if the caller can guarantee that no
     /// reclamation can occur, e.g. when records are never retired at all.
+    ///
+    /// # Example
+    ///
+    /// ...
     #[inline]
     pub unsafe fn deref_unprotected<'a>(self) -> &'a T {
         self.inner.as_ref_unbounded()
