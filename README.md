@@ -1,7 +1,7 @@
 # Reclaim - Concurrent memory reclamation
 
-A unified abstract interface for concurrent memory reclamation that leverages Rust's type system in order to expose a
-public API that is (almost) safe.
+A unified abstract interface for concurrent memory reclamation that leverages
+Rust's type system in order to expose a public API that is largely safe.
 
 [![Build Status](https://travis-ci.com/oliver-giersch/reclaim.svg?branch=master)](
 https://travis-ci.com/oliver-giersch/reclaim)
@@ -24,21 +24,30 @@ reclaim = "0.1.0"
 
 ## Minimum Supported Rust Version (MSRV)
 
-The minimum supported rust version for this crate is 1.35.0
+The minimum supported rust version for this crate is 1.35.0.
 
 ## Features
 
-...
+This crate is `no_std` + `alloc` compatible. The `std` feature (enabled by
+default) must be disabled when this crate is intended for use in a `#[no_std]`
+environment.
 
 ## Reclamation Scheme Implementations
 
-The following lists the currently available reclamation scheme implementations
-using this crate:
+The following list containts the currently available reclamation scheme
+implementations based on this crate's API and interface:
 
-- hazptr
-- arc-reclaim
-- debra
+- [hazptr](https://github.com/oliver-giersch/hazptr)
 
 ## Down the Road
 
-...
+The ultimate goal of this crate is to allow fully generic memory reclamation
+based only on the traits `Reclaim` and `Protect`.
+This will allow writers of lock-free data structures to parametrize their code
+over the reclamation scheme they use, making it easily exchangeable.
+This is currently not possible due to the lack of GAT (generic associated
+types).
+
+Likewise, since `const generics` are currently not available in stable Rust, the
+crate's type safe pointer tagging mechanism has to rely on the `typenum` crate.
+This is also bound change in the future.

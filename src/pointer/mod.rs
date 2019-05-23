@@ -4,6 +4,9 @@ use core::mem;
 use core::ptr::{self, NonNull};
 use core::sync::atomic::AtomicPtr;
 
+#[cfg(feature = "std")]
+use std::error::Error;
+
 use typenum::Unsigned;
 
 mod atomic;
@@ -11,7 +14,7 @@ mod marked;
 mod non_null;
 mod raw;
 
-use self::Marked::{Value, Null};
+use self::Marked::{Null, Value};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // MarkedPtr
@@ -66,6 +69,9 @@ pub struct AtomicMarkedPtr<T, N> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A value that represents the possible states of a nullable marked pointer.
+///
+/// This type is similar to [`Option<T>`][Option] but can also express `null`
+/// pointers with mark bits.
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Marked<T: NonNullable> {
     /// A marked, non-nullable pointer or reference value.
@@ -73,22 +79,6 @@ pub enum Marked<T: NonNullable> {
     /// A null pointer that may be marked, in which case the `usize` is
     /// non-zero.
     Null(usize),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// InvalidNullError
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// An error type for representing failed conversions from nullable to
-/// non-nullable pointer types.
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
-pub struct InvalidNullError;
-
-impl fmt::Display for InvalidNullError {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "failed conversion of null pointer to non-nullable type")
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -163,7 +153,7 @@ pub trait MarkedPointer: Sized + Internal {
 
 impl<U, T, N: Unsigned> MarkedPointer for Option<U>
 where
-    U: MarkedPointer<Pointer = U, Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>
+    U: MarkedPointer<Pointer = U, Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>,
 {
     type Pointer = U;
     type Item = T;
@@ -173,7 +163,7 @@ where
     fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
         match self {
             Some(ptr) => Self::Pointer::as_marked_ptr(ptr),
-            None => MarkedPtr::null()
+            None => MarkedPtr::null(),
         }
     }
 
@@ -181,7 +171,7 @@ where
     fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits> {
         match self {
             Some(ptr) => Self::Pointer::into_marked_ptr(ptr),
-            None => MarkedPtr::null()
+            None => MarkedPtr::null(),
         }
     }
 
@@ -205,7 +195,7 @@ where
                 let (ptr, tag) = Self::Pointer::decompose(ptr);
                 (Some(ptr), tag)
             }
-            None => (None, 0)
+            None => (None, 0),
         }
     }
 
@@ -213,7 +203,7 @@ where
     unsafe fn from_marked_ptr(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
         match !marked.is_null() {
             true => Some(Self::Pointer::from_marked_non_null(MarkedNonNull::new_unchecked(marked))),
-            false => None
+            false => None,
         }
     }
 
@@ -225,7 +215,7 @@ where
 
 impl<U, T, N: Unsigned> MarkedPointer for Marked<U>
 where
-    U: MarkedPointer<Pointer = U, Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>
+    U: MarkedPointer<Pointer = U, Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>,
 {
     type Pointer = U;
     type Item = T;
@@ -235,7 +225,7 @@ where
     fn as_marked_ptr(&self) -> MarkedPtr<Self::Item, Self::MarkBits> {
         match self {
             Value(ptr) => Self::Pointer::as_marked_ptr(ptr),
-            Null(tag) => MarkedPtr::compose(ptr::null_mut(), *tag)
+            Null(tag) => MarkedPtr::compose(ptr::null_mut(), *tag),
         }
     }
 
@@ -243,7 +233,7 @@ where
     fn into_marked_ptr(self) -> MarkedPtr<Self::Item, Self::MarkBits> {
         match self {
             Value(ptr) => Self::Pointer::into_marked_ptr(ptr),
-            Null(tag) => MarkedPtr::compose(ptr::null_mut(), tag)
+            Null(tag) => MarkedPtr::compose(ptr::null_mut(), tag),
         }
     }
 
@@ -251,7 +241,7 @@ where
     fn marked(marked: Self, tag: usize) -> Marked<Self::Pointer> {
         match marked {
             Value(ptr) => Self::Pointer::marked(ptr, tag),
-            Null(_) => Null(tag)
+            Null(_) => Null(tag),
         }
     }
 
@@ -270,7 +260,7 @@ where
                 let (ptr, tag) = Self::Pointer::decompose(ptr);
                 (Value(ptr), tag)
             }
-            Null(tag) => (Null(0), tag)
+            Null(tag) => (Null(0), tag),
         }
     }
 
@@ -284,6 +274,25 @@ where
         Value(Self::Pointer::from_marked_non_null(marked))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// InvalidNullError
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An error type for representing failed conversions from nullable to
+/// non-nullable pointer types.
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
+pub struct InvalidNullError;
+
+impl fmt::Display for InvalidNullError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "failed conversion of null pointer to non-nullable type")
+    }
+}
+
+#[cfg(feature = "std")]
+impl Error for InvalidNullError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // internal traits
@@ -332,13 +341,15 @@ impl<'a, T> NonNullable for &'a mut T {
 /// A marker trait for internal traits.
 pub trait Internal {}
 
-impl<U, T, N: Unsigned> Internal for Option<U>
-where
-    U: MarkedPointer<Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N> {}
+impl<U, T, N: Unsigned> Internal for Option<U> where
+    U: MarkedPointer<Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>
+{
+}
 
-impl<U, T, N: Unsigned> Internal for Marked<U>
-where
-    U: MarkedPointer<Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N> {}
+impl<U, T, N: Unsigned> Internal for Marked<U> where
+    U: MarkedPointer<Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>
+{
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // helper functions

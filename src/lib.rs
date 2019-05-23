@@ -40,19 +40,74 @@
 //!
 //! Due to the restrictions of atomic instructions to machine-word sized chunks
 //! of memory, lock-free data structures are necessarily required to work with
-//! pointers and working with pointers is inherently unsafe.
-//! Nonetheless, this crate seeks to provide an API that hides this unsafety as
-//! much as possible exposing methods and functions that are for the most part
-//! safe to call without having to maintain numerous invariants.
+//! pointers as well, which is inherently unsafe.
+//! Nonetheless, this crate attempts to provide abstractions and an API that
+//! encapsulates this unsafety behind safe interface as much as possible.
+//! Consequently, the majority of functions and methods exposed are safe to call
+//! and can not lead to memory-unsafety.
 //!
 //! This is primarily achieved by shifting the burden of explicitly maintaining
 //! safety invariants to the process of actually reclaiming allocated records.
+//! Also construction and insertion into shared variables ([`Atomic`]) is only
+//! safely allowed with *valid* (heap allocated) values.
+//! All values that are read from shared variables have reference semantics and
+//! are non-nullable, although not all types can be safely dereferenced.
+//! The [`Option`] and [`Marked`] wrapper types are used to ensure `null`
+//! pointer safety.
+//! Under these circumstances, memory-unsafety (e.g. use-after-free errors) can
+//! only be introduced by incorrectly [`retiring`][LocalReclaim::retire_local]
+//! (and hence reclaiming) memory, which is consequently `unsafe`.
 //!
-//! ...
+//! # Markable Pointer & Reference Types
 //!
-//! # Pointer Tagging & Reference Types
+//! It is a ubiquitous technique in lock-free programming to use the lower bits
+//! of a pointer address to store additional information alongside an address.
+//! Common use-cases are ABA problem mitigation or to mark a node of a linked
+//! list for removal.
 //!
-//! ...
+//! Accordingly, this crate allows all pointer and reference types
+//! ([`MarkedPtr`], [`Shared`], etc.) to be marked.
+//! The number of usable mark bits is encoded in the type itself as a generic
+//! parameter `N`.
+//! However, the number of available mark bits has a physical upper bound, which
+//! is dictated by the alignment of the pointed-to type.
+//! For instance, a `bool` has an alignment of 1, hence pointers to boolean
+//! values can not, in fact, be marked.
+//! On a 64-bit system, an `usize` has an alignment of 8, which means a pointer
+//! to one can use up to 3 mark bits.
+//! Since the number `N` is encoded in the pointer types themselves, attempting
+//! to declare types with more available mark bits than what the pointed-to
+//! type's alignment will lead to a (currently fairly cryptic) compile time
+//! error.
+//! Note, that tags are allowed to overflow. This can lead to surprising results
+//! when attempting to e.g. mark a pointer that is declared to support zero mark
+//! bits (`N = 0`), as the tag will be silently truncated.
+//!
+//! # Terminology
+//!
+//! Throughout this crate's API and its documentation a certain terminology is
+//! consistently used, which is summarized below:
+//!
+//! - record
+//!   
+//!   A heap allocated value which is managed by some reclamation scheme.
+//!
+//! - unlink
+//!   
+//!   The act removing the pointer to a *record* from shared memory through an
+//!   atomic operation such as *compare-and-swap*.
+//!
+//! - retire
+//!
+//!   The act of marking an *unlinked* record as no longer in use and handing
+//!   off the responsibility for deallocation to the reclamation scheme.
+//!
+//! - reclaim
+//!
+//!   The act of dropping and deallocating a *retired* record.
+//!   The reclamation scheme is responsible for guaranteeing that *retired*
+//!   records are kept alive (cached) **at least** until their respective *grace
+//!   periods* have expired.
 
 #![cfg_attr(not(any(test, feature = "std")), no_std)]
 #![warn(missing_docs)]
@@ -64,6 +119,9 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::ptr::NonNull;
 use core::sync::atomic::Ordering;
+
+#[cfg(feature = "std")]
+use std::error::Error;
 
 // TODO: replace with const generics once available
 pub use typenum;
@@ -179,7 +237,7 @@ pub unsafe trait LocalReclaim
 where
     Self: Sized,
 {
-    // TODO: type Allocator;
+    // TODO: type Allocator: Alloc + Default???;
     // TODO: type Guarded<T, const N: usize>: Protect<Item = T, MARK_BITS = N>;
 
     /// The type used for storing all relevant thread local state.
@@ -310,7 +368,7 @@ where
     ///
     /// *May* panic if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
     ///
-    /// [acquire]: core::sync::atomic::Ordering::Acquire
+    /// [release]: core::sync::atomic::Ordering::Release
     /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
     fn acquire(
         &mut self,
@@ -339,7 +397,7 @@ where
     ///
     /// *May* panic if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
     ///
-    /// [acquire]: core::sync::atomic::Ordering::Acquire
+    /// [release]: core::sync::atomic::Ordering::Release
     /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
     fn acquire_if_equal(
         &mut self,
@@ -369,6 +427,9 @@ impl fmt::Display for NotEqualError {
         write!(f, "acquired value does not match `expected`.")
     }
 }
+
+#[cfg(feature = "std")]
+impl Error for NotEqualError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Record

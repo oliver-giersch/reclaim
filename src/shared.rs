@@ -45,6 +45,30 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
 
     /// Consumes and decomposes the marked reference, returning only the
     /// reference itself.
+    ///
+    /// # Example
+    ///
+    /// Derefencing a [`Shared`] through the [`Deref`] implementation ties the
+    /// returned reference to the shorter lifetime of the `shared` itself.
+    /// Use this function to get a reference with the full lifetime `'g`.
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering::Relaxed;
+    ///
+    /// use reclaim::typenum::U0;
+    /// use reclaim::leak::Shared;
+    ///
+    /// type Atomic<T> = reclaim::leak::Atomic<T, U0>;
+    /// type Guarded<T> = reclaim::leak::LeakingGuard<T, U0>;
+    ///
+    /// let atomic = Atomic::new("string");
+    ///
+    /// let mut guarded = Guarded::new();
+    /// let shared = atomic.load(Relaxed, &mut guarded);
+    ///
+    /// let reference = Shared::into_ref(shared.unwrap());
+    /// assert_eq!(reference, &"string");
+    /// ```
     #[inline]
     pub fn into_ref(shared: Self) -> &'g T {
         unsafe { &*shared.inner.decompose_ptr() }

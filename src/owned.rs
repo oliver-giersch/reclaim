@@ -92,6 +92,23 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
 
     /// Decomposes the internal marked pointer, returning a reference and the
     /// separated tag.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering::Relaxed;
+    ///
+    /// use reclaim::typenum::U1;
+    /// use reclaim::leak::Owned;
+    ///
+    /// type Atomic<T> = reclaim::leak::Atomic<T, U1>;
+    ///
+    /// let mut atomic = Atomic::from(Owned::with_tag("string", 0b1));
+    /// // ... potential operations by other threads ...
+    /// let owned = atomic.take(); // after all threads have joined
+    ///
+    /// assert_eq!((&"string", 0b1), Owned::decompose_ref(owned.as_ref().unwrap()));
+    /// ```
     #[inline]
     pub fn decompose_ref(owned: &Self) -> (&T, usize) {
         // this is safe because is `inner` is guaranteed to be backed by a valid allocation

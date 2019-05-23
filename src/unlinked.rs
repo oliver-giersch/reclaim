@@ -42,12 +42,19 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     /// The same caveats as with [`LocalReclaim::retire_local`][retire] apply.
     ///
     /// [retire]: crate::LocalReclaim::retire_local
+    ///
+    /// # Note
+    ///
+    /// This method takes `self` as receiver, which means it may conflict with
+    /// methods of `T`, since `Unlinked` implements [`Deref`].
+    /// This is a deliberate trade-off in favor of better ergonomics around
+    /// retiring records.
     #[inline]
-    pub unsafe fn retire_local(unlinked: Self, local: &R::Local)
+    pub unsafe fn retire_local(self, local: &R::Local)
     where
         T: 'static,
     {
-        R::retire_local(local, unlinked)
+        R::retire_local(local, self)
     }
 
     /// Retires a record by calling [`retire_local_unchecked`][retire_unchecked]
@@ -59,9 +66,16 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     /// apply.
     ///
     /// [retire_unchecked]: crate::LocalReclaim::retire_local_unchecked
+    ///
+    /// # Note
+    ///
+    /// This method takes `self` as receiver, which means it may conflict with
+    /// methods of `T`, since `Unlinked` implements [`Deref`].
+    /// This is a deliberate trade-off in favor of better ergonomics around
+    /// retiring records.
     #[inline]
-    pub unsafe fn retire_local_unchecked(unlinked: Self, local: &R::Local) {
-        R::retire_local_unchecked(local, unlinked)
+    pub unsafe fn retire_local_unchecked(self, local: &R::Local) {
+        R::retire_local_unchecked(local, self)
     }
 }
 
@@ -74,12 +88,19 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
     /// The same caveats as with [`Reclaim::retire`][retire] apply.
     ///
     /// [retire]: crate::Reclaim::retire
+    ///
+    /// # Note
+    ///
+    /// This method takes `self` as receiver, which means it may conflict with
+    /// methods of `T`, since `Unlinked` implements [`Deref`].
+    /// This is a deliberate trade-off in favor of better ergonomics around
+    /// retiring records.
     #[inline]
-    pub unsafe fn retire(unlinked: Self)
+    pub unsafe fn retire(self)
     where
         T: 'static,
     {
-        R::retire(unlinked)
+        R::retire(self)
     }
 
     /// Retires a record by calling [`retire_unchecked`][retire_unchecked] on
@@ -91,9 +112,16 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
     /// apply.
     ///
     /// [retire_unchecked]: crate::Reclaim::retire_unchecked
+    ///
+    /// # Note
+    ///
+    /// This method takes `self` as receiver, which means it may conflict with
+    /// methods of `T`, since `Unlinked` implements [`Deref`].
+    /// This is a deliberate trade-off in favor of better ergonomics around
+    /// retiring records.
     #[inline]
-    pub unsafe fn retire_unchecked(unlinked: Self) {
-        R::retire_unchecked(unlinked)
+    pub unsafe fn retire_unchecked(self) {
+        R::retire_unchecked(self)
     }
 }
 

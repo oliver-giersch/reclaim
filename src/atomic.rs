@@ -70,7 +70,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     ///
     /// Commonly, this is likely going to be used in conjunction with
     /// [`load_if_equal`][Atomic::load_if_equal] or
-    /// [`acquire_if_equal`][LocalReclaim::acquire_if_equal].
+    /// [`acquire_if_equal`][Protect::acquire_if_equal].
     ///
     /// ```
     /// use std::sync::atomic::Ordering::Relaxed;
