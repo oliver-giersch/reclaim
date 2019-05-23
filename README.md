@@ -51,3 +51,10 @@ types).
 Likewise, since `const generics` are currently not available in stable Rust, the
 crate's type safe pointer tagging mechanism has to rely on the `typenum` crate.
 This is also bound change in the future.
+
+## License
+
+Reclaim is distributed under the terms of both the MIT license and the
+Apache License (Version 2.0).
+
+See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT](LICENSE-MIT) for details.
