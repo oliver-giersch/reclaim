@@ -37,6 +37,13 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// The bitmask for the (higher) pointer bits.
     pub const POINTER_MASK: usize = !Self::MARK_MASK;
 
+    /// Returns the inner pointer *as is*, meaning potential tags are not
+    /// stripped.
+    #[inline]
+    pub fn into_non_null(self) -> NonNull<T> {
+        self.inner
+    }
+
     /// Converts a marked non-null pointer with `M` potential mark bits to the
     /// **same** marked pointer with `N` potential mark bits, requires that
     /// `N >= M`.

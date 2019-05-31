@@ -63,6 +63,13 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
         self.inner as usize
     }
 
+    /// Returns the inner pointer *as is*, meaning potential tags are not
+    /// stripped.
+    #[inline]
+    pub fn into_ptr(self) -> *mut T {
+        self.inner
+    }
+
     /// Composes a new marked pointer from a raw unmarked pointer and a tag
     /// value.
     #[inline]
