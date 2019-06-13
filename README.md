@@ -10,7 +10,7 @@ https://crates.io/crates/reclaim)
 [![Documentation](https://docs.rs/reclaim/badge.svg)](https://docs.rs/reclaim)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](
 https://github.com/oliver-giersch/reclaim)
-[![Rust 1.35+](https://img.shields.io/badge/rust-1.35+-lightgray.svg)](
+[![Rust 1.36+](https://img.shields.io/badge/rust-1.36+-lightgray.svg)](
 https://www.rust-lang.org)
 
 ## Usage
@@ -24,7 +24,7 @@ reclaim = "0.1.0"
 
 ## Minimum Supported Rust Version (MSRV)
 
-The minimum supported rust version for this crate is 1.35.0.
+The minimum supported rust version for this crate is 1.36.0.
 
 ## Features
 
@@ -34,15 +34,16 @@ environment.
 
 ## Reclamation Scheme Implementations
 
-The following list containts the currently available reclamation scheme
+The following list contains the currently available reclamation scheme
 implementations based on this crate's API and interface:
 
+- [debra (work in progress)](https://github.com/oliver-giersch/debra)
 - [hazptr](https://github.com/oliver-giersch/hazptr)
 
 ## Down the Road
 
 The ultimate goal of this crate is to allow fully generic memory reclamation
-based only on the traits `Reclaim` and `Protect`.
+based only on the traits `Reclaim`/`LocalReclaim` and `Protect`.
 This will allow writers of lock-free data structures to parametrize their code
 over the reclamation scheme they use, making it easily exchangeable.
 This is currently not possible due to the lack of GAT (generic associated
