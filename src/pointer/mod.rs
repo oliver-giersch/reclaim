@@ -100,7 +100,7 @@ pub trait MarkedPointer: Sized + Internal {
     ///
     /// For types like [`Shared`][crate::Owned], [`Shared`][crate::Shared] and
     /// [`Unlinked`][crate::Unlinked], which implement [`Deref`][core::ops::Deref]
-    /// this method may conflict with inherent methods of the dereferenced type
+    /// this method may conflict with inherent methods of the de-referenced type
     /// and goes against Rust's API guidelines.
     /// This is a deliberate trade-off for enabling more ergonomic usage of
     /// this method
@@ -112,7 +112,7 @@ pub trait MarkedPointer: Sized + Internal {
     ///
     /// For types like [`Shared`][crate::Owned], [`Shared`][crate::Shared] and
     /// [`Unlinked`][crate::Unlinked], which implement [`Deref`][core::ops::Deref]
-    /// this method may conflict with inherent methods of the dereferenced type
+    /// this method may conflict with inherent methods of the de-referenced type
     /// and goes against Rust's API guidelines.
     /// This is a deliberate trade-off for enabling more ergonomic usage of
     /// this method
@@ -311,7 +311,7 @@ pub trait NonNullable: Sized {
     ///
     /// For types like [`Shared`][crate::Owned], [`Shared`][crate::Shared] and
     /// [`Unlinked`][crate::Unlinked], which implement [`Deref`][core::ops::Deref]
-    /// this method may conflict with inherent methods of the dereferenced type
+    /// this method may conflict with inherent methods of the de-referenced type
     /// and goes against Rust's API guidelines.
     /// This is a deliberate trade-off for enabling more ergonomic usage of
     /// this method

@@ -19,7 +19,7 @@ use crate::{LocalReclaim, NotEqualError, Owned, Protect, Shared, Unlinked, Unpro
 /// pointer that is either `null` or otherwise must point to a valid, heap
 /// allocated value.
 /// Note, that the type does not implement the [`Drop`](core::ops::Drop) trait,
-/// meaning it does not automatically take care of memory deallocation when it
+/// meaning it does not automatically take care of memory de-allocation when it
 /// goes out of scope.
 /// Use the [`take`][Atomic::take] method to extract an (optional) [`Owned`]
 /// value, which *does* correctly deallocate memory when it goes out of scope.
@@ -104,7 +104,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// resulting [`Unprotected`] type has stronger guarantees than a raw
     /// [`MarkedPtr`].
     /// It can be useful to load an unprotected pointer if that pointer does not
-    /// need to be dereferenced, but is only used to reinsert it in a different
+    /// need to be de-referenced, but is only used to reinsert it in a different
     /// spot, which is e.g. done when removing a value from a linked list.
     ///
     /// # Panics
@@ -129,7 +129,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
     /// resulting [`Unprotected`] type has stronger guarantees than a raw
     /// [`MarkedPtr`].
     /// It can be useful to load an unprotected pointer if that pointer does not
-    /// need to be dereferenced, but is only used to reinsert it in a different
+    /// need to be de-referenced, but is only used to reinsert it in a different
     /// spot, which is e.g. done when removing a value from a linked list.
     ///
     /// # Panics

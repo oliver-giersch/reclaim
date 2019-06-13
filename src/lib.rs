@@ -17,7 +17,7 @@
 //!
 //! In the domain of concurrent lock-free data structures, however, the
 //! aforementioned memory management schemes are insufficient for determining,
-//! when a removed entry can be actually dropped and deallocated:
+//! when a removed entry can be actually dropped and de-allocated:
 //! Just because an entry has been removed (*unlinked*) from some shared data
 //! structure does not guarantee, that no other thread could be in the process
 //! of reading that same entry at the same time.
@@ -51,14 +51,14 @@
 //! Also construction and insertion into shared variables ([`Atomic`]) is only
 //! safely allowed with *valid* (heap allocated) values.
 //! All values that are read from shared variables have reference semantics and
-//! are non-nullable, although not all types can be safely dereferenced.
+//! are non-nullable, although not all types can be safely de-referenced.
 //! The [`Option`] and [`Marked`] wrapper types are used to ensure `null`
 //! pointer safety.
 //! Under these circumstances, memory-unsafety (e.g. use-after-free errors) can
 //! only be introduced by incorrectly [`retiring`][LocalReclaim::retire_local]
 //! (and hence reclaiming) memory, which is consequently `unsafe`.
 //!
-//! # Markable Pointer & Reference Types
+//! # Marked Pointer & Reference Types
 //!
 //! It is a ubiquitous technique in lock-free programming to use the lower bits
 //! of a pointer address to store additional information alongside an address.
@@ -100,11 +100,11 @@
 //! - retire
 //!
 //!   The act of marking an *unlinked* record as no longer in use and handing
-//!   off the responsibility for deallocation to the reclamation scheme.
+//!   off the responsibility for de-allocation to the reclamation scheme.
 //!
 //! - reclaim
 //!
-//!   The act of dropping and deallocating a *retired* record.
+//!   The act of dropping and de-allocating a *retired* record.
 //!   The reclamation scheme is responsible for guaranteeing that *retired*
 //!   records are kept alive (cached) **at least** until their respective *grace
 //!   periods* have expired.
@@ -573,7 +573,7 @@ pub struct Owned<T, R: LocalReclaim, N: Unsigned> {
 /// other threads.
 ///
 /// `Shared` values have similar semantics to shared references (`&'g T`), i.e.
-/// they can be trivially copied, cloned and (safely) dereferenced.
+/// they can be trivially copied, cloned and (safely) de-referenced.
 /// However, they do retain potential mark bits of the atomic value from which
 /// they were originally read.
 /// They are also usually borrowed from guard values implementing the
@@ -613,7 +613,7 @@ pub struct Unlinked<T, R, N> {
 /// A reference to a value loaded from an [`Atomic`] that is not actively
 /// protected from reclamation.
 ///
-/// `Unprotected` values can not be safely dereferenced under usual
+/// `Unprotected` values can not be safely de-referenced under usual
 /// circumstances (i.e. other threads can retire and reclaim unlinked records).
 /// They do, however, have stronger guarantees than raw (marked) pointers:
 /// Since are loaded from [`Atomic`] values they must (at least at one point)

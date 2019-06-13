@@ -212,7 +212,7 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
         (&mut *ptr.as_ptr(), tag)
     }
 
-    /// Decomposes the marked pointer, returning only the dereferenced raw
+    /// Decomposes the marked pointer, returning only the de-referenced raw
     /// pointer.
     ///
     /// The resulting lifetime is bound to self so this behaves "as if" it were
@@ -229,7 +229,7 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
         &*self.decompose_non_null().as_ptr()
     }
 
-    /// Decomposes the marked pointer, returning only the dereferenced raw
+    /// Decomposes the marked pointer, returning only the de-referenced raw
     /// pointer, which is not bound to the lifetime of the `MarkedNonNull`.
     ///
     /// # Safety
@@ -242,7 +242,7 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
         &*self.decompose_non_null().as_ptr()
     }
 
-    /// Decomposes the marked pointer, returning only the mutably dereferenced
+    /// Decomposes the marked pointer, returning only the mutably de-referenced
     /// raw pointer.
     ///
     /// The resulting lifetime is bound to self so this behaves "as if"
@@ -259,7 +259,7 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
         &mut *self.decompose_non_null().as_ptr()
     }
 
-    /// Decomposes the marked pointer, returning only the mutably dereferenced
+    /// Decomposes the marked pointer, returning only the mutably de-referenced
     /// raw pointer, which is not bound to the lifetime of the `MarkedNonNull`.
     ///
     /// # Safety
