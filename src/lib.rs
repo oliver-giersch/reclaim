@@ -151,6 +151,7 @@ pub mod prelude {
 mod atomic;
 mod owned;
 mod pointer;
+mod retired;
 mod shared;
 mod unlinked;
 mod unprotected;
@@ -159,6 +160,7 @@ pub use crate::atomic::{Atomic, CompareExchangeFailure};
 pub use crate::pointer::{
     AtomicMarkedPtr, InvalidNullError, Marked, MarkedNonNull, MarkedPointer, MarkedPtr, NonNullable,
 };
+pub use crate::retired::Retired;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Reclaim (trait)
