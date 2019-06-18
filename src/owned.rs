@@ -1,3 +1,5 @@
+//! Inherent implementation and trait implementations for the [`Owned`] type.
+
 #[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
 
@@ -11,13 +13,13 @@ use core::ptr::NonNull;
 use typenum::Unsigned;
 
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
-use crate::{LocalReclaim, Owned, Record, Shared, Unprotected};
+use crate::{Owned, Reclaim, Record, Shared, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Clone
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T: Clone, R: LocalReclaim, N: Unsigned> Clone for Owned<T, R, N> {
+impl<T: Clone, R: Reclaim, N: Unsigned> Clone for Owned<T, R, N> {
     #[inline]
     fn clone(&self) -> Self {
         let (reference, tag) = unsafe { self.inner.decompose_ref() };
@@ -29,14 +31,14 @@ impl<T: Clone, R: LocalReclaim, N: Unsigned> Clone for Owned<T, R, N> {
 // Send & Sync
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-unsafe impl<T, R: LocalReclaim, N: Unsigned> Send for Owned<T, R, N> where T: Send {}
-unsafe impl<T, R: LocalReclaim, N: Unsigned> Sync for Owned<T, R, N> where T: Sync {}
+unsafe impl<T, R: Reclaim, N: Unsigned> Send for Owned<T, R, N> where T: Send {}
+unsafe impl<T, R: Reclaim, N: Unsigned> Sync for Owned<T, R, N> where T: Sync {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // MarkedPointer
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
     impl_trait!(owned);
 }
 
@@ -44,7 +46,7 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Owned<T, R, N> {
 // inherent
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> Owned<T, R, N> {
     /// Allocates memory for a [`Record<T>`](Record) on the heap and then
     /// places a record with a default header and `owned` into it.
     ///
@@ -240,14 +242,14 @@ impl<T, R: LocalReclaim, N: Unsigned> Owned<T, R, N> {
 // AsRef & AsMut
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> AsRef<T> for Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> AsRef<T> for Owned<T, R, N> {
     #[inline]
     fn as_ref(&self) -> &T {
         &**self
     }
 }
 
-impl<T, R: LocalReclaim, N: Unsigned> AsMut<T> for Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> AsMut<T> for Owned<T, R, N> {
     #[inline]
     fn as_mut(&mut self) -> &mut T {
         &mut **self
@@ -258,14 +260,14 @@ impl<T, R: LocalReclaim, N: Unsigned> AsMut<T> for Owned<T, R, N> {
 // Borrow & BorrowMut
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> Borrow<T> for Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> Borrow<T> for Owned<T, R, N> {
     #[inline]
     fn borrow(&self) -> &T {
         &**self
     }
 }
 
-impl<T, R: LocalReclaim, N: Unsigned> BorrowMut<T> for Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> BorrowMut<T> for Owned<T, R, N> {
     #[inline]
     fn borrow_mut(&mut self) -> &mut T {
         &mut **self
@@ -276,7 +278,7 @@ impl<T, R: LocalReclaim, N: Unsigned> BorrowMut<T> for Owned<T, R, N> {
 // Default
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T: Default, R: LocalReclaim, N: Unsigned> Default for Owned<T, R, N> {
+impl<T: Default, R: Reclaim, N: Unsigned> Default for Owned<T, R, N> {
     #[inline]
     fn default() -> Self {
         Owned::new(T::default())
@@ -287,7 +289,7 @@ impl<T: Default, R: LocalReclaim, N: Unsigned> Default for Owned<T, R, N> {
 // Deref & DerefMut
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> Deref for Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> Deref for Owned<T, R, N> {
     type Target = T;
 
     #[inline]
@@ -296,7 +298,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Deref for Owned<T, R, N> {
     }
 }
 
-impl<T, R: LocalReclaim, N: Unsigned> DerefMut for Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> DerefMut for Owned<T, R, N> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.inner.as_mut() }
@@ -307,7 +309,7 @@ impl<T, R: LocalReclaim, N: Unsigned> DerefMut for Owned<T, R, N> {
 // Drop
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> Drop for Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> Drop for Owned<T, R, N> {
     #[inline]
     fn drop(&mut self) {
         unsafe {
@@ -321,7 +323,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Drop for Owned<T, R, N> {
 // From
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> From<T> for Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> From<T> for Owned<T, R, N> {
     #[inline]
     fn from(owned: T) -> Self {
         Owned::new(owned)
@@ -332,7 +334,7 @@ impl<T, R: LocalReclaim, N: Unsigned> From<T> for Owned<T, R, N> {
 // Debug & Pointer
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> fmt::Debug for Owned<T, R, N>
+impl<T, R: Reclaim, N: Unsigned> fmt::Debug for Owned<T, R, N>
 where
     T: fmt::Debug,
 {
@@ -343,7 +345,7 @@ where
     }
 }
 
-impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Owned<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)
@@ -354,7 +356,7 @@ impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Owned<T, R, N> {
 // NonNullable
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> NonNullable for Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> NonNullable for Owned<T, R, N> {
     type Item = T;
     type MarkBits = N;
 
@@ -370,7 +372,7 @@ impl<T, R: LocalReclaim, N: Unsigned> NonNullable for Owned<T, R, N> {
 // Internal
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> Internal for Owned<T, R, N> {}
+impl<T, R: Reclaim, N: Unsigned> Internal for Owned<T, R, N> {}
 
 #[cfg(test)]
 mod test {

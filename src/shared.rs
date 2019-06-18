@@ -1,3 +1,5 @@
+//! Inherent implementation and trait implementations for the [`Shared`] type.
+
 use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Deref;
@@ -5,7 +7,7 @@ use core::ops::Deref;
 use typenum::Unsigned;
 
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
-use crate::{LocalReclaim, Shared, Unprotected};
+use crate::{Reclaim, Shared, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Copy & Clone
@@ -24,7 +26,7 @@ impl<'g, T, R, N> Copy for Shared<'g, T, R, N> {}
 // MarkedPointer
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Shared<'g, T, R, N> {
+impl<'g, T, R: Reclaim, N: Unsigned> MarkedPointer for Shared<'g, T, R, N> {
     impl_trait!(shared);
 }
 
@@ -32,7 +34,7 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> MarkedPointer for Shared<'g, T, R, N> 
 // inherent
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
+impl<'g, T, R: Reclaim, N: Unsigned> Shared<'g, T, R, N> {
     impl_inherent!(shared);
 
     /// Decomposes the marked reference, returning the reference itself and the
@@ -84,7 +86,7 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> Shared<'g, T, R, N> {
 // AsRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<'g, T, R: LocalReclaim, N: Unsigned> AsRef<T> for Shared<'g, T, R, N> {
+impl<'g, T, R: Reclaim, N: Unsigned> AsRef<T> for Shared<'g, T, R, N> {
     #[inline]
     fn as_ref(&self) -> &T {
         unsafe { self.inner.as_ref() }
@@ -95,7 +97,7 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> AsRef<T> for Shared<'g, T, R, N> {
 // Deref
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<'g, T, R: LocalReclaim, N: Unsigned> Deref for Shared<'g, T, R, N> {
+impl<'g, T, R: Reclaim, N: Unsigned> Deref for Shared<'g, T, R, N> {
     type Target = T;
 
     #[inline]
@@ -108,7 +110,7 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> Deref for Shared<'g, T, R, N> {
 // Debug & Pointer
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<'g, T, R: LocalReclaim, N: Unsigned> fmt::Debug for Shared<'g, T, R, N> {
+impl<'g, T, R: Reclaim, N: Unsigned> fmt::Debug for Shared<'g, T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (ptr, tag) = self.inner.decompose();
@@ -116,7 +118,7 @@ impl<'g, T, R: LocalReclaim, N: Unsigned> fmt::Debug for Shared<'g, T, R, N> {
     }
 }
 
-impl<'g, T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Shared<'g, T, R, N> {
+impl<'g, T, R: Reclaim, N: Unsigned> fmt::Pointer for Shared<'g, T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)

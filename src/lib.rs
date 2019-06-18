@@ -55,7 +55,7 @@
 //! The [`Option`] and [`Marked`] wrapper types are used to ensure `null`
 //! pointer safety.
 //! Under these circumstances, memory-unsafety (e.g. use-after-free errors) can
-//! only be introduced by incorrectly [`retiring`][LocalReclaim::retire_local]
+//! only be introduced by incorrectly [`retiring`][Reclaim::retire_local]
 //! (and hence reclaiming) memory, which is consequently `unsafe`.
 //!
 //! # Marked Pointer & Reference Types
@@ -115,6 +115,36 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
+#[macro_use]
+mod macros;
+
+pub mod align;
+pub mod leak;
+pub mod prelude {
+    //! Useful and/or required types, discriminants and traits for the `reclaim`
+    //! crate.
+
+    pub use crate::atomic::{LoadProtected, LoadRegionProtected};
+
+    pub use crate::pointer::{
+        Marked::{self, Null, Value},
+        MarkedPointer, NonNullable,
+    };
+
+    pub use crate::GlobalReclaim;
+    pub use crate::Protect;
+    pub use crate::ProtectRegion;
+    pub use crate::Reclaim;
+}
+
+mod atomic;
+mod owned;
+mod pointer;
+mod retired;
+mod shared;
+mod unlinked;
+mod unprotected;
+
 use core::fmt;
 use core::marker::PhantomData;
 use core::ptr::NonNull;
@@ -129,33 +159,6 @@ pub use typenum;
 use memoffset::offset_of;
 use typenum::Unsigned;
 
-#[macro_use]
-mod macros;
-
-pub mod align;
-pub mod leak;
-pub mod prelude {
-    //! Useful and/or required types, discriminants and traits for the `reclaim`
-    //! crate.
-
-    pub use crate::pointer::{
-        Marked::{self, Null, Value},
-        MarkedPointer, NonNullable,
-    };
-
-    pub use crate::LocalReclaim;
-    pub use crate::Protect;
-    pub use crate::Reclaim;
-}
-
-mod atomic;
-mod owned;
-mod pointer;
-mod retired;
-mod shared;
-mod unlinked;
-mod unprotected;
-
 pub use crate::atomic::{Atomic, CompareExchangeFailure};
 pub use crate::pointer::{
     AtomicMarkedPtr, InvalidNullError, Marked, MarkedNonNull, MarkedPointer, MarkedPtr, NonNullable,
@@ -169,18 +172,18 @@ pub use crate::retired::Retired;
 /// A trait for retiring and reclaiming entries removed from concurrent
 /// collections and data structures.
 ///
-/// Implementing this trait requires first implementing the [`LocalReclaim`]
+/// Implementing this trait requires first implementing the [`Reclaim`]
 /// trait for the same type and is usually only possible in `std` environments
 /// with access to thread local storage.
-pub unsafe trait Reclaim
+pub unsafe trait GlobalReclaim
 where
-    Self: LocalReclaim,
+    Self: Reclaim,
 {
     /// Retires a record and caches it **at least** until it is safe to
     /// deallocate it.
     ///
     /// For further information, refer to the documentation of
-    /// [`retire_local`][`LocalReclaim::retire_local`].
+    /// [`retire_local`][`Reclaim::retire_local`].
     ///
     /// # Safety
     ///
@@ -192,18 +195,18 @@ where
     /// deallocate it.
     ///
     /// For further information, refer to the documentation of
-    /// [`retire_local_unchecked`][`LocalReclaim::retire_local_unchecked`].
+    /// [`retire_local_unchecked`][`Reclaim::retire_local_unchecked`].
     ///
     /// # Safety
     ///
-    /// The same caveats as with [`retire_local`][`LocalReclaim::retire_local`]
+    /// The same caveats as with [`retire_local`][`Reclaim::retire_local`]
     /// apply.
     unsafe fn retire_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, Self, N>);
 }
 
-unsafe impl<R> Reclaim for R
+unsafe impl<R> GlobalReclaim for R
 where
-    R: LocalReclaim<Local = ()>,
+    R: Reclaim<Local = ()>,
 {
     #[inline]
     unsafe fn retire<T: 'static, N: Unsigned>(unlinked: Unlinked<T, Self, N>) {
@@ -217,10 +220,10 @@ where
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// RetireLocal (trait)
+// Reclaim (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A trait, which constitutes the foundation for the [`Reclaim`] trait.
+/// A trait, which constitutes the foundation for the [`GlobalReclaim`] trait.
 ///
 /// This trait is specifically intended to be fully compatible with `#[no_std]`
 /// environments.
@@ -234,13 +237,16 @@ where
 /// Note, that this will generally require more and also more frequent
 /// synchronization.
 /// For cases in which `Local` is defined to be `()`, there exists a blanket
-/// implementation of [`Reclaim].
-pub unsafe trait LocalReclaim
+/// implementation of [`GlobalReclaim].
+pub unsafe trait Reclaim
 where
     Self: Sized,
 {
     // TODO: type Allocator: Alloc + Default???;
     // TODO: type Guarded<T, const N: usize>: Protect<Item = T, MARK_BITS = N>;
+
+    /// TODO: Docs...
+    type Guard: Protect;
 
     /// The type used for storing all relevant thread local state.
     type Local: Sized;
@@ -315,7 +321,7 @@ where
     ///
     /// # Safety
     ///
-    /// The same restrictions as with the [`retire_local`][LocalReclaim::retire_local]
+    /// The same restrictions as with the [`retire_local`][Reclaim::retire_local]
     /// function apply here as well.
     ///
     /// In addition to these invariants, this method additionally requires the
@@ -339,24 +345,10 @@ where
 /// from reclamation during the lifetime of the protecting *guard*.
 pub unsafe trait Protect
 where
-    Self: Sized + Clone,
+    Self: Clone + Drop + Sized,
 {
-    /// The type of the value protected from reclamation
-    type Item: Sized;
     /// The reclamation scheme associated with this type of guard
-    type Reclaimer: LocalReclaim;
-    /// The Number of bits available for storing additional information
-    type MarkBits: Unsigned;
-
-    /// Returns an optional [`Shared`] reference to the protected value, which
-    /// is tied to the lifetime of `&self`.
-    fn shared(&self) -> Option<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>> {
-        self.marked().value()
-    }
-
-    /// Returns a  [`Shared`] reference wrapped in a [`Marked`] for the
-    /// protected value, which is tied to the lifetime of `&self`.
-    fn marked(&self) -> Marked<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>;
+    type Reclaimer: Reclaim;
 
     /// Atomically takes a snapshot of `atomic` and returns a protected
     /// [`Shared`] reference wrapped in a [`Marked`] to it.
@@ -372,11 +364,11 @@ where
     ///
     /// [release]: core::sync::atomic::Ordering::Release
     /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
-    fn acquire(
+    fn protect<T, N: Unsigned>(
         &mut self,
-        atomic: &Atomic<Self::Item, Self::Reclaimer, Self::MarkBits>,
+        atomic: &Atomic<T, Self::Reclaimer, N>,
         order: Ordering,
-    ) -> Marked<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>;
+    ) -> Marked<Shared<T, Self::Reclaimer, N>>;
 
     /// Atomically takes a snapshot of `atomic` and returns a protected
     /// [`Shared`] reference wrapped in a [`Marked`] to it, **if** the loaded
@@ -401,22 +393,35 @@ where
     ///
     /// [release]: core::sync::atomic::Ordering::Release
     /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
-    fn acquire_if_equal(
+    fn protect_if_equal<T, N: Unsigned>(
         &mut self,
-        atomic: &Atomic<Self::Item, Self::Reclaimer, Self::MarkBits>,
-        expected: MarkedPtr<Self::Item, Self::MarkBits>,
+        atomic: &Atomic<T, Self::Reclaimer, N>,
+        expected: MarkedPtr<T, N>,
         order: Ordering,
-    ) -> AcquireResult<Self::Item, Self::Reclaimer, Self::MarkBits>;
-
-    /// Clears the current internal value and its protected state.
-    ///
-    /// Subsequent calls to [`shared`][Protect::shared] and [`marked`][Protect::marked]
-    /// must return [`None`] and [`Null`][Marked::Null], respectively.
-    fn release(&mut self);
+    ) -> AcquireResult<T, Self::Reclaimer, N>;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// ProtectRegion (trait)
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO: Docs...
+pub unsafe trait ProtectRegion
+where
+    Self: Protect,
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// AcquireResult
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Result type for [`acquire_if_equal`][Protect::acquire_if_equal] operations.
 pub type AcquireResult<'g, T, R, N> = Result<Marked<Shared<'g, T, R, N>>, NotEqualError>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// NotEqualError
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A zero-size marker type that represents the failure state of an
 /// [`acquire_if_equal`][Protect::acquire_if_equal] operation.
@@ -444,14 +449,14 @@ impl Error for NotEqualError {}
 /// The record and its header are never directly exposed to the data structure
 /// using a given memory reclamation scheme and should only be accessed by the
 /// reclamation scheme itself.
-pub struct Record<T, R: LocalReclaim> {
+pub struct Record<T, R: Reclaim> {
     /// The record's header
     header: R::RecordHeader,
     /// The record's wrapped (inner) element
     elem: T,
 }
 
-impl<T, R: LocalReclaim> Record<T, R> {
+impl<T, R: Reclaim> Record<T, R> {
     /// Creates a new record with the specified `elem` and a default header.
     #[inline]
     pub fn new(elem: T) -> Self {
@@ -557,10 +562,10 @@ impl<T, R: LocalReclaim> Record<T, R> {
 /// A pointer type for heap allocated values similar to `Box`.
 ///
 /// `Owned` values function like marked pointers and are also guaranteed to
-/// allocate the appropriate [`RecordHeader`][LocalReclaim::RecordHeader] type
-/// for its generic [`LocalReclaim`] parameter alongside their actual content.
+/// allocate the appropriate [`RecordHeader`][Reclaim::RecordHeader] type
+/// for its generic [`Reclaim`] parameter alongside their actual content.
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
-pub struct Owned<T, R: LocalReclaim, N: Unsigned> {
+pub struct Owned<T, R: Reclaim, N: Unsigned> {
     inner: MarkedNonNull<T, N>,
     _marker: PhantomData<(T, R)>,
 }
@@ -598,7 +603,7 @@ pub struct Shared<'g, T, R, N> {
 /// results in a memory leak.
 ///
 /// The safety invariants around retiring `Unlinked` references are explained
-/// in detail in the documentation for [`retire_local`][LocalReclaim::retire_local].
+/// in detail in the documentation for [`retire_local`][Reclaim::retire_local].
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
 #[must_use = "unlinked values are meant to be retired, otherwise a memory leak is highly likely"]
 pub struct Unlinked<T, R, N> {

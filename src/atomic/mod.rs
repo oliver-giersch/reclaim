@@ -1,3 +1,7 @@
+mod compare;
+mod load;
+mod store;
+
 use core::fmt;
 use core::marker::PhantomData;
 use core::sync::atomic::Ordering;
@@ -6,7 +10,10 @@ use typenum::Unsigned;
 
 use crate::leak::Leaking;
 use crate::pointer::{AtomicMarkedPtr, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
-use crate::{LocalReclaim, NotEqualError, Owned, Protect, Shared, Unlinked, Unprotected};
+use crate::{NotEqualError, Owned, Protect, Reclaim, Shared, Unlinked, Unprotected};
+
+pub use self::load::{LoadProtected, LoadRegionProtected};
+use self::{compare::Compare, store::Store};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Atomic
@@ -28,8 +35,8 @@ pub struct Atomic<T, R, N> {
     _marker: PhantomData<(T, R)>,
 }
 
-unsafe impl<T, R: LocalReclaim, N: Unsigned> Send for Atomic<T, R, N> where T: Send + Sync {}
-unsafe impl<T, R: LocalReclaim, N: Unsigned> Sync for Atomic<T, R, N> where T: Send + Sync {}
+unsafe impl<T, R: Reclaim, N: Unsigned> Send for Atomic<T, R, N> where T: Send + Sync {}
+unsafe impl<T, R: Reclaim, N: Unsigned> Sync for Atomic<T, R, N> where T: Send + Sync {}
 
 impl<T, R, N> Atomic<T, R, N> {
     /// Creates a new `null` pointer.
@@ -45,7 +52,7 @@ impl<T, R, N> Atomic<T, R, N> {
     }
 }
 
-impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
     /// Allocates a new [`Owned`] containing the given `val` and immediately
     /// storing it an `Atomic`.
     #[inline]
@@ -144,6 +151,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         self.load_marked_unprotected(order).value()
     }
 
+    /*
     /// Loads a value from the pointer and stores it within `guard`.
     ///
     /// If the loaded value is non-null, the value is guaranteed to be protected
@@ -166,9 +174,10 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Option<Shared<'g, T, R, N>> {
-        guard.acquire(&self, order).value()
-    }
+        guard.protect(&self, order).value()
+    }*/
 
+    /*
     /// Loads a value from the pointer and stores it within `guard`.
     /// The protected [`Shared`] value is wrapped in a [`Marked].
     ///
@@ -188,9 +197,10 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Marked<Shared<'g, T, R, N>> {
-        guard.acquire(&self, order)
-    }
+        guard.protect(&self, order)
+    }*/
 
+    /*
     /// Loads a value from the pointer and stores it within `guard`, but only if
     /// the loaded value equals `expected`.
     ///
@@ -215,7 +225,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Result<Option<Shared<'g, T, R, N>>, NotEqualError> {
-        guard.acquire_if_equal(self, expected, order).map(|marked| marked.value())
+        guard.protect_if_equal(self, expected, order).map(|marked| marked.value())
     }
 
     /// Loads a value wrapped in a [`Marked] from the pointer and stores it
@@ -242,8 +252,8 @@ impl<T, R: LocalReclaim, N: Unsigned> Atomic<T, R, N> {
         order: Ordering,
         guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
     ) -> Result<Marked<Shared<'g, T, R, N>>, NotEqualError> {
-        guard.acquire_if_equal(self, expected, order)
-    }
+        guard.protect_if_equal(self, expected, order)
+    }*/
 
     /// Stores either `null` or a valid pointer to an owned heap allocated value
     /// into the pointer.
@@ -467,7 +477,7 @@ impl<T, N: Unsigned> Atomic<T, Leaking, N> {
 // Default
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> Default for Atomic<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> Default for Atomic<T, R, N> {
     #[inline]
     fn default() -> Self {
         Self::null()
@@ -478,14 +488,14 @@ impl<T, R: LocalReclaim, N: Unsigned> Default for Atomic<T, R, N> {
 // From
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> From<T> for Atomic<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> From<T> for Atomic<T, R, N> {
     #[inline]
     fn from(val: T) -> Self {
         Self::new(val)
     }
 }
 
-impl<T, R: LocalReclaim, N: Unsigned> From<Owned<T, R, N>> for Atomic<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> From<Owned<T, R, N>> for Atomic<T, R, N> {
     #[inline]
     fn from(owned: Owned<T, R, N>) -> Self {
         Self { inner: AtomicMarkedPtr::from(Owned::into_marked_ptr(owned)), _marker: PhantomData }
@@ -496,7 +506,7 @@ impl<T, R: LocalReclaim, N: Unsigned> From<Owned<T, R, N>> for Atomic<T, R, N> {
 // Debug & Pointer
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> fmt::Debug for Atomic<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> fmt::Debug for Atomic<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (ptr, tag) = self.inner.load(Ordering::SeqCst).decompose();
@@ -504,7 +514,7 @@ impl<T, R: LocalReclaim, N: Unsigned> fmt::Debug for Atomic<T, R, N> {
     }
 }
 
-impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Atomic<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Atomic<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.load(Ordering::SeqCst), f)
@@ -520,7 +530,7 @@ impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Atomic<T, R, N> {
 #[derive(Debug)]
 pub struct CompareExchangeFailure<T, R, S, N>
 where
-    R: LocalReclaim,
+    R: Reclaim,
     S: Store<Item = T, MarkBits = N, Reclaimer = R>,
     N: Unsigned,
 {
@@ -530,100 +540,4 @@ where
     pub input: S,
     // prevents construction outside of the current module
     _marker: PhantomData<R>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Store (trait)
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Trait for pointer types that can be stored in an `Atomic`.
-pub trait Store: MarkedPointer + Sized {
-    type Reclaimer: LocalReclaim;
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> Store for Owned<T, R, N> {
-    type Reclaimer = R;
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> Store for Option<Owned<T, R, N>> {
-    type Reclaimer = R;
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> Store for Marked<Owned<T, R, N>> {
-    type Reclaimer = R;
-}
-
-impl<'g, T, R: LocalReclaim, N: Unsigned> Store for Shared<'g, T, R, N> {
-    type Reclaimer = R;
-}
-
-impl<'g, T, R: LocalReclaim, N: Unsigned> Store for Option<Shared<'g, T, R, N>> {
-    type Reclaimer = R;
-}
-
-impl<'g, T, R: LocalReclaim, N: Unsigned> Store for Marked<Shared<'g, T, R, N>> {
-    type Reclaimer = R;
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> Store for Unlinked<T, R, N> {
-    type Reclaimer = R;
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> Store for Option<Unlinked<T, R, N>> {
-    type Reclaimer = R;
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> Store for Marked<Unlinked<T, R, N>> {
-    type Reclaimer = R;
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> Store for Unprotected<T, R, N> {
-    type Reclaimer = R;
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> Store for Option<Unprotected<T, R, N>> {
-    type Reclaimer = R;
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> Store for Marked<Unprotected<T, R, N>> {
-    type Reclaimer = R;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Compare (trait)
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait Compare: MarkedPointer + Sized {
-    type Reclaimer: LocalReclaim;
-    type Unlinked: MarkedPointer<Item = Self::Item, MarkBits = Self::MarkBits>;
-}
-
-impl<'g, T, R: LocalReclaim, N: Unsigned> Compare for Shared<'g, T, R, N> {
-    type Reclaimer = R;
-    type Unlinked = Unlinked<T, R, N>;
-}
-
-impl<'g, T, R: LocalReclaim, N: Unsigned> Compare for Option<Shared<'g, T, R, N>> {
-    type Reclaimer = R;
-    type Unlinked = Option<Unlinked<T, R, N>>;
-}
-
-impl<'g, T, R: LocalReclaim, N: Unsigned> Compare for Marked<Shared<'g, T, R, N>> {
-    type Reclaimer = R;
-    type Unlinked = Marked<Unlinked<T, R, N>>;
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> Compare for Unprotected<T, R, N> {
-    type Reclaimer = R;
-    type Unlinked = Unlinked<T, R, N>;
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> Compare for Option<Unprotected<T, R, N>> {
-    type Reclaimer = R;
-    type Unlinked = Option<Unlinked<T, R, N>>;
-}
-
-impl<T, R: LocalReclaim, N: Unsigned> Compare for Marked<Unprotected<T, R, N>> {
-    type Reclaimer = R;
-    type Unlinked = Marked<Unlinked<T, R, N>>;
 }

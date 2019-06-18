@@ -1,3 +1,5 @@
+//! Inherent implementation and trait implementations for the [`Unlinked`] type.
+
 use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Deref;
@@ -5,13 +7,13 @@ use core::ops::Deref;
 use typenum::Unsigned;
 
 use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
-use crate::{LocalReclaim, Reclaim, Unlinked, Unprotected};
+use crate::{GlobalReclaim, Reclaim, Unlinked, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // MarkedPointer
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unlinked<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> MarkedPointer for Unlinked<T, R, N> {
     impl_trait!(unlinked);
 }
 
@@ -19,7 +21,7 @@ impl<T, R: LocalReclaim, N: Unsigned> MarkedPointer for Unlinked<T, R, N> {
 // inherent
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
     impl_inherent!(unlinked);
 
     /// Decomposes the marked reference, returning the reference itself and the
@@ -79,7 +81,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Unlinked<T, R, N> {
     }
 }
 
-impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
+impl<T, R: GlobalReclaim, N: Unsigned> Unlinked<T, R, N> {
     /// Retires a record by calling [`retire`][retire] on the generic
     /// reclamation parameter `R`.
     ///
@@ -129,7 +131,7 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
 // AsRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> AsRef<T> for Unlinked<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> AsRef<T> for Unlinked<T, R, N> {
     #[inline]
     fn as_ref(&self) -> &T {
         unsafe { self.inner.as_ref() }
@@ -140,7 +142,7 @@ impl<T, R: LocalReclaim, N: Unsigned> AsRef<T> for Unlinked<T, R, N> {
 // Deref
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> Deref for Unlinked<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> Deref for Unlinked<T, R, N> {
     type Target = T;
 
     #[inline]
@@ -153,7 +155,7 @@ impl<T, R: LocalReclaim, N: Unsigned> Deref for Unlinked<T, R, N> {
 // Debug & Pointer
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T, R: LocalReclaim, N: Unsigned> fmt::Debug for Unlinked<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> fmt::Debug for Unlinked<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (ptr, tag) = self.inner.decompose();
@@ -161,7 +163,7 @@ impl<T, R: LocalReclaim, N: Unsigned> fmt::Debug for Unlinked<T, R, N> {
     }
 }
 
-impl<T, R: LocalReclaim, N: Unsigned> fmt::Pointer for Unlinked<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Unlinked<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.inner.decompose_ptr(), f)

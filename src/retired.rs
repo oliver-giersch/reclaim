@@ -7,7 +7,7 @@ use core::ptr::NonNull;
 #[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
 
-use crate::{LocalReclaim, Record};
+use crate::{Reclaim, Record};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Retired
@@ -16,7 +16,7 @@ use crate::{LocalReclaim, Record};
 /// A type-erased fat pointer to a retired record.
 pub struct Retired<R>(NonNull<dyn Any + 'static>, PhantomData<R>);
 
-impl<R: LocalReclaim + 'static> Retired<R> {
+impl<R: Reclaim + 'static> Retired<R> {
     /// Creates a new [`Retired`] record from a raw pointer.
     ///
     /// # Safety
@@ -72,41 +72,41 @@ impl<R: LocalReclaim + 'static> Retired<R> {
 // cmp
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<R: LocalReclaim + 'static> PartialEq for Retired<R> {
+impl<R: Reclaim + 'static> PartialEq for Retired<R> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.as_ptr().eq(&other.as_ptr())
     }
 }
 
-impl<R: LocalReclaim + 'static> PartialOrd for Retired<R> {
+impl<R: Reclaim + 'static> PartialOrd for Retired<R> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         self.as_ptr().partial_cmp(&other.as_ptr())
     }
 }
 
-impl<R: LocalReclaim + 'static> Ord for Retired<R> {
+impl<R: Reclaim + 'static> Ord for Retired<R> {
     #[inline]
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.as_ptr().cmp(&other.as_ptr())
     }
 }
 
-impl<R: LocalReclaim + 'static> Eq for Retired<R> {}
+impl<R: Reclaim + 'static> Eq for Retired<R> {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // fmt
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<R: LocalReclaim + 'static> fmt::Debug for Retired<R> {
+impl<R: Reclaim + 'static> fmt::Debug for Retired<R> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Retired").field("address", &self.as_ptr()).finish()
     }
 }
 
-impl<R: LocalReclaim + 'static> fmt::Display for Retired<R> {
+impl<R: Reclaim + 'static> fmt::Display for Retired<R> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&self.as_ptr(), f)

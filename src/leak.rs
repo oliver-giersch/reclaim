@@ -6,7 +6,7 @@ use core::sync::atomic::Ordering;
 use typenum::Unsigned;
 
 use crate::pointer::{Marked, MarkedPointer, MarkedPtr};
-use crate::{AcquireResult, LocalReclaim, Protect, Reclaim};
+use crate::{AcquireResult, GlobalReclaim, Protect, Reclaim};
 
 /// An [`Atomic`][crate::Atomic] type that uses the no-op [`Leaking`]
 /// "reclamation" scheme.
@@ -81,7 +81,7 @@ impl Default for Header {
     }
 }
 
-unsafe impl LocalReclaim for Leaking {
+unsafe impl Reclaim for Leaking {
     type Local = ();
 
     #[cfg(test)]
@@ -122,7 +122,7 @@ unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
 
     /// Acquires a value from shared memory.
     #[inline]
-    fn acquire(
+    fn protect(
         &mut self,
         atomic: &Atomic<Self::Item, Self::MarkBits>,
         order: Ordering,
@@ -133,7 +133,7 @@ unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
 
     /// Acquires a value from shared memory if it equals `expected`.
     #[inline]
-    fn acquire_if_equal(
+    fn protect_if_equal(
         &mut self,
         atomic: &Atomic<Self::Item, Self::MarkBits>,
         expected: MarkedPtr<Self::Item, Self::MarkBits>,
