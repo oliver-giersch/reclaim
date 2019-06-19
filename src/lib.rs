@@ -138,6 +138,7 @@ pub mod prelude {
 }
 
 mod atomic;
+mod fuse;
 mod owned;
 mod pointer;
 mod retired;

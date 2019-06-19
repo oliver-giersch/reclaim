@@ -1,4 +1,3 @@
-use core::marker::PhantomData;
 use core::sync::atomic::Ordering;
 
 use typenum::Unsigned;
@@ -6,7 +5,7 @@ use typenum::Unsigned;
 use crate::atomic::Atomic;
 use crate::pointer::Internal;
 use crate::{
-    AcquireResult, Marked, MarkedNonNull, MarkedPtr, NotEqualError, Protect, ProtectRegion,
+    AcquireResult, Marked, MarkedPointer, MarkedPtr, NotEqualError, Protect, ProtectRegion,
     Reclaim, Shared,
 };
 
@@ -19,20 +18,21 @@ pub trait LoadProtected
 where
     Self: Internal + Sized,
 {
-    /// TODO: Docs...
+    /// The type of the value protected from reclamation
     type Item: Sized;
 
-    /// TODO: Docs...
+    /// The reclamation scheme associated with this type of guard
     type Reclaimer: Reclaim;
 
-    /// TODO: Docs...
+    /// The Number of bits available for storing additional information
     type MarkBits: Unsigned;
 
-    /// Loads a value from the pointer and `guard` to protect it.
+    /// Loads a value from the pointer and uses `guard` to protect it.
     ///
     /// If the loaded value is non-null, the value is guaranteed to be protected
-    /// from reclamation during the lifetime of `guard`. This method
-    /// internally relies on [`protect`](crate::Protect::protect).
+    /// from reclamation during the lifetime of `guard` or until the guard is
+    /// used to protect a different value.
+    /// This method internally relies on [`protect`](crate::Protect::protect).
     ///
     /// `load` takes an [`Ordering`][ordering] argument, which describes the
     /// memory ordering of this operation.
@@ -52,27 +52,65 @@ where
         self.load_marked(order, guard).value()
     }
 
-    /// TODO: Docs...
+    /// Loads a value from the pointer and uses `guard` to protect it, but only
+    /// if the loaded value equals `expected`.
+    ///
+    /// If the loaded value is non-null, the value is guaranteed to be protected
+    /// from reclamation during the lifetime of `guard` or until the guard is
+    /// used to protect a different value.
+    /// This method internally relies on [`protect`](crate::Protect::protect).
+    ///
+    /// `load_if_equal` takes an [`Ordering`][ordering] argument, which
+    /// describes the memory ordering of this operation.
+    ///
+    /// # Panics
+    ///
+    /// *May* panic if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
     fn load_if_equal<'g>(
         &self,
         expected: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
         guard: &'g mut impl Protect<Reclaimer = Self::Reclaimer>,
-    ) -> Result<Option<Shared<'g, T, R, N>>, NotEqualError> {
+    ) -> Result<Option<Shared<'g, Self::Item, Self::Reclaimer, Self::MarkBits>>, NotEqualError>
+    {
         self.load_marked_if_equal(expected, order, guard).map(Marked::value)
     }
 
+    /// Loads a value from the pointer and uses `guard` to protect it.
+    /// The (optional) protected [`Shared`] value is wrapped in a [`Marked].
+    ///
+    /// If the loaded value is non-null, the value is guaranteed to be protected
+    /// from reclamation during the lifetime of `guard` or until the guard is
+    /// used to protect a different value.
+    /// This method internally relies on [`protect`](crate::Protect::protect).
+    ///
+    /// `load_marked` takes an [`Ordering`][ordering] argument, which describes
+    /// the memory ordering of this operation.
+    ///
+    /// # Panics
+    ///
+    /// *May* panic if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
     fn load_marked<'g>(
         &self,
         order: Ordering,
         guard: &'g mut impl Protect<Reclaimer = Self::Reclaimer>,
     ) -> Marked<Shared<'g, Self::Item, Self::Reclaimer, Self::MarkBits>>;
 
-    /// Loads a value wrapped in a [`Marked] from the pointer and stores it
-    /// within `guard`, but only if the loaded value equals `expected`.
+    /// Loads a value from the pointer and uses `guard` to protect it, but only
+    /// if the loaded value equals `expected`.
+    /// The (optional) protected [`Shared`] value is wrapped in a [`Marked].
     ///
     /// If the loaded value is non-null, the value is guaranteed to be protected
-    /// from reclamation for as long as it is stored within `guard`. This method
+    /// from reclamation during the lifetime of `guard` or until the guard is
+    /// used to protect a different value.
     /// internally calls [`acquire_if_equal`][Protect::acquire_if_equal].
     ///
     /// `load_if_equal` takes an [`Ordering`][ordering] argument, which
@@ -127,22 +165,22 @@ impl<T, R: Reclaim, N: Unsigned> LoadProtected for Atomic<T, R, N> {
 pub trait LoadRegionProtected
 where
     Self: Internal + Sized,
-    Self::Reclaimer::Guard: ProtectRegion,
+    <Self::Reclaimer as Reclaim>::Guard: ProtectRegion,
 {
-    /// TODO: Docs...
+    /// The type of the value protected from reclamation
     type Item: Sized;
 
-    /// TODO: Docs...
+    /// The reclamation scheme associated with this type of guard
     type Reclaimer: Reclaim;
 
-    /// TODO: Docs...
+    /// The Number of bits available for storing additional information
     type MarkBits: Unsigned;
 
     /// TODO: Docs...
     fn load<'g>(
         &self,
         order: Ordering,
-        guard: &'g Self::Reclaimer::Guard,
+        guard: &'g impl Protect<Reclaimer = Self::Reclaimer>,
     ) -> Option<Shared<'g, Self::Item, Self::Reclaimer, Self::MarkBits>> {
         self.load_marked(order, guard).value()
     }
@@ -153,7 +191,8 @@ where
         expected: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
         guard: &'g impl Protect<Reclaimer = Self::Reclaimer>,
-    ) -> Result<Option<Shared<'g, T, R, N>>, NotEqualError> {
+    ) -> Result<Option<Shared<'g, Self::Item, Self::Reclaimer, Self::MarkBits>>, NotEqualError>
+    {
         self.load_marked_if_equal(expected, order, guard).map(Marked::value)
     }
 
@@ -161,7 +200,7 @@ where
     fn load_marked<'g>(
         &self,
         order: Ordering,
-        _: &'g Self::Reclaimer::Guard,
+        _: &'g impl Protect<Reclaimer = Self::Reclaimer>,
     ) -> Marked<Shared<'g, Self::Item, Self::Reclaimer, Self::MarkBits>>;
 
     /// Loads a value wrapped in a [`Marked] from the pointer and stores it
@@ -185,7 +224,7 @@ where
         &self,
         expected: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
-        guard: &'g impl Protect<Reclaimer = Self::Reclaimer>,
+        _: &'g impl Protect<Reclaimer = Self::Reclaimer>,
     ) -> AcquireResult<'g, Self::Item, Self::Reclaimer, Self::MarkBits>;
 }
 
@@ -201,18 +240,22 @@ where
     fn load_marked<'g>(
         &self,
         order: Ordering,
-        _: &'g Self::Reclaimer::Guard,
+        _: &'g impl Protect<Reclaimer = Self::Reclaimer>,
     ) -> Marked<Shared<'g, Self::Item, Self::Reclaimer, Self::MarkBits>> {
-        MarkedNonNull::new(self.load_raw(order))
-            .map(|ptr| Shared { inner: ptr, _marker: PhantomData })
+        unsafe { Marked::from_marked_ptr(self.load_raw(order)) }
     }
 
+    #[inline]
     fn load_marked_if_equal<'g>(
         &self,
         expected: MarkedPtr<Self::Item, Self::MarkBits>,
         order: Ordering,
-        guard: &'g mut impl Protect<Reclaimer = Self::Reclaimer>,
-    ) -> Result<Marked<Shared<Self::Item, Self::Reclaimer, Self::MarkBits>>, NotEqualError> {
-        unimplemented!()
+        _: &'g impl Protect<Reclaimer = Self::Reclaimer>,
+    ) -> Result<Marked<Shared<'g, Self::Item, Self::Reclaimer, Self::MarkBits>>, NotEqualError>
+    {
+        match self.load_raw(order) {
+            raw if raw == expected => Ok(unsafe { Marked::from_marked_ptr(self.load_raw(order)) }),
+            _ => Err(NotEqualError),
+        }
     }
 }

@@ -6,7 +6,7 @@ use core::sync::atomic::Ordering;
 use typenum::Unsigned;
 
 use crate::pointer::{Marked, MarkedPointer, MarkedPtr};
-use crate::{AcquireResult, GlobalReclaim, Protect, Reclaim};
+use crate::{AcquireResult, GlobalReclaim, Protect, ProtectRegion, Reclaim};
 
 /// An [`Atomic`][crate::Atomic] type that uses the no-op [`Leaking`]
 /// "reclamation" scheme.
@@ -40,32 +40,21 @@ impl Leaking {
     }
 }
 
-/// The corresponding guard type for the [`Leaking`](Leaking) type.
-///
-/// Since leaking reclamation is a no-op, this is just a thin wrapper
-/// for a marked pointer.
-pub struct LeakingGuard<T, N: Unsigned>(MarkedPtr<T, N>);
+/// The [`Guard`][Reclaim::Guard] type for the [`Leaking`] "reclamation".
+#[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Guard;
 
-impl<T, N: Unsigned> LeakingGuard<T, N> {
+impl Guard {
     /// Creates a new empty `LeakingGuard`.
     #[inline]
     pub fn new() -> Self {
-        Self(MarkedPtr::null())
+        Self
     }
 }
 
-impl<T, N: Unsigned> Clone for LeakingGuard<T, N> {
+impl Drop for Guard {
     #[inline]
-    fn clone(&self) -> Self {
-        Self(self.0)
-    }
-}
-
-impl<T, N: Unsigned> Default for LeakingGuard<T, N> {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
+    fn drop(&mut self) {}
 }
 
 #[cfg(test)]
@@ -82,6 +71,8 @@ impl Default for Header {
 }
 
 unsafe impl Reclaim for Leaking {
+    type Guard = Guard;
+
     type Local = ();
 
     #[cfg(test)]
@@ -108,49 +99,32 @@ unsafe impl Reclaim for Leaking {
     unsafe fn retire_local_unchecked<T, N: Unsigned>(_: &(), _: Unlinked<T, N>) {}
 }
 
-unsafe impl<T, N: Unsigned> Protect for LeakingGuard<T, N> {
-    type Item = T;
+unsafe impl Protect for Guard {
     type Reclaimer = Leaking;
-    type MarkBits = N;
-
-    /// Returns a [`Shared`] reference wrapped in a [`Marked`] for the protected
-    /// value, which is tied to the lifetime of `self`.
-    #[inline]
-    fn marked(&self) -> Marked<Shared<Self::Item, Self::MarkBits>> {
-        unsafe { Marked::from_marked_ptr(self.0) }
-    }
 
     /// Acquires a value from shared memory.
     #[inline]
-    fn protect(
+    fn protect<T, N: Unsigned>(
         &mut self,
-        atomic: &Atomic<Self::Item, Self::MarkBits>,
+        atomic: &Atomic<T, N>,
         order: Ordering,
-    ) -> Marked<Shared<Self::Item, Self::MarkBits>> {
-        self.0 = atomic.load_raw(order);
-        unsafe { Marked::from_marked_ptr(self.0) }
+    ) -> Marked<Shared<T, N>> {
+        unsafe { Marked::from_marked_ptr(atomic.load_raw(order)) }
     }
 
     /// Acquires a value from shared memory if it equals `expected`.
     #[inline]
-    fn protect_if_equal(
+    fn protect_if_equal<T, N: Unsigned>(
         &mut self,
-        atomic: &Atomic<Self::Item, Self::MarkBits>,
-        expected: MarkedPtr<Self::Item, Self::MarkBits>,
+        atomic: &Atomic<T, N>,
+        expected: MarkedPtr<T, N>,
         order: Ordering,
-    ) -> AcquireResult<Self::Item, Self::Reclaimer, Self::MarkBits> {
+    ) -> AcquireResult<T, Self::Reclaimer, N> {
         match atomic.load_raw(order) {
-            marked if marked == expected => {
-                self.0 = marked;
-                unsafe { Ok(Marked::from_marked_ptr(marked)) }
-            }
+            raw if raw == expected => Ok(unsafe { Marked::from_marked_ptr(raw) }),
             _ => Err(crate::NotEqualError),
         }
     }
-
-    /// Discards the current value, replacing it with `null`.
-    #[inline]
-    fn release(&mut self) {
-        self.0 = MarkedPtr::null();
-    }
 }
+
+unsafe impl ProtectRegion for Guard {}

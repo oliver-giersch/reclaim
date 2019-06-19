@@ -9,8 +9,8 @@ use core::sync::atomic::Ordering;
 use typenum::Unsigned;
 
 use crate::leak::Leaking;
-use crate::pointer::{AtomicMarkedPtr, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
-use crate::{NotEqualError, Owned, Protect, Reclaim, Shared, Unlinked, Unprotected};
+use crate::pointer::{AtomicMarkedPtr, Internal, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
+use crate::{Owned, Reclaim, Shared, Unlinked, Unprotected};
 
 pub use self::load::{LoadProtected, LoadRegionProtected};
 use self::{compare::Compare, store::Store};
@@ -520,6 +520,12 @@ impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Atomic<T, R, N> {
         fmt::Pointer::fmt(&self.inner.load(Ordering::SeqCst), f)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// impl Internal
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, R: Reclaim, N: Unsigned> Internal for Atomic<T, R, N> {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CompareExchangeFailure
