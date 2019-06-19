@@ -57,16 +57,17 @@ impl<'g, T, R: Reclaim, N: Unsigned> Shared<'g, T, R, N> {
     /// ```
     /// use core::sync::atomic::Ordering::Relaxed;
     ///
+    /// use reclaim::prelude::*;
     /// use reclaim::typenum::U0;
     /// use reclaim::leak::Shared;
     ///
     /// type Atomic<T> = reclaim::leak::Atomic<T, U0>;
-    /// type Guarded<T> = reclaim::leak::LeakingGuard<T, U0>;
+    /// type Guard = reclaim::leak::Guard;
     ///
     /// let atomic = Atomic::new("string");
     ///
-    /// let mut guarded = Guarded::new();
-    /// let shared = atomic.load(Relaxed, &mut guarded);
+    /// let mut guard = Guard::new();
+    /// let shared = atomic.load(Relaxed, &mut guard);
     ///
     /// let reference = Shared::into_ref(shared.unwrap());
     /// assert_eq!(reference, &"string");

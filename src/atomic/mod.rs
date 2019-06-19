@@ -1,5 +1,5 @@
 mod compare;
-mod load;
+mod guard;
 mod store;
 
 use core::fmt;
@@ -10,10 +10,9 @@ use typenum::Unsigned;
 
 use crate::leak::Leaking;
 use crate::pointer::{AtomicMarkedPtr, Internal, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
-use crate::{Owned, Reclaim, Shared, Unlinked, Unprotected};
+use crate::{AcquireResult, NotEqualError, Owned, Reclaim, Shared, Unlinked, Unprotected};
 
-pub use self::load::{LoadProtected, LoadRegionProtected};
-use self::{compare::Compare, store::Store};
+use self::{compare::Compare, guard::Guard, store::Store};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Atomic
@@ -149,6 +148,48 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
     #[inline]
     pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, R, N>> {
         self.load_marked_unprotected(order).value()
+    }
+
+    /// TODO: Docs...
+    #[inline]
+    pub fn load<'g>(
+        &self,
+        order: Ordering,
+        guard: impl Guard<'g, Reclaimer = R>,
+    ) -> Option<Shared<'g, T, R, N>> {
+        guard.load_protected(self, order).value()
+    }
+
+    /// TODO: Docs...
+    #[inline]
+    pub fn load_if_equal<'g>(
+        &self,
+        expected: MarkedPtr<T, N>,
+        order: Ordering,
+        guard: impl Guard<'g, Reclaimer = R>,
+    ) -> Result<Option<Shared<'g, T, R, N>>, NotEqualError> {
+        guard.load_protected_if_equal(self, expected, order).map(Marked::value)
+    }
+
+    /// TODO: Docs...
+    #[inline]
+    pub fn load_marked<'g>(
+        &self,
+        order: Ordering,
+        guard: impl Guard<'g, Reclaimer = R>,
+    ) -> Marked<Shared<'g, T, R, N>> {
+        guard.load_protected(self, order)
+    }
+
+    /// TODO: Docs...
+    #[inline]
+    pub fn load_marked_if_equal<'g>(
+        &self,
+        expected: MarkedPtr<T, N>,
+        order: Ordering,
+        guard: impl Guard<'g, Reclaimer = R>,
+    ) -> AcquireResult<'g, T, R, N> {
+        guard.load_protected_if_equal(self, expected, order)
     }
 
     /*

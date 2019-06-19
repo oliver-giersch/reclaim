@@ -124,8 +124,6 @@ pub mod prelude {
     //! Useful and/or required types, discriminants and traits for the `reclaim`
     //! crate.
 
-    pub use crate::atomic::{LoadProtected, LoadRegionProtected};
-
     pub use crate::pointer::{
         Marked::{self, Null, Value},
         MarkedPointer, NonNullable,
@@ -138,7 +136,6 @@ pub mod prelude {
 }
 
 mod atomic;
-mod fuse;
 mod owned;
 mod pointer;
 mod retired;
