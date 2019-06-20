@@ -6,6 +6,7 @@ use core::ptr::NonNull;
 
 use typenum::{IsGreaterOrEqual, True, Unsigned};
 
+use crate::internal::Internal;
 use crate::pointer::{
     self, InvalidNullError,
     Marked::{self, Null, Value},
@@ -383,6 +384,12 @@ impl<T, N: Unsigned> NonNullable for MarkedNonNull<T, N> {
         self
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Internal
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T, N: Unsigned> Internal for MarkedNonNull<T, N> {}
 
 #[cfg(test)]
 mod tests {

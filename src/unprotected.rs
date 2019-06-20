@@ -3,7 +3,8 @@ use core::marker::PhantomData;
 
 use typenum::Unsigned;
 
-use crate::pointer::{Internal, Marked, MarkedNonNull, MarkedPointer, NonNullable};
+use crate::internal::Internal;
+use crate::pointer::{Marked, MarkedNonNull, MarkedPointer, NonNullable};
 use crate::{Reclaim, Shared, Unprotected};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

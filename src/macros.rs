@@ -1,3 +1,7 @@
+//! Macros for implementing common functionality and traits for the marked
+//! pointer types with identical internal structure (Owned, Shared, Unlinked and
+//! Unprotected)
+
 macro_rules! impl_trait {
     ($self:ident) => {
         type Pointer = Self;

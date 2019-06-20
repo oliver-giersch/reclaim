@@ -7,28 +7,13 @@ use core::sync::atomic::Ordering;
 use typenum::Unsigned;
 
 use crate::atomic::Atomic;
+use crate::internal::Guard;
 use crate::pointer::{Marked, MarkedPointer, MarkedPtr};
-use crate::{AcquireResult, Protect, ProtectRegion, Reclaim, Shared};
+use crate::{AcquireResult, Protect, ProtectRegion, Shared};
 
-/// TODO: Docs...
-pub trait Guard<'g> {
-    /// TODO: Docs...
-    type Reclaimer: Reclaim;
-
-    /// TODO: Docs...
-    fn load_protected<T, N: Unsigned>(
-        self,
-        atomic: &Atomic<T, Self::Reclaimer, N>,
-        order: Ordering,
-    ) -> Marked<Shared<'g, T, Self::Reclaimer, N>>;
-
-    fn load_protected_if_equal<T, N: Unsigned>(
-        self,
-        atomic: &Atomic<T, Self::Reclaimer, N>,
-        expected: MarkedPtr<T, N>,
-        order: Ordering,
-    ) -> AcquireResult<'g, T, Self::Reclaimer, N>;
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Guard (trait)
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'g, G> Guard<'g> for &'g mut G
 where

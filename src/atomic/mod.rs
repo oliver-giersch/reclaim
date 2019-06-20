@@ -8,11 +8,10 @@ use core::sync::atomic::Ordering;
 
 use typenum::Unsigned;
 
+use crate::internal::{Compare, Guard, Internal, Store};
 use crate::leak::Leaking;
-use crate::pointer::{AtomicMarkedPtr, Internal, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
+use crate::pointer::{AtomicMarkedPtr, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
 use crate::{AcquireResult, NotEqualError, Owned, Reclaim, Shared, Unlinked, Unprotected};
-
-use self::{compare::Compare, guard::Guard, store::Store};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Atomic
@@ -100,6 +99,30 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
         self.inner.load(order)
     }
 
+    /// Loads an optional [`Unprotected`] reference from the `Atomic`.
+    ///
+    /// The returned reference is explicitly **not** protected from reclamation,
+    /// meaning another thread could free the value's memory at any time.
+    ///
+    /// This method is similar to [`load_raw`][Atomic::load_raw], but the
+    /// resulting [`Unprotected`] type has stronger guarantees than a raw
+    /// [`MarkedPtr`].
+    /// It can be useful to load an unprotected pointer if that pointer does not
+    /// need to be de-referenced, but is only used to reinsert it in a different
+    /// spot, which is e.g. done when removing a value from a linked list.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
+    #[inline]
+    pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, R, N>> {
+        self.load_marked_unprotected(order).value()
+    }
+
     /// Loads an [`Unprotected`] reference wrapped in a [`Marked`] from the
     /// `Atomic`.
     ///
@@ -126,78 +149,10 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
             .map(|ptr| Unprotected { inner: ptr, _marker: PhantomData })
     }
 
-    /// Loads an optional [`Unprotected`] reference from the `Atomic`.
-    ///
-    /// The returned reference is explicitly **not** protected from reclamation,
-    /// meaning another thread could free the value's memory at any time.
-    ///
-    /// This method is similar to [`load_raw`][Atomic::load_raw], but the
-    /// resulting [`Unprotected`] type has stronger guarantees than a raw
-    /// [`MarkedPtr`].
-    /// It can be useful to load an unprotected pointer if that pointer does not
-    /// need to be de-referenced, but is only used to reinsert it in a different
-    /// spot, which is e.g. done when removing a value from a linked list.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
-    ///
-    /// [ordering]: core::sync::atomic::Ordering
-    /// [release]: core::sync::atomic::Ordering::Release
-    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
-    #[inline]
-    pub fn load_unprotected(&self, order: Ordering) -> Option<Unprotected<T, R, N>> {
-        self.load_marked_unprotected(order).value()
-    }
-
-    /// TODO: Docs...
-    #[inline]
-    pub fn load<'g>(
-        &self,
-        order: Ordering,
-        guard: impl Guard<'g, Reclaimer = R>,
-    ) -> Option<Shared<'g, T, R, N>> {
-        guard.load_protected(self, order).value()
-    }
-
-    /// TODO: Docs...
-    #[inline]
-    pub fn load_if_equal<'g>(
-        &self,
-        expected: MarkedPtr<T, N>,
-        order: Ordering,
-        guard: impl Guard<'g, Reclaimer = R>,
-    ) -> Result<Option<Shared<'g, T, R, N>>, NotEqualError> {
-        guard.load_protected_if_equal(self, expected, order).map(Marked::value)
-    }
-
-    /// TODO: Docs...
-    #[inline]
-    pub fn load_marked<'g>(
-        &self,
-        order: Ordering,
-        guard: impl Guard<'g, Reclaimer = R>,
-    ) -> Marked<Shared<'g, T, R, N>> {
-        guard.load_protected(self, order)
-    }
-
-    /// TODO: Docs...
-    #[inline]
-    pub fn load_marked_if_equal<'g>(
-        &self,
-        expected: MarkedPtr<T, N>,
-        order: Ordering,
-        guard: impl Guard<'g, Reclaimer = R>,
-    ) -> AcquireResult<'g, T, R, N> {
-        guard.load_protected_if_equal(self, expected, order)
-    }
-
-    /*
-    /// Loads a value from the pointer and stores it within `guard`.
+    /// Loads a value from the pointer and uses `guard` to protect it.
     ///
     /// If the loaded value is non-null, the value is guaranteed to be protected
-    /// from reclamation for as long as it is stored within `guard`. This method
-    /// internally relies on [`acquire`](crate::Protect::acquire).
+    /// from reclamation during the lifetime of `guard`.
     ///
     /// `load` takes an [`Ordering`][ordering] argument, which describes the
     /// memory ordering of this operation.
@@ -213,41 +168,16 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
     pub fn load<'g>(
         &self,
         order: Ordering,
-        guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
+        guard: impl Guard<'g, Reclaimer = R>,
     ) -> Option<Shared<'g, T, R, N>> {
-        guard.protect(&self, order).value()
-    }*/
+        guard.load_protected(self, order).value()
+    }
 
-    /*
-    /// Loads a value from the pointer and stores it within `guard`.
-    /// The protected [`Shared`] value is wrapped in a [`Marked].
-    ///
-    /// `load_marked` takes an [`Ordering`][ordering] argument, which describes
-    /// the memory ordering of this operation.
-    ///
-    /// # Panics
-    ///
-    /// *May* panic if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
-    ///
-    /// [ordering]: core::sync::atomic::Ordering
-    /// [release]: core::sync::atomic::Ordering::Release
-    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
-    #[inline]
-    pub fn load_marked<'g>(
-        &self,
-        order: Ordering,
-        guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
-    ) -> Marked<Shared<'g, T, R, N>> {
-        guard.protect(&self, order)
-    }*/
-
-    /*
-    /// Loads a value from the pointer and stores it within `guard`, but only if
-    /// the loaded value equals `expected`.
+    /// Loads a value from the pointer and uses `guard` to protect it, but only
+    /// if the loaded value equals `expected`.
     ///
     /// If the loaded value is non-null, the value is guaranteed to be protected
-    /// from reclamation for as long as it is stored within `guard`. This method
-    /// internally calls [`acquire_if_equal`][Protect::acquire_if_equal].
+    /// from reclamation during the lifetime of `guard`.
     ///
     /// `load_if_equal` takes an [`Ordering`][ordering] argument, which
     /// describes the memory ordering of this operation.
@@ -264,19 +194,52 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
         &self,
         expected: MarkedPtr<T, N>,
         order: Ordering,
-        guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
+        guard: impl Guard<'g, Reclaimer = R>,
     ) -> Result<Option<Shared<'g, T, R, N>>, NotEqualError> {
-        guard.protect_if_equal(self, expected, order).map(|marked| marked.value())
+        guard.load_protected_if_equal(self, expected, order).map(Marked::value)
     }
 
-    /// Loads a value wrapped in a [`Marked] from the pointer and stores it
-    /// within `guard`, but only if the loaded value equals `expected`.
+    /// Loads a value from the pointer and uses `guard` to protect it.
+    /// The (optional) protected [`Shared`] value is wrapped in a [`Marked].
     ///
     /// If the loaded value is non-null, the value is guaranteed to be protected
-    /// from reclamation for as long as it is stored within `guard`. This method
-    /// internally calls [`acquire_if_equal`][Protect::acquire_if_equal].
+    /// from reclamation during the lifetime of `guard`.
     ///
-    /// `load_if_equal` takes an [`Ordering`][ordering] argument, which
+    /// The primary difference to [`load`][Atomic::load] is, that the returned
+    /// [`Marked`] type is additionally able to represent marked `null`
+    /// pointers.
+    ///
+    /// `load_marked` takes an [`Ordering`][ordering] argument, which describes
+    /// the memory ordering of this operation.
+    ///
+    /// # Panics
+    ///
+    /// *May* panic if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
+    #[inline]
+    pub fn load_marked<'g>(
+        &self,
+        order: Ordering,
+        guard: impl Guard<'g, Reclaimer = R>,
+    ) -> Marked<Shared<'g, T, R, N>> {
+        guard.load_protected(self, order)
+    }
+
+    /// Loads a value from the pointer and uses `guard` to protect it, but only
+    /// if the loaded value equals `expected`.
+    /// The (optional) protected [`Shared`] value is wrapped in a [`Marked].
+    ///
+    /// If the loaded value is non-null, the value is guaranteed to be protected
+    /// from reclamation during the lifetime of `guard`.
+    ///
+    /// The primary difference to [`load_if_equal`][Atomic::load_if_equal] is,
+    /// that the returned [`Marked`] type is additionally able to represent
+    /// marked `null` pointers.
+    ///
+    /// `load_marked_if_equal` takes an [`Ordering`][ordering] argument, which
     /// describes the memory ordering of this operation.
     ///
     /// # Panics
@@ -291,10 +254,10 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
         &self,
         expected: MarkedPtr<T, N>,
         order: Ordering,
-        guard: &'g mut impl Protect<Item = T, MarkBits = N, Reclaimer = R>,
-    ) -> Result<Marked<Shared<'g, T, R, N>>, NotEqualError> {
-        guard.protect_if_equal(self, expected, order)
-    }*/
+        guard: impl Guard<'g, Reclaimer = R>,
+    ) -> AcquireResult<'g, T, R, N> {
+        guard.load_protected_if_equal(self, expected, order)
+    }
 
     /// Stores either `null` or a valid pointer to an owned heap allocated value
     /// into the pointer.
@@ -515,7 +478,7 @@ impl<T, N: Unsigned> Atomic<T, Leaking, N> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Default
+// impl Default
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: Reclaim, N: Unsigned> Default for Atomic<T, R, N> {
@@ -526,7 +489,7 @@ impl<T, R: Reclaim, N: Unsigned> Default for Atomic<T, R, N> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// From
+// impl From
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: Reclaim, N: Unsigned> From<T> for Atomic<T, R, N> {
@@ -544,7 +507,7 @@ impl<T, R: Reclaim, N: Unsigned> From<Owned<T, R, N>> for Atomic<T, R, N> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Debug & Pointer
+// impl Debug & Pointer
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, R: Reclaim, N: Unsigned> fmt::Debug for Atomic<T, R, N> {

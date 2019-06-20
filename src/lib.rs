@@ -136,6 +136,7 @@ pub mod prelude {
 }
 
 mod atomic;
+mod internal;
 mod owned;
 mod pointer;
 mod retired;
@@ -164,7 +165,7 @@ pub use crate::pointer::{
 pub use crate::retired::Retired;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Reclaim (trait)
+// GlobalReclaim (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A trait for retiring and reclaiming entries removed from concurrent
@@ -176,7 +177,14 @@ pub use crate::retired::Retired;
 pub unsafe trait GlobalReclaim
 where
     Self: Reclaim,
+    <Self as Reclaim>::Guard: Default,
 {
+    /// TODO: Docs...
+    #[inline]
+    fn guard() -> Self::Guard {
+        Self::Guard::default()
+    }
+
     /// Retires a record and caches it **at least** until it is safe to
     /// deallocate it.
     ///
@@ -205,6 +213,7 @@ where
 unsafe impl<R> GlobalReclaim for R
 where
     R: Reclaim<Local = ()>,
+    <R as Reclaim>::Guard: Default,
 {
     #[inline]
     unsafe fn retire<T: 'static, N: Unsigned>(unlinked: Unlinked<T, Self, N>) {

@@ -1,14 +1,6 @@
-use crate::pointer::{Marked, MarkedPointer};
+use crate::internal::Store;
+use crate::pointer::Marked;
 use crate::{Owned, Reclaim, Shared, Unlinked, Unprotected, Unsigned};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Store (trait)
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Trait for pointer types that can be stored in an `Atomic`.
-pub trait Store: MarkedPointer + Sized {
-    type Reclaimer: Reclaim;
-}
 
 impl<T, R: Reclaim, N: Unsigned> Store for Owned<T, R, N> {
     type Reclaimer = R;

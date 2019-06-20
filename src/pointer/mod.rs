@@ -1,18 +1,20 @@
+mod atomic;
+mod marked;
+mod non_null;
+mod raw;
+
+#[cfg(feature = "std")]
+use std::error::Error;
+
 use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
 use core::ptr::{self, NonNull};
 use core::sync::atomic::AtomicPtr;
 
-#[cfg(feature = "std")]
-use std::error::Error;
-
 use typenum::Unsigned;
 
-mod atomic;
-mod marked;
-mod non_null;
-mod raw;
+use crate::internal::Internal;
 
 use self::Marked::{Null, Value};
 
@@ -295,11 +297,11 @@ impl fmt::Display for InvalidNullError {
 impl Error for InvalidNullError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// internal traits
+// NonNullable (traits)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// An sealed (internal) marker trait for non-nullable pointer types.
-pub trait NonNullable: Sized {
+pub trait NonNullable: Sized + Internal {
     /// The pointed-to type.
     type Item: Sized;
     /// Number of bits available for tagging.
@@ -339,11 +341,8 @@ impl<'a, T> NonNullable for &'a mut T {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Internal (sealed trait)
+// impl Internal
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// A marker trait for internal traits.
-pub trait Internal {}
 
 impl<U, T, N: Unsigned> Internal for Option<U> where
     U: MarkedPointer<Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>

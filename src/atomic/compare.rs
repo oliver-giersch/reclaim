@@ -1,14 +1,6 @@
-use crate::pointer::{Marked, MarkedPointer};
+use crate::internal::Compare;
+use crate::pointer::Marked;
 use crate::{Reclaim, Shared, Unlinked, Unprotected, Unsigned};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Compare (trait)
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait Compare: MarkedPointer + Sized {
-    type Reclaimer: Reclaim;
-    type Unlinked: MarkedPointer<Item = Self::Item, MarkBits = Self::MarkBits>;
-}
 
 impl<'g, T, R: Reclaim, N: Unsigned> Compare for Shared<'g, T, R, N> {
     type Reclaimer = R;
