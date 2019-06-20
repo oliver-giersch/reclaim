@@ -441,6 +441,23 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
 }
 
 impl<T, N: Unsigned> Atomic<T, Leaking, N> {
+    /// Loads an optional [`Shared`] reference from the `Atomic`.
+    ///
+    /// Since [`Leaking`] never frees memory of retired records, this is always
+    /// safe even without any guards.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
+    ///
+    /// [ordering]: core::sync::atomic::Ordering
+    /// [release]: core::sync::atomic::Ordering::Release
+    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
+    #[inline]
+    pub fn load_shared(&self, order: Ordering) -> Option<Shared<T, Leaking, N>> {
+        self.load_marked_shared(order).value()
+    }
+
     /// Loads a [`Shared`] reference wrapped in a [`Marked`] from the `Atomic`.
     ///
     /// Since [`Leaking`] never frees memory of retired records, this is always
@@ -457,23 +474,6 @@ impl<T, N: Unsigned> Atomic<T, Leaking, N> {
     pub fn load_marked_shared(&self, order: Ordering) -> Marked<Shared<T, Leaking, N>> {
         MarkedNonNull::new(self.inner.load(order))
             .map(|ptr| Shared { inner: ptr, _marker: PhantomData })
-    }
-
-    /// Loads an optional [`Shared`] reference from the `Atomic`.
-    ///
-    /// Since [`Leaking`] never frees memory of retired records, this is always
-    /// safe even without any guards.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `order` is [`Release`][release] or [`AcqRel`][acq_rel].
-    ///
-    /// [ordering]: core::sync::atomic::Ordering
-    /// [release]: core::sync::atomic::Ordering::Release
-    /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
-    #[inline]
-    pub fn load_shared(&self, order: Ordering) -> Option<Shared<T, Leaking, N>> {
-        self.load_marked_shared(order).value()
     }
 }
 

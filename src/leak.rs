@@ -5,7 +5,7 @@ use core::sync::atomic::Ordering;
 
 use typenum::Unsigned;
 
-use crate::pointer::{Marked, MarkedPointer, MarkedPtr};
+use crate::pointer::{Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
 use crate::{AcquireResult, GlobalReclaim, Protect, ProtectRegion, Reclaim};
 
 /// An [`Atomic`][crate::Atomic] type that uses the no-op [`Leaking`]

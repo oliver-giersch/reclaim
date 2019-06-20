@@ -136,6 +136,7 @@ pub mod prelude {
 }
 
 mod atomic;
+mod guarded;
 mod internal;
 mod owned;
 mod pointer;
@@ -346,6 +347,21 @@ where
     /// The reclamation scheme associated with this type of guard
     type Reclaimer: Reclaim;
 
+    /// TODO: Docs...
+    #[inline]
+    fn try_into_guarded<T, N: Unsigned>(
+        mut self,
+        atomic: &Atomic<T, Self::Reclaimer, N>,
+        order: Ordering,
+    ) -> Result<Guarded<T, Self, N>, Self> {
+        if let Marked::Value(shared) = self.protect(atomic, order) {
+            let ptr = Shared::into_marked_non_null(shared);
+            Ok(Guarded { guard: self, ptr })
+        } else {
+            Err(self)
+        }
+    }
+
     /// Atomically takes a snapshot of `atomic` and returns a protected
     /// [`Shared`] reference wrapped in a [`Marked`] to it.
     ///
@@ -548,6 +564,31 @@ impl<T, R: Reclaim> Record<T, R> {
     #[inline]
     pub fn offset_elem() -> usize {
         offset_of!(Self, elem)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Guarded
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// TODO: Docs...
+#[derive(Debug)]
+pub struct Guarded<T, G, N: Unsigned> {
+    guard: G,
+    ptr: MarkedNonNull<T, N>,
+}
+
+impl<T, G: Protect, N: Unsigned> Guarded<T, G, N> {
+    /// TODO: Docs...
+    #[inline]
+    pub fn shared(&self) -> Shared<T, G::Reclaimer, N> {
+        Shared { inner: self.ptr, _marker: PhantomData }
+    }
+
+    /// TODO: Docs...
+    #[inline]
+    pub fn into_guard(self) -> G {
+        self.guard
     }
 }
 

@@ -187,7 +187,7 @@ where
 
     #[inline]
     fn unmarked(opt: Self) -> Self {
-        opt.map(|ptr| Self::Pointer::unmarked(ptr))
+        opt.map(Self::Pointer::unmarked)
     }
 
     #[inline]
@@ -203,9 +203,10 @@ where
 
     #[inline]
     unsafe fn from_marked_ptr(marked: MarkedPtr<Self::Item, Self::MarkBits>) -> Self {
-        match !marked.is_null() {
-            true => Some(Self::Pointer::from_marked_non_null(MarkedNonNull::new_unchecked(marked))),
-            false => None,
+        if !marked.is_null() {
+            Some(Self::Pointer::from_marked_non_null(MarkedNonNull::new_unchecked(marked)))
+        } else {
+            None
         }
     }
 
@@ -446,8 +447,8 @@ mod test {
         assert_eq!(super::compose::<_, U2>(reference, 0b11), (ptr | 0b11) as *mut _);
         assert_eq!(super::compose::<_, U2>(reference, 0b1111), (ptr | 0b11) as *mut _);
         assert_eq!(
-            super::compose::<Aligned64<u8>, U6>(ptr::null_mut(), 0b110101),
-            0b110101 as *mut Aligned64<u8>
+            super::compose::<Aligned64<u8>, U6>(ptr::null_mut(), 0b11_0101),
+            0b11_0101 as *mut Aligned64<u8>
         );
     }
 
