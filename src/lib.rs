@@ -89,11 +89,11 @@
 //! consistently used, which is summarized below:
 //!
 //! - record
-//!   
+//!
 //!   A heap allocated value which is managed by some reclamation scheme.
 //!
 //! - unlink
-//!   
+//!
 //!   The act removing the pointer to a *record* from shared memory through an
 //!   atomic operation such as *compare-and-swap*.
 //!
@@ -177,14 +177,7 @@ pub use crate::retired::Retired;
 pub unsafe trait GlobalReclaim
 where
     Self: Reclaim,
-    <Self as Reclaim>::Guard: Default,
 {
-    /// TODO: Docs...
-    #[inline]
-    fn guard() -> Self::Guard {
-        Self::Guard::default()
-    }
-
     /// Retires a record and caches it **at least** until it is safe to
     /// deallocate it.
     ///
@@ -213,7 +206,6 @@ where
 unsafe impl<R> GlobalReclaim for R
 where
     R: Reclaim<Local = ()>,
-    <R as Reclaim>::Guard: Default,
 {
     #[inline]
     unsafe fn retire<T: 'static, N: Unsigned>(unlinked: Unlinked<T, Self, N>) {
@@ -250,10 +242,7 @@ where
     Self: Sized,
 {
     // TODO: type Allocator: Alloc + Default???;
-    // TODO: type Guarded<T, const N: usize>: Protect<Item = T, MARK_BITS = N>;
-
-    /// TODO: Docs...
-    type Guard: Protect;
+    // TODO: type Guard<'a>: Protect;
 
     /// The type used for storing all relevant thread local state.
     type Local: Sized;
@@ -352,7 +341,7 @@ where
 /// from reclamation during the lifetime of the protecting *guard*.
 pub unsafe trait Protect
 where
-    Self: Clone + Drop + Sized,
+    Self: Clone + Sized,
 {
     /// The reclamation scheme associated with this type of guard
     type Reclaimer: Reclaim;

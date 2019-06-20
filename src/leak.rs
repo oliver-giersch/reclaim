@@ -52,11 +52,6 @@ impl Guard {
     }
 }
 
-impl Drop for Guard {
-    #[inline]
-    fn drop(&mut self) {}
-}
-
 #[cfg(test)]
 pub struct Header {
     pub checksum: usize,
@@ -71,8 +66,6 @@ impl Default for Header {
 }
 
 unsafe impl Reclaim for Leaking {
-    type Guard = Guard;
-
     type Local = ();
 
     #[cfg(test)]

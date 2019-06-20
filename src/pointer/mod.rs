@@ -19,71 +19,6 @@ use crate::internal::Internal;
 use self::Marked::{Null, Value};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// MarkedPtr
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// A raw, unsafe pointer type like `*mut T` in which up to `N` of the pointer's
-/// lower bits can be used to store additional information (the *tag*).
-///
-/// Note, that the upper bound for `N` is dictated by the alignment of `T`.
-/// A type with an alignment of `8` (e.g. a `usize` on 64-bit architectures) can
-/// have up to `3` mark bits.
-/// Attempts to use types with insufficient alignment will result in a compile-
-/// time error.
-pub struct MarkedPtr<T, N> {
-    inner: *mut T,
-    _marker: PhantomData<N>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// MarkedNonNull
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// A non-nullable marked raw pointer type like [`NonNull`](std::ptr::NonNull).
-///
-/// Note, that unlike [`MarkedPtr`][MarkedPtr] this also **excludes** marked
-/// null-pointers.
-pub struct MarkedNonNull<T, N> {
-    inner: NonNull<T>,
-    _marker: PhantomData<N>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// AtomicMarkedPtr
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// A raw pointer type which can be safely shared between threads, which
-/// can store additional information in its lower (unused) bits.
-///
-/// This type has the same in-memory representation as a *mut T. It is mostly
-/// identical to [`AtomicPtr`][atomic], except that all of its methods involve
-/// a [`MarkedPtr`][marked] instead of `*mut T`.
-///
-/// [atomic]: std::sync::atomic::AtomicPtr
-/// [marked]: MarkedPtr
-pub struct AtomicMarkedPtr<T, N> {
-    inner: AtomicPtr<T>,
-    _marker: PhantomData<N>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Marked
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// A value that represents the possible states of a nullable marked pointer.
-///
-/// This type is similar to [`Option<T>`][Option] but can also express `null`
-/// pointers with mark bits.
-#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum Marked<T: NonNullable> {
-    /// A marked, non-nullable pointer or reference value.
-    Value(T),
-    /// A null pointer that may be marked, in which case the `usize` is
-    /// non-zero.
-    Null(usize),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
 // MarkedPointer (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -147,6 +82,71 @@ pub trait MarkedPointer: Sized + Internal {
     /// The same caveats as with [`from_marked_ptr`][MarkedPointer::from_marked_ptr]
     /// apply as well.
     unsafe fn from_marked_non_null(marked: MarkedNonNull<Self::Item, Self::MarkBits>) -> Self;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// MarkedPtr
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A raw, unsafe pointer type like `*mut T` in which up to `N` of the pointer's
+/// lower bits can be used to store additional information (the *tag*).
+///
+/// Note, that the upper bound for `N` is dictated by the alignment of `T`.
+/// A type with an alignment of `8` (e.g. a `usize` on 64-bit architectures) can
+/// have up to `3` mark bits.
+/// Attempts to use types with insufficient alignment will result in a compile-
+/// time error.
+pub struct MarkedPtr<T, N> {
+    inner: *mut T,
+    _marker: PhantomData<N>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// MarkedNonNull
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A non-nullable marked raw pointer type like [`NonNull`](std::ptr::NonNull).
+///
+/// Note, that unlike [`MarkedPtr`][MarkedPtr] this also **excludes** marked
+/// null-pointers.
+pub struct MarkedNonNull<T, N> {
+    inner: NonNull<T>,
+    _marker: PhantomData<N>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// AtomicMarkedPtr
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A raw pointer type which can be safely shared between threads, which
+/// can store additional information in its lower (unused) bits.
+///
+/// This type has the same in-memory representation as a *mut T. It is mostly
+/// identical to [`AtomicPtr`][atomic], except that all of its methods involve
+/// a [`MarkedPtr`][marked] instead of `*mut T`.
+///
+/// [atomic]: std::sync::atomic::AtomicPtr
+/// [marked]: MarkedPtr
+pub struct AtomicMarkedPtr<T, N> {
+    inner: AtomicPtr<T>,
+    _marker: PhantomData<N>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Marked
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A value that represents the possible states of a nullable marked pointer.
+///
+/// This type is similar to [`Option<T>`][Option] but can also express `null`
+/// pointers with mark bits.
+#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum Marked<T: NonNullable> {
+    /// A marked, non-nullable pointer or reference value.
+    Value(T),
+    /// A null pointer that may be marked, in which case the `usize` is
+    /// non-zero.
+    Null(usize),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

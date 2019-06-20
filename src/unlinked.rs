@@ -82,10 +82,7 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
     }
 }
 
-impl<T, R: GlobalReclaim, N: Unsigned> Unlinked<T, R, N>
-where
-    <R as Reclaim>::Guard: Default,
-{
+impl<T, R: GlobalReclaim, N: Unsigned> Unlinked<T, R, N> {
     /// Retires a record by calling [`retire`][retire] on the generic
     /// reclamation parameter `R`.
     ///
