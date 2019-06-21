@@ -31,7 +31,7 @@
 //!
 //! Concurrent memory reclamation schemes work by granting every value
 //! (*record*) earmarked for deletion (*retired*) a certain **grace period**
-//! before being actually dropped and deallocated, during which it is cached and
+//! before being actually dropped and de-allocated, during which it is cached and
 //! can still be safely read by other threads with live references to it.
 //! How to determine the length of this grace period is up to each individual
 //! reclamation scheme.
@@ -136,7 +136,6 @@ pub mod prelude {
 }
 
 mod atomic;
-mod guarded;
 mod internal;
 mod owned;
 mod pointer;
@@ -179,6 +178,19 @@ pub unsafe trait GlobalReclaim
 where
     Self: Reclaim,
 {
+    /// The type used for protecting concurrently shared references.
+    type Guard: Protect + Default;
+
+    /// Creates a new [`Guard`][GlobalReclaim::Guard].
+    ///
+    /// When `Self::Guard` implements [`ProtectRegion`], this operation
+    /// instantly establishes protection for loaded values.
+    /// Otherwise, the guard must first explicitly protect a specific shared
+    /// value.
+    fn guard() -> Self::Guard {
+        Self::Guard::default()
+    }
+
     /// Retires a record and caches it **at least** until it is safe to
     /// deallocate it.
     ///
@@ -204,21 +216,6 @@ where
     unsafe fn retire_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, Self, N>);
 }
 
-unsafe impl<R> GlobalReclaim for R
-where
-    R: Reclaim<Local = ()>,
-{
-    #[inline]
-    unsafe fn retire<T: 'static, N: Unsigned>(unlinked: Unlinked<T, Self, N>) {
-        Self::retire_local(&(), unlinked)
-    }
-
-    #[inline]
-    unsafe fn retire_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, Self, N>) {
-        Self::retire_local_unchecked(&(), unlinked)
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Reclaim (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -242,9 +239,6 @@ pub unsafe trait Reclaim
 where
     Self: Sized,
 {
-    // TODO: type Allocator: Alloc + Default???;
-    // TODO: type Guard<'a>: Protect;
-
     /// The type used for storing all relevant thread local state.
     type Local: Sized;
 
@@ -338,8 +332,8 @@ where
 // Protect (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A trait applicable for pointer types that *protect* their pointed-to value
-/// from reclamation during the lifetime of the protecting *guard*.
+/// A trait for guard types that *protect* a specific value from reclamation
+/// during the lifetime of the protecting guard.
 pub unsafe trait Protect
 where
     Self: Clone + Sized,
@@ -347,7 +341,13 @@ where
     /// The reclamation scheme associated with this type of guard
     type Reclaimer: Reclaim;
 
-    /// TODO: Docs...
+    /// Converts the guard into a [`Guarded`] by fusing it with a value loaded
+    /// from `atomic`.
+    ///
+    /// # Errors
+    ///
+    /// If the value loaded from `atomic` is `null`, this method instead returns
+    /// `self` again, wrapped in an [`Err`].
     #[inline]
     fn try_into_guarded<T, N: Unsigned>(
         mut self,
@@ -361,6 +361,11 @@ where
             Err(self)
         }
     }
+
+    /// Releases any current protection that may be provided by the guard.
+    ///
+    /// If `Self` additionally implements [`ProtectRegion`], this is a no-op
+    fn release(&mut self);
 
     /// Atomically takes a snapshot of `atomic` and returns a protected
     /// [`Shared`] reference wrapped in a [`Marked`] to it.
@@ -417,7 +422,8 @@ where
 // ProtectRegion (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Docs...
+/// A trait for guard types that protect any values loaded during their
+/// existence and lifetime.
 pub unsafe trait ProtectRegion
 where
     Self: Protect,
@@ -571,7 +577,7 @@ impl<T, R: Reclaim> Record<T, R> {
 // Guarded
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Docs...
+/// A guard type fused with a protected value.
 #[derive(Debug)]
 pub struct Guarded<T, G, N: Unsigned> {
     guard: G,
@@ -579,16 +585,21 @@ pub struct Guarded<T, G, N: Unsigned> {
 }
 
 impl<T, G: Protect, N: Unsigned> Guarded<T, G, N> {
-    /// TODO: Docs...
+    /// Returns a [`Shared`] reference borrowed from the [`Guarded`].
     #[inline]
     pub fn shared(&self) -> Shared<T, G::Reclaimer, N> {
         Shared { inner: self.ptr, _marker: PhantomData }
     }
 
-    /// TODO: Docs...
+    /// Converts the [`Guarded`] into the internally stored guard.
+    ///
+    /// If `G` does not implement [`ProtectRegion`], the returned guard is
+    /// guaranteed to be [`released`][Protect::release] before being returned.
     #[inline]
     pub fn into_guard(self) -> G {
-        self.guard
+        let mut guard = self.guard;
+        guard.release();
+        guard
     }
 }
 

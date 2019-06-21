@@ -5,7 +5,7 @@ use core::sync::atomic::Ordering;
 
 use typenum::Unsigned;
 
-use crate::pointer::{Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
+use crate::pointer::{Marked, MarkedPointer, MarkedPtr};
 use crate::{AcquireResult, GlobalReclaim, Protect, ProtectRegion, Reclaim};
 
 /// An [`Atomic`][crate::Atomic] type that uses the no-op [`Leaking`]
@@ -65,6 +65,16 @@ impl Default for Header {
     }
 }
 
+unsafe impl GlobalReclaim for Leaking {
+    type Guard = Guard;
+
+    #[inline]
+    unsafe fn retire<T: 'static, N: Unsigned>(_: Unlinked<T, N>) {}
+
+    #[inline]
+    unsafe fn retire_unchecked<T, N: Unsigned>(_: Unlinked<T, N>) {}
+}
+
 unsafe impl Reclaim for Leaking {
     type Local = ();
 
@@ -94,6 +104,10 @@ unsafe impl Reclaim for Leaking {
 
 unsafe impl Protect for Guard {
     type Reclaimer = Leaking;
+
+    /// This is a no-op.
+    #[inline]
+    fn release(&mut self) {}
 
     /// Acquires a value from shared memory.
     #[inline]
