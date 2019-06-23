@@ -1,17 +1,18 @@
-//! An abstract & generalized interface supporting various schemes for
+//! A generic trait based interface for abstracting over various schemes for
 //! concurrent memory reclamation.
 //!
 //! # Memory Management in Rust
 //!
 //! Unlike garbage collected languages such as *Go* or *Java*, memory
-//! management in *Rust* is ultimately manual and more akin to *C++*.
+//! management in *Rust* is primarily scope or ownership based and more akin to
+//! *C++*.
 //! Rust's ownership model in combination with the standard library's smart
 //! pointer types `Box`, `Rc` and `Arc` make memory management as painless as
 //! possible and are able to handle the vast majority of use-cases, while at the
 //! same time preventing the classic memory bugs such as *use-after-free*,
-//! *double-free* or access to dangling pointers/references.
-//! Consequently, there is usually little need for the small additional comfort
-//! provided by a fully automated **Garbage Collector** (GC).
+//! *double-free* or memory leaks.
+//! Consequently, there is usually little need for the relatively small
+//! additional comfort provided by a fully automated **Garbage Collector** (GC).
 //!
 //! ## The Need for Automatic Memory Reclamation
 //!
@@ -19,11 +20,11 @@
 //! aforementioned memory management schemes are insufficient for determining,
 //! when a removed entry can be actually dropped and de-allocated:
 //! Just because an entry has been removed (*unlinked*) from some shared data
-//! structure does not guarantee, that no other thread could be in the process
-//! of reading that same entry at the same time.
-//! This is due to the possibility of stale references that were created before
-//! the unlinking occurred.
-//! The only thing that can be ascertained, due to nature of atomic *swap* and
+//! structure does not guarantee, that no other thread could still be in the
+//! process of reading that same entry at the same time.
+//! This is due to the possible existence of stale references that were created
+//! by other threads before the unlinking occurred.
+//! The only fact that can be ascertained, due to nature of atomic *swap* and
 //! *compare-and-swap* operations, is that other threads can not acquire *new*
 //! references after an entry has been unlinked.
 //!
@@ -31,12 +32,62 @@
 //!
 //! Concurrent memory reclamation schemes work by granting every value
 //! (*record*) earmarked for deletion (*retired*) a certain **grace period**
-//! before being actually dropped and de-allocated, during which it is cached and
-//! can still be safely read by other threads with live references to it.
-//! How to determine the length of this grace period is up to each individual
+//! before being actually dropped and de-allocated.
+//! During this period the value will be cached and can still be safely read by
+//! other threads with live references to it, but no new references must be
+//! possible.
+//! Determining the exact length of this grace period is up to each individual
 //! reclamation scheme.
+//! It is usually either not possible or not practical to determine the exact
+//! moment at which it becomes safe to reclaim a retired.
+//! Hence, reclamation schemes commonly tend to only guarantee grace periods
+//! that are *at least* as long as to ensure no references can possibly exist
+//! afterwards.
 //!
 //! # The Reclaim Interface
+//!
+//! Lock-free data structures are usually required to work on atomic pointers to
+//! heap allocated memory.
+//! This is due to the restrictions of atomic CPU instructions to machine-word
+//! sized values, such as pointers.
+//! Working with raw pointers is inherently *unsafe* in the Rust sense.
+//! Consequently, this crate avoids and discourages the use of raw pointers as
+//! much as possible in favor of safer abstractions with stricter constraints
+//! for their usage.
+//! In effect, the vast majority of this crate's public API is safe to use under
+//! any circumstances.
+//! This, however, is achieved by shifting and concentrating the burden of
+//! manually maintaining safety invariants into one specific key aspect:
+//! The retiring (and eventual reclamation) of records.
+//!
+//! ## Traits and Types
+//!
+//! The `reclaim` crate primarily exposes four different traits, which are
+//! relevant for users of generic code and implementors of reclamation schemes
+//! alike.
+//! The first trait is [`Reclaim`], which provides generic functionality for
+//! retiring records.
+//! Note, that this trait does not presume the presence of an operating system
+//! and functionality like thread local storage.
+//! Hence, this trait can even be used in `#[no_std]` environments.
+//! However, in order to use this trait's associated methods, an explicit
+//! reference to the current thread's (local) state is required.
+//! For environments with implicit access to thread local storage, the
+//! [`GlobalReclaim`] trait exists as an extension to [`Reclaim`].
+//! This trait additionally requires an associated type
+//! [`Guard`][GlobalReclaim::Guard], which must implement both the [`Default`]
+//! and the [`Protect`] trait.
+//!
+//! Types implementing the [`Protect`] trait can be used to safely read values
+//! from shared memory that are subsequently safe from concurrent reclamation
+//! and can hence be safely de-referenced.
+//! Note that a single guard can only protect one value at a time.
+//! This follows the design of many reclamation schemes, such as *hazard
+//! pointers*.
+//! This is represented by the requirement to pass a *mutable* reference to a
+//! guard in order to safely load a shared value.
+//!
+//! ...
 //!
 //! Due to the restrictions of atomic instructions to machine-word sized chunks
 //! of memory, lock-free data structures are necessarily required to work with
@@ -179,7 +230,7 @@ where
     Self: Reclaim,
 {
     /// The type used for protecting concurrently shared references.
-    type Guard: Protect + Default;
+    type Guard: Protect<Reclaimer = Self> + Default;
 
     /// Creates a new [`Guard`][GlobalReclaim::Guard].
     ///
@@ -237,7 +288,7 @@ where
 /// implementation of [`GlobalReclaim].
 pub unsafe trait Reclaim
 where
-    Self: Sized,
+    Self: Sized + 'static,
 {
     /// The type used for storing all relevant thread local state.
     type Local: Sized;

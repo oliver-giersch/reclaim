@@ -13,7 +13,13 @@ use crate::{AcquireResult, Reclaim, Shared};
 // Guard (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Docs...
+/// A sealed trait for abstracting over different types for valid guard values.
+///
+/// For guard types implementing only the [`Protect`](crate::Protect) trait,
+/// this trait is only implemented for *mutable* references to this type.
+/// For guard types that also implement the
+/// [`ProtectRegion`](crate::ProtectRegion) trait, this trait is also
+/// implemented for *shared* references.
 pub trait Guard<'g> {
     /// TODO: Docs...
     type Reclaimer: Reclaim;
@@ -37,6 +43,7 @@ pub trait Guard<'g> {
 // Compare (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// TODO: Docs...
 pub trait Compare: MarkedPointer + Sized {
     type Reclaimer: Reclaim;
     type Unlinked: MarkedPointer<Item = Self::Item, MarkBits = Self::MarkBits>;
