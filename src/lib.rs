@@ -420,6 +420,25 @@ where
 
 /// A trait for guard types that *protect* a specific value from reclamation
 /// during the lifetime of the protecting guard.
+///
+/// # Examples
+///
+/// ```
+/// use core::sync::atomic::Ordering::Relaxed;
+///
+/// use reclaim::typenum::U0;
+/// use reclaim::prelude::*;
+/// // `Leaking` implements both `Protect` and `ProtectRegion`
+/// use reclaim::leak::Guard;
+///
+/// type Atomic<T> = reclaim::leak::Atomic<T, U0>;
+///
+/// let atomic = Atomic::new(1);
+///
+/// let mut guard = Guard::new();
+/// let shared = atomic.load(Relaxed, &mut guard).unwrap();
+/// assert_eq!(&*shared, &1);
+/// ```
 pub unsafe trait Protect
 where
     Self: Clone + Sized,
@@ -512,6 +531,28 @@ where
 
 /// A trait for guard types that protect any values loaded during their
 /// existence and lifetime.
+///
+/// # Examples
+///
+/// ```
+/// use core::sync::atomic::Ordering::Relaxed;
+///
+/// use reclaim::typenum::U0;
+/// use reclaim::prelude::*;
+/// // `Leaking` implements both `Protect` and `ProtectRegion`
+/// use reclaim::leak::Guard;
+///
+/// type Atomic<T> = reclaim::leak::Atomic<T, U0>;
+///
+/// let atomic = Atomic::new(1);
+/// let other = Atomic::new(0);
+///
+/// let guard = Guard::new();
+/// let shared1 = atomic.load(Relaxed, &guard).unwrap();
+/// let shared0 = other.load(Relaxed, &guard).unwrap();
+/// assert_eq!(&*shared1, &1);
+/// assert_eq!(&*shared0, &0);
+/// ```
 pub unsafe trait ProtectRegion
 where
     Self: Protect,
