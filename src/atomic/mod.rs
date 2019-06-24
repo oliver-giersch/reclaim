@@ -58,6 +58,20 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
         Self::from(Owned::from(val))
     }
 
+    /// Creates a new [`Atomic`] from the given `ptr`.
+    ///
+    /// # Safety
+    ///
+    /// The given `ptr` argument must be a pointer to a valid heap allocated
+    /// instance of `T` that was allocated as part of a [`Record`][crate::Record],
+    /// e.g. through an [`Owned`].
+    /// The same pointer should also not be used to create more than one
+    /// [`Atomic`]s.
+    #[inline]
+    pub unsafe fn from_raw(ptr: MarkedPtr<T, N>) -> Self {
+        Self { inner: AtomicMarkedPtr::new(ptr), _marker: PhantomData }
+    }
+
     /// Loads a raw marked value from the pointer.
     ///
     /// `load_raw` takes an [`Ordering`][ordering] argument, which describes the
