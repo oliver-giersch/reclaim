@@ -87,29 +87,43 @@
 //! This is represented by the requirement to pass a *mutable* reference to a
 //! guard in order to safely load a shared value.
 //!
-//! ...
+//! Some reclamation schemes (e.g. epoch based ones) do not require individual
+//! protection of values, but instead protect arbitrary numbers of shared at
+//! once.
+//! The guard types for these schemes can additionally implement the
+//! [`ProtectRegion`] trait.
+//! Such guards do not have to carry any state and protect values simply by
+//! their existence.
+//! Consequently, it is also possible to call eg [`Atomic::load`] with a shared
+//! reference to a guard implementing that trait.
 //!
-//! Due to the restrictions of atomic instructions to machine-word sized chunks
-//! of memory, lock-free data structures are necessarily required to work with
-//! pointers as well, which is inherently unsafe.
-//! Nonetheless, this crate attempts to provide abstractions and an API that
-//! encapsulates this unsafety behind safe interface as much as possible.
-//! Consequently, the majority of functions and methods exposed are safe to call
-//! and can not lead to memory-unsafety.
+//! ## The `Atomic` Type
 //!
-//! This is primarily achieved by shifting the burden of explicitly maintaining
-//! safety invariants to the process of actually reclaiming allocated records.
-//! Also construction and insertion into shared variables ([`Atomic`]) is only
-//! safely allowed with *valid* (heap allocated) values.
-//! All values that are read from shared variables have reference semantics and
-//! are non-nullable, although not all types can be safely de-referenced.
-//! The [`Option`] and [`Marked`] wrapper types are used to ensure `null`
-//! pointer safety.
-//! Under these circumstances, memory-unsafety (e.g. use-after-free errors) can
-//! only be introduced by incorrectly [`retiring`][Reclaim::retire_local]
-//! (and hence reclaiming) memory, which is consequently `unsafe`.
+//! The [`Atomic`] markable concurrent pointer type is the main point of
+//! interaction with this crate.
+//! It can only be safely created as a `null` pointer or with valid heap
+//! allocation backing it up.
+//! It supports all common atomic operations like `load`, `store`,
+//! `compare_exchange`, etc.
+//! The key aspect of this type is that together with a guard, shared values
+//! can be safely loaded and de-referenced while other threads can concurrently
+//! reclaim removed values.
+//! In addition to the [`Shared`] type, which represents a shared reference that
+//! is protected from reclamation, other atomic operations can yield
+//! [`Unprotected`] or [`Unlinked`] values.
+//! The former are explicitly not protected from reclamation and can be loaded
+//! without any guards.
+//! They are not safe to de-reference, but can be used to e.g. swing a pointer
+//! from one linked list node to another.
+//! [`Unlinked`] values are the result of *swap* or *compare-and-swap*
+//! operations and represent values/references to which no new references can be
+//! acquired any more by other threads.
+//! They are like *owned* values that are also borrowed, since other threads may
+//! still reference them.
+//! All of these three different types are guaranteed to never be null at the
+//! type level.
 //!
-//! # Marked Pointer & Reference Types
+//! ## Marked Pointer & Reference Types
 //!
 //! It is a ubiquitous technique in lock-free programming to use the lower bits
 //! of a pointer address to store additional information alongside an address.
@@ -225,6 +239,27 @@ pub use crate::retired::Retired;
 /// Implementing this trait requires first implementing the [`Reclaim`]
 /// trait for the same type and is usually only possible in `std` environments
 /// with access to thread local storage.
+///
+/// # Examples
+///
+/// Defining a concurrent data structure generic over the employed reclamation
+/// scheme:
+///
+/// ```
+/// use reclaim::typenum::U0;
+/// use reclaim::GlobalReclaim;
+///
+/// type Atomic<T, R> = reclaim::Atomic<T, R, U0>;
+///
+/// pub struct Stack<T, R: GlobalReclaim> {
+///     head: Atomic<Node<T, R>, R>,
+/// }
+///
+/// struct Node<T, R: GlobalReclaim> {
+///     elem: T,
+///     next: Atomic<Node<T, R>, R>,
+/// }
+/// ```
 pub unsafe trait GlobalReclaim
 where
     Self: Reclaim,
@@ -335,7 +370,7 @@ where
     ///     .compare_exchange(expected, Owned::null(), Relaxed, Relaxed)
     ///     .unwrap();
     ///
-    /// unsafe { Unlinked::retire(unlinked) };
+    /// unsafe { unlinked.retire() };
     ///
     /// // thread 2
     /// if let Some(shared) = g.load(Relaxed, &mut guard) {
@@ -397,10 +432,10 @@ where
     ///
     /// # Errors
     ///
-    /// If the value loaded from `atomic` is `null`, this method instead returns
-    /// `self` again, wrapped in an [`Err`].
+    /// If the value loaded from `atomic` is `null`, this method instead `self`
+    /// again, wrapped in an [`Err`].
     #[inline]
-    fn try_into_guarded<T, N: Unsigned>(
+    fn try_fuse<T, N: Unsigned>(
         mut self,
         atomic: &Atomic<T, Self::Reclaimer, N>,
         order: Ordering,
@@ -415,6 +450,8 @@ where
 
     /// Releases any current protection that may be provided by the guard.
     ///
+    /// By borrowing `self` mutably it is ensured that no loaded values
+    /// protected by this guard can be used after calling this method.
     /// If `Self` additionally implements [`ProtectRegion`], this is a no-op
     fn release(&mut self);
 

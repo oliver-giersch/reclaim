@@ -21,10 +21,8 @@ use crate::{AcquireResult, Reclaim, Shared};
 /// [`ProtectRegion`](crate::ProtectRegion) trait, this trait is also
 /// implemented for *shared* references.
 pub trait Guard<'g> {
-    /// TODO: Docs...
     type Reclaimer: Reclaim;
 
-    /// TODO: Docs...
     fn load_protected<T, N: Unsigned>(
         self,
         atomic: &Atomic<T, Self::Reclaimer, N>,
@@ -43,7 +41,8 @@ pub trait Guard<'g> {
 // Compare (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Docs...
+/// Trait for pointer types that can be compared against in atomic
+/// *compare-and-swap* operations.
 pub trait Compare: MarkedPointer + Sized {
     type Reclaimer: Reclaim;
     type Unlinked: MarkedPointer<Item = Self::Item, MarkBits = Self::MarkBits>;
@@ -62,7 +61,6 @@ pub trait Store: MarkedPointer + Sized {
 // Internal (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// TODO: Docs...
 pub trait Internal {}
 
 impl<'a, T> Internal for &'a T {}

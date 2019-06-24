@@ -47,25 +47,20 @@ impl<T, R: GlobalReclaim> Stack<T, R> {
     pub fn pop(&self) -> Option<T> {
         let mut guard = R::guard();
 
-        loop {
-            match self.head.load(Relaxed, &mut guard) {
-                None => return None,
-                Some(head) => {
-                    let next = head.next.load_unprotected(Relaxed);
-                    if let Ok(unlinked) =
-                        self.head.compare_exchange_weak(head, next, Release, Relaxed)
-                    {
-                        unsafe {
-                            // the `Drop` code for T is never called for retired nodes, so it is
-                            // safe to use `retire_unchecked` and not require that `T: 'static`.
-                            let elem = ptr::read(&*unlinked.elem);
-                            unlinked.retire_unchecked();
-                            return Some(elem);
-                        }
-                    }
+        while let Some(head) = self.head.load(Relaxed, &mut guard) {
+            let next = head.next.load_unprotected(Relaxed);
+            if let Ok(unlinked) = self.head.compare_exchange_weak(head, next, Release, Relaxed) {
+                unsafe {
+                    // the `Drop` code for T is never called for retired nodes, so it is
+                    // safe to use `retire_unchecked` and not require that `T: 'static`.
+                    let elem = ptr::read(&*unlinked.elem);
+                    unlinked.retire_unchecked();
+                    return Some(elem);
                 }
             }
         }
+
+        None
     }
 }
 
@@ -81,12 +76,12 @@ impl<T, R: GlobalReclaim> Drop for Stack<T, R> {
 }
 
 #[derive(Debug)]
-struct Node<T, R> {
+struct Node<T, R: GlobalReclaim> {
     elem: ManuallyDrop<T>,
     next: Atomic<Node<T, R>, R>,
 }
 
-impl<T, R> Node<T, R> {
+impl<T, R: GlobalReclaim> Node<T, R> {
     #[inline]
     fn new(elem: T) -> Self {
         Self { elem: ManuallyDrop::new(elem), next: Atomic::null() }

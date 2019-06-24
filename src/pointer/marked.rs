@@ -122,7 +122,6 @@ impl<T: NonNullable> Marked<T> {
     }
 }
 
-// TODO: remove?
 impl<T: NonNullable + MarkedPointer> Marked<T> {
     /// Decomposes the inner marked pointer, returning only the separated tag.
     #[inline]
