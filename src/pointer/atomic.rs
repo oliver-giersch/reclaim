@@ -258,7 +258,7 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     #[inline]
     unsafe fn fetch_and_x(
         &self,
-        op: impl FnOnce(&AtomicUsize, usize, Ordering) -> usize,
+        op: fn(&AtomicUsize, usize, Ordering) -> usize,
         value: usize,
         order: Ordering,
     ) -> MarkedPtr<T, N> {
