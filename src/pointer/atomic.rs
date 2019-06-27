@@ -1,6 +1,6 @@
 use core::fmt;
 use core::marker::PhantomData;
-use core::sync::atomic::{AtomicPtr, Ordering};
+use core::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
 
 use typenum::Unsigned;
 
@@ -165,6 +165,106 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
             .compare_exchange_weak(current.inner, new.inner, success, failure)
             .map(MarkedPtr::new)
             .map_err(MarkedPtr::new)
+    }
+
+    /// Bitwise `and` with the current tag value.
+    ///
+    /// Performs a bitwise `and` operation on the current tag and the argument `value` and sets the
+    /// new value to the result.
+    ///
+    /// Returns the [`MarkedPtr`] with the previous tag, the pointer itself can not change.
+    /// It `value` is larger than the mask of markable bits of this type it is silently truncated.
+    ///
+    /// `fetch_and` takes an [`Ordering`] argument, which describes the memory ordering of this
+    /// operation.
+    /// All orderings modes are possible.
+    /// Note, that using [`Acquire`][acq] makes the store part of this operation [`Relaxed`][rlx]
+    /// and using [`Release`][rel] makes the load part [`Relaxed][rlx]
+    ///
+    /// [acq]: core::sync::atomic::Ordering::Acquire
+    /// [rel]: core::sync::atomic::Ordering::Release
+    /// [rlx]: core::sync::atomic::Ordering::Relaxed
+    #[inline]
+    pub fn fetch_and(&self, value: usize, order: Ordering) -> MarkedPtr<T, N> {
+        unsafe { self.fetch_and_x(AtomicUsize::fetch_and, value, order) }
+    }
+
+    /// Bitwise `nand` with the current tag value.
+    ///
+    /// Performs a bitwise `nand` operation on the current tag and the argument `value` and sets the
+    /// new value to the result.
+    ///
+    /// Returns the [`MarkedPtr`] with the previous tag, the pointer itself can not change.
+    /// It `value` is larger than the mask of markable bits of this type it is silently truncated.
+    ///
+    /// `fetch_nand` takes an [`Ordering`] argument, which describes the memory ordering of this
+    /// operation.
+    /// All orderings modes are possible.
+    /// Note, that using [`Acquire`][acq] makes the store part of this operation [`Relaxed`][rlx]
+    /// and using [`Release`][rel] makes the load part [`Relaxed][rlx]
+    ///
+    /// [acq]: core::sync::atomic::Ordering::Acquire
+    /// [rel]: core::sync::atomic::Ordering::Release
+    /// [rlx]: core::sync::atomic::Ordering::Relaxed
+    #[inline]
+    pub fn fetch_nand(&self, value: usize, order: Ordering) -> MarkedPtr<T, N> {
+        unsafe { self.fetch_and_x(AtomicUsize::fetch_nand, value, order) }
+    }
+
+    /// Bitwise `or` with the current tag value.
+    ///
+    /// Performs a bitwise `or` operation on the current tag and the argument `value` and sets the
+    /// new value to the result.
+    ///
+    /// Returns the [`MarkedPtr`] with the previous tag, the pointer itself can not change.
+    /// It `value` is larger than the mask of markable bits of this type it is silently truncated.
+    ///
+    /// `fetch_or` takes an [`Ordering`] argument, which describes the memory ordering of this
+    /// operation.
+    /// All orderings modes are possible.
+    /// Note, that using [`Acquire`][acq] makes the store part of this operation [`Relaxed`][rlx]
+    /// and using [`Release`][rel] makes the load part [`Relaxed][rlx]
+    ///
+    /// [acq]: core::sync::atomic::Ordering::Acquire
+    /// [rel]: core::sync::atomic::Ordering::Release
+    /// [rlx]: core::sync::atomic::Ordering::Relaxed
+    #[inline]
+    pub fn fetch_or(&self, value: usize, order: Ordering) -> MarkedPtr<T, N> {
+        unsafe { self.fetch_and_x(AtomicUsize::fetch_or, value, order) }
+    }
+
+    /// Bitwise `xor` with the current tag value.
+    ///
+    /// Performs a bitwise `xor` operation on the current tag and the argument `value` and sets the
+    /// new value to the result.
+    ///
+    /// Returns the [`MarkedPtr`] with the previous tag, the pointer itself can not change.
+    /// It `value` is larger than the mask of markable bits of this type it is silently truncated.
+    ///
+    /// `fetch_xor` takes an [`Ordering`] argument, which describes the memory ordering of this
+    /// operation.
+    /// All orderings modes are possible.
+    /// Note, that using [`Acquire`][acq] makes the store part of this operation [`Relaxed`][rlx]
+    /// and using [`Release`][rel] makes the load part [`Relaxed][rlx]
+    ///
+    /// [acq]: core::sync::atomic::Ordering::Acquire
+    /// [rel]: core::sync::atomic::Ordering::Release
+    /// [rlx]: core::sync::atomic::Ordering::Relaxed
+    #[inline]
+    pub fn fetch_xor(&self, value: usize, order: Ordering) -> MarkedPtr<T, N> {
+        unsafe { self.fetch_and_x(AtomicUsize::fetch_xor, value, order) }
+    }
+
+    #[inline]
+    unsafe fn fetch_and_x(
+        &self,
+        op: impl FnOnce(&AtomicUsize, usize, Ordering) -> usize,
+        value: usize,
+        order: Ordering,
+    ) -> MarkedPtr<T, N> {
+        let cast = &*(self as *const _ as *const AtomicUsize);
+        let prev = op(cast, value & Self::MARK_MASK, order);
+        MarkedPtr::from(prev as *const _)
     }
 }
 

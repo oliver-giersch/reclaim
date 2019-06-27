@@ -38,6 +38,12 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// The bitmask for the (higher) pointer bits.
     pub const POINTER_MASK: usize = !Self::MARK_MASK;
 
+    /// Cast to a pointer of another type.
+    #[inline]
+    pub fn cast<U>(self) -> MarkedNonNull<U, N> {
+        MarkedNonNull::from(self.inner.cast())
+    }
+
     /// Returns the inner pointer *as is*, meaning potential tags are not
     /// stripped.
     #[inline]

@@ -37,6 +37,12 @@ impl<T, N> MarkedPtr<T, N> {
         Self::new(ptr::null_mut())
     }
 
+    /// Cast to a pointer of another type.
+    #[inline]
+    pub const fn cast<U>(self) -> MarkedPtr<U, N> {
+        MarkedPtr::new(self.inner as *mut U)
+    }
+
     /// Creates a marked pointer from the numeric representation of a
     /// potentially marked pointer.
     #[inline]
