@@ -79,8 +79,23 @@ impl<'g, T, R: Reclaim, N: Unsigned> Shared<'g, T, R, N> {
     }
 
     /// Converts the `Shared` reference into an [`Unprotected`].
+    #[inline]
     pub fn into_unprotected(shared: Self) -> Unprotected<T, R, N> {
         Unprotected { inner: shared.inner, _marker: PhantomData }
+    }
+
+    /// Casts the [`Shared`] to a reference to a different type and with a different lifetime.
+    ///
+    /// This can be useful to extend the lifetime of a [`Shared`] in cases the borrow checker is
+    /// unable to correctly determine the relationship between mutable borrows of guards and the
+    /// resulting shared references.
+    ///
+    /// # Safety
+    ///
+    /// The caller has to ensure the cast is valid both in terms of type and lifetime.
+    #[inline]
+    pub unsafe fn cast<'h, U>(shared: Self) -> Shared<'h, U, R, N> {
+        Shared { inner: shared.inner.cast(), _marker: PhantomData }
     }
 }
 

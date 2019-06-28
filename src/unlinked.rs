@@ -37,6 +37,16 @@ impl<T, R: Reclaim, N: Unsigned> Unlinked<T, R, N> {
         Unprotected { inner: shared.inner, _marker: PhantomData }
     }
 
+    /// Casts the [`Unlinked`] to a reference to a different type.
+    ///
+    /// # Safety
+    ///
+    /// The caller has to ensure the cast is valid.
+    #[inline]
+    pub unsafe fn cast<U>(unlinked: Self) -> Unlinked<U, R, N> {
+        Unlinked { inner: unlinked.inner.cast(), _marker: PhantomData }
+    }
+
     /// Retires a record by calling [`retire_local`][retire] on the generic
     /// reclamation parameter `R`.
     ///

@@ -209,13 +209,13 @@ mod shared;
 mod unlinked;
 mod unprotected;
 
+#[cfg(feature = "std")]
+use std::error::Error;
+
 use core::fmt;
 use core::marker::PhantomData;
 use core::ptr::NonNull;
 use core::sync::atomic::Ordering;
-
-#[cfg(feature = "std")]
-use std::error::Error;
 
 // TODO: replace with const generics once available
 pub use typenum;
@@ -300,6 +300,21 @@ where
     /// The same caveats as with [`retire_local`][`Reclaim::retire_local`]
     /// apply.
     unsafe fn retire_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, Self, N>);
+
+    /// Retires a raw marked pointer to a record.
+    ///
+    /// # Safety
+    ///
+    /// The same caveats as with [`retire_local_raw`][`Reclaim::retire_local_raw`]
+    /// apply.
+    ///
+    /// # Panics
+    ///
+    /// In debug mode, this function panics if `ptr` is `null`.
+    unsafe fn retire_raw<T, N: Unsigned>(ptr: MarkedPtr<T, N>) {
+        debug_assert!(!ptr.is_null());
+        Self::retire_unchecked(Unlinked::from_marked_ptr(ptr));
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -412,6 +427,23 @@ where
         local: &Self::Local,
         unlinked: Unlinked<T, Self, N>,
     );
+
+    /// Retires a raw marked pointer to a record.
+    ///
+    /// # Safety
+    ///
+    /// The same restrictions as with [`retire_local_unchecked`][Reclaim::retire_local_unchecked]
+    /// apply.
+    /// Since this function accepts a raw pointer, no type level checks on the validity are possible
+    /// and are hence the responsibility of the caller.
+    ///
+    /// # Panics
+    ///
+    /// In debug mode, this function panics if `ptr` is `null`.
+    unsafe fn retire_local_raw<T, N: Unsigned>(local: &Self::Local, ptr: MarkedPtr<T, N>) {
+        debug_assert!(!ptr.is_null());
+        Self::retire_local_unchecked(local, Unlinked::from_marked_ptr(ptr));
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -79,6 +79,12 @@ impl<T, R: Reclaim, N: Unsigned> Unprotected<T, R, N> {
     pub unsafe fn into_shared<'a>(unprotected: Self) -> Shared<'a, T, R, N> {
         Shared::from_marked_non_null(unprotected.inner)
     }
+
+    /// Casts the [`Unprotected`] to a reference to a different type.
+    #[inline]
+    pub fn cast<U>(unprotected: Self) -> Unprotected<U, R, N> {
+        Unprotected { inner: unprotected.inner.cast(), _marker: PhantomData }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
