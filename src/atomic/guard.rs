@@ -7,15 +7,15 @@ use core::sync::atomic::Ordering;
 use typenum::Unsigned;
 
 use crate::atomic::Atomic;
-use crate::internal::Guard;
+use crate::internal::GuardRef;
 use crate::pointer::{Marked, MarkedPointer, MarkedPtr};
 use crate::{AcquireResult, Protect, ProtectRegion, Shared};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Guard (trait)
+// impl Guard
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<'g, G> Guard<'g> for &'g mut G
+impl<'g, G> GuardRef<'g> for &'g mut G
 where
     G: Protect,
 {
@@ -41,7 +41,7 @@ where
     }
 }
 
-impl<'g, G> Guard<'g> for &'g G
+impl<'g, G> GuardRef<'g> for &'g G
 where
     G: ProtectRegion,
 {

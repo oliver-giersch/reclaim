@@ -13,14 +13,14 @@ use crate::{AcquireResult, Reclaim, Shared};
 // Guard (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A sealed trait for abstracting over different types for valid guard values.
+/// A sealed trait for abstracting over different types for valid guard references.
 ///
 /// For guard types implementing only the [`Protect`](crate::Protect) trait,
 /// this trait is only implemented for *mutable* references to this type.
 /// For guard types that also implement the
 /// [`ProtectRegion`](crate::ProtectRegion) trait, this trait is also
 /// implemented for *shared* references.
-pub trait Guard<'g> {
+pub trait GuardRef<'g> {
     type Reclaimer: Reclaim;
 
     fn load_protected<T, N: Unsigned>(

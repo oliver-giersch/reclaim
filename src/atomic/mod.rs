@@ -8,7 +8,7 @@ use core::sync::atomic::Ordering;
 
 use typenum::Unsigned;
 
-use crate::internal::{Compare, Guard, Internal, Store};
+use crate::internal::{Compare, GuardRef, Internal, Store};
 use crate::leak::Leaking;
 use crate::pointer::{AtomicMarkedPtr, Marked, MarkedNonNull, MarkedPointer, MarkedPtr};
 use crate::{AcquireResult, NotEqualError, Owned, Reclaim, Shared, Unlinked, Unprotected};
@@ -182,7 +182,7 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
     pub fn load<'g>(
         &self,
         order: Ordering,
-        guard: impl Guard<'g, Reclaimer = R>,
+        guard: impl GuardRef<'g, Reclaimer = R>,
     ) -> Option<Shared<'g, T, R, N>> {
         guard.load_protected(self, order).value()
     }
@@ -208,7 +208,7 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
         &self,
         expected: MarkedPtr<T, N>,
         order: Ordering,
-        guard: impl Guard<'g, Reclaimer = R>,
+        guard: impl GuardRef<'g, Reclaimer = R>,
     ) -> Result<Option<Shared<'g, T, R, N>>, NotEqualError> {
         guard.load_protected_if_equal(self, expected, order).map(Marked::value)
     }
@@ -237,7 +237,7 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
     pub fn load_marked<'g>(
         &self,
         order: Ordering,
-        guard: impl Guard<'g, Reclaimer = R>,
+        guard: impl GuardRef<'g, Reclaimer = R>,
     ) -> Marked<Shared<'g, T, R, N>> {
         guard.load_protected(self, order)
     }
@@ -268,7 +268,7 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
         &self,
         expected: MarkedPtr<T, N>,
         order: Ordering,
-        guard: impl Guard<'g, Reclaimer = R>,
+        guard: impl GuardRef<'g, Reclaimer = R>,
     ) -> AcquireResult<'g, T, R, N> {
         guard.load_protected_if_equal(self, expected, order)
     }
