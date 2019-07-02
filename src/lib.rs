@@ -214,6 +214,7 @@ use std::error::Error;
 
 use core::fmt;
 use core::marker::PhantomData;
+use core::mem;
 use core::ptr::NonNull;
 use core::sync::atomic::Ordering;
 
@@ -723,14 +724,28 @@ impl<T, R: Reclaim> Record<T, R> {
     /// field.
     #[inline]
     pub fn offset_header() -> usize {
-        offset_of!(Self, header)
+        // FIXME: the offset_of! macro is unsound, this allows at least avoiding using it
+        //        in many cases until a better solution becomes available
+        // https://internals.rust-lang.org/t/pre-rfc-add-a-new-offset-of-macro-to-core-mem/9273
+        if mem::size_of::<R::RecordHeader>() == 0 {
+            0
+        } else {
+            offset_of!(Self, header)
+        }
     }
 
     /// Returns the offset in bytes from the address of a record to its element
     /// field.
     #[inline]
     pub fn offset_elem() -> usize {
-        offset_of!(Self, elem)
+        // FIXME: the offset_of! macro is currently, this allows at least avoiding using it
+        //        in many cases until a better solution becomes available
+        // https://internals.rust-lang.org/t/pre-rfc-add-a-new-offset-of-macro-to-core-mem/9273
+        if mem::size_of::<R::RecordHeader>() == 0 {
+            0
+        } else {
+            offset_of!(Self, elem)
+        }
     }
 }
 
