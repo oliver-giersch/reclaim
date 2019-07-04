@@ -278,6 +278,15 @@ where
         Self::Guard::default()
     }
 
+    /// Attempts to safely reclaim some retired records.
+    ///
+    /// Retired records are often cached locally by each thread to some
+    /// extent.
+    /// In cases, where opportunities for reclaiming these records (usually
+    /// actions requiring protection of shared values) materialize only rarely,
+    /// this function can be used to initiate the (safe) reclamation manually.
+    fn try_flush();
+
     /// Retires a record and caches it **at least** until it is safe to
     /// deallocate it.
     ///

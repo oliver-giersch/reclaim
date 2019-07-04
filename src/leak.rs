@@ -69,6 +69,9 @@ unsafe impl GlobalReclaim for Leaking {
     type Guard = Guard;
 
     #[inline]
+    fn try_flush() {}
+
+    #[inline]
     unsafe fn retire<T: 'static, N: Unsigned>(_: Unlinked<T, N>) {}
 
     #[inline]
