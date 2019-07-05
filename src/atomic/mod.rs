@@ -95,15 +95,15 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
     /// use std::sync::atomic::Ordering::Relaxed;
     ///
     /// use reclaim::typenum::U0;
+    /// use reclaim::leak::Guard;
     ///
     /// type Atomic<T> = reclaim::leak::Atomic<T, U0>;
-    /// type Guarded<T> = reclaim::leak::LeakingGuard<T, U0>;
     ///
     /// let atomic = Atomic::new("string");
-    /// let mut guarded = Guarded::default();
+    /// let guard = &Guard::new();
     ///
     /// let ptr = atomic.load_raw(Relaxed);
-    /// let res = atomic.load_if_equal(ptr, Relaxed, &mut guarded);
+    /// let res = atomic.load_if_equal(ptr, Relaxed, guard);
     ///
     /// assert!(res.is_ok());
     /// # assert_eq!(&"string", &*res.unwrap().unwrap());
