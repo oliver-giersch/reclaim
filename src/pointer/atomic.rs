@@ -1,6 +1,6 @@
 use core::fmt;
 use core::marker::PhantomData;
-use core::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use typenum::Unsigned;
 
@@ -11,16 +11,10 @@ use crate::pointer::{self, AtomicMarkedPtr, MarkedPtr};
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<T, N> AtomicMarkedPtr<T, N> {
-    /// Creates a new `AtomicMarkedPtr`.
-    #[inline]
-    pub const fn new(ptr: MarkedPtr<T, N>) -> Self {
-        Self { inner: AtomicPtr::new(ptr.inner), _marker: PhantomData }
-    }
-
     /// Creates a new & unmarked `null` pointer.
     #[inline]
     pub const fn null() -> Self {
-        Self::new(MarkedPtr::null())
+        Self { inner: AtomicUsize::new(0), _marker: PhantomData }
     }
 }
 
@@ -36,10 +30,16 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     /// The bitmask for the (higher) pointer bits.
     pub const POINTER_MASK: usize = !Self::MARK_MASK;
 
+    /// Creates a new `AtomicMarkedPtr`.
+    #[inline]
+    pub fn new(ptr: MarkedPtr<T, N>) -> Self {
+        Self { inner: AtomicUsize::new(ptr.inner as usize), _marker: PhantomData }
+    }
+
     /// Consumes `self` and returns the inner [`MarkedPtr`](crate::pointer::MarkedPtr)
     #[inline]
     pub fn into_inner(self) -> MarkedPtr<T, N> {
-        MarkedPtr::new(self.inner.into_inner())
+        MarkedPtr::from_usize(self.inner.into_inner())
     }
 
     /// Loads a value from the pointer.
@@ -76,7 +76,7 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     /// ```
     #[inline]
     pub fn load(&self, order: Ordering) -> MarkedPtr<T, N> {
-        MarkedPtr::new(self.inner.load(order))
+        MarkedPtr::from_usize(self.inner.load(order))
     }
 
     /// Stores a value into the pointer.
@@ -114,13 +114,13 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     /// ```
     #[inline]
     pub fn store(&self, ptr: MarkedPtr<T, N>, order: Ordering) {
-        self.inner.store(ptr.inner, order);
+        self.inner.store(ptr.into_usize(), order);
     }
 
     /// Stores a value into the pointer, returning the previous value.
     #[inline]
     pub fn swap(&self, ptr: MarkedPtr<T, N>, order: Ordering) -> MarkedPtr<T, N> {
-        MarkedPtr::new(self.inner.swap(ptr.inner, order))
+        MarkedPtr::from_usize(self.inner.swap(ptr.into_usize(), order))
     }
 
     /// Stores a value into the pointer if the current value is the same
@@ -132,7 +132,11 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
         new: MarkedPtr<T, N>,
         order: Ordering,
     ) -> MarkedPtr<T, N> {
-        MarkedPtr::new(self.inner.compare_and_swap(current.inner, new.inner, order))
+        MarkedPtr::from_usize(self.inner.compare_and_swap(
+            current.into_usize(),
+            new.into_usize(),
+            order,
+        ))
     }
 
     /// Stores a value into the pointer if the current value is the same
@@ -146,9 +150,9 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
         failure: Ordering,
     ) -> Result<MarkedPtr<T, N>, MarkedPtr<T, N>> {
         self.inner
-            .compare_exchange(current.inner, new.inner, success, failure)
-            .map(MarkedPtr::new)
-            .map_err(MarkedPtr::new)
+            .compare_exchange(current.into_usize(), new.into_usize(), success, failure)
+            .map(MarkedPtr::from_usize)
+            .map_err(MarkedPtr::from_usize)
     }
 
     /// Stores a value into the pointer if the current value is the same
@@ -162,9 +166,9 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
         failure: Ordering,
     ) -> Result<MarkedPtr<T, N>, MarkedPtr<T, N>> {
         self.inner
-            .compare_exchange_weak(current.inner, new.inner, success, failure)
-            .map(MarkedPtr::new)
-            .map_err(MarkedPtr::new)
+            .compare_exchange_weak(current.into_usize(), new.into_usize(), success, failure)
+            .map(MarkedPtr::from_usize)
+            .map_err(MarkedPtr::from_usize)
     }
 
     /// Bitwise `and` with the current tag value.
@@ -186,7 +190,7 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     /// [rlx]: core::sync::atomic::Ordering::Relaxed
     #[inline]
     pub fn fetch_and(&self, value: usize, order: Ordering) -> MarkedPtr<T, N> {
-        unsafe { self.fetch_and_x(AtomicUsize::fetch_and, value, order) }
+        MarkedPtr::from_usize(self.inner.fetch_and(value, order))
     }
 
     /// Bitwise `nand` with the current tag value.
@@ -208,7 +212,7 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     /// [rlx]: core::sync::atomic::Ordering::Relaxed
     #[inline]
     pub fn fetch_nand(&self, value: usize, order: Ordering) -> MarkedPtr<T, N> {
-        unsafe { self.fetch_and_x(AtomicUsize::fetch_nand, value, order) }
+        MarkedPtr::from_usize(self.inner.fetch_nand(value, order))
     }
 
     /// Bitwise `or` with the current tag value.
@@ -230,7 +234,7 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     /// [rlx]: core::sync::atomic::Ordering::Relaxed
     #[inline]
     pub fn fetch_or(&self, value: usize, order: Ordering) -> MarkedPtr<T, N> {
-        unsafe { self.fetch_and_x(AtomicUsize::fetch_or, value, order) }
+        MarkedPtr::from_usize(self.inner.fetch_or(value, order))
     }
 
     /// Bitwise `xor` with the current tag value.
@@ -252,19 +256,7 @@ impl<T, N: Unsigned> AtomicMarkedPtr<T, N> {
     /// [rlx]: core::sync::atomic::Ordering::Relaxed
     #[inline]
     pub fn fetch_xor(&self, value: usize, order: Ordering) -> MarkedPtr<T, N> {
-        unsafe { self.fetch_and_x(AtomicUsize::fetch_xor, value, order) }
-    }
-
-    #[inline]
-    unsafe fn fetch_and_x(
-        &self,
-        op: fn(&AtomicUsize, usize, Ordering) -> usize,
-        value: usize,
-        order: Ordering,
-    ) -> MarkedPtr<T, N> {
-        let cast = &*(self as *const _ as *const AtomicUsize);
-        let prev = op(cast, value & Self::MARK_MASK, order);
-        MarkedPtr::from(prev as *const _)
+        MarkedPtr::from_usize(self.inner.fetch_xor(value, order))
     }
 }
 

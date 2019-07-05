@@ -30,6 +30,28 @@ impl<T, N> Copy for MarkedNonNull<T, N> {}
 // impl inherent
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl<T, N> MarkedNonNull<T, N> {
+    /// Cast to a pointer of another type.
+    #[inline]
+    pub const fn cast<U>(self) -> MarkedNonNull<U, N> {
+        MarkedNonNull { inner: self.inner.cast(), _marker: PhantomData }
+    }
+
+    /// Creates a new `MarkedNonNull` that is dangling, but well-aligned.
+    ///
+    /// This is useful for initializing types which lazily allocate, like
+    /// `Vec::new` does.
+    ///
+    /// Note that the pointer value may potentially represent a valid pointer to
+    /// a `T`, which means this must not be used as a "not yet initialized"
+    /// sentinel value. Types that lazily allocate must track initialization by
+    /// some other means.
+    #[inline]
+    pub const fn dangling() -> Self {
+        Self { inner: NonNull::dangling(), _marker: PhantomData }
+    }
+}
+
 impl<T, N: Unsigned> MarkedNonNull<T, N> {
     /// The number of available mark bits for this type.
     pub const MARK_BITS: usize = N::USIZE;
@@ -37,12 +59,6 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     pub const MARK_MASK: usize = pointer::mark_mask::<T>(Self::MARK_BITS);
     /// The bitmask for the (higher) pointer bits.
     pub const POINTER_MASK: usize = !Self::MARK_MASK;
-
-    /// Cast to a pointer of another type.
-    #[inline]
-    pub fn cast<U>(self) -> MarkedNonNull<U, N> {
-        MarkedNonNull::from(self.inner.cast())
-    }
 
     /// Returns the inner pointer *as is*, meaning potential tags are not
     /// stripped.
@@ -81,20 +97,6 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
             (raw, _) if !raw.is_null() => unsafe { Value(Self::new_unchecked(ptr)) },
             (_, tag) => Null(tag),
         }
-    }
-
-    /// Creates a new `MarkedNonNull` that is dangling, but well-aligned.
-    ///
-    /// This is useful for initializing types which lazily allocate, like
-    /// `Vec::new` does.
-    ///
-    /// Note that the pointer value may potentially represent a valid pointer to
-    /// a `T`, which means this must not be used as a "not yet initialized"
-    /// sentinel value. Types that lazily allocate must track initialization by
-    /// some other means.
-    #[inline]
-    pub fn dangling() -> Self {
-        Self { inner: NonNull::dangling(), _marker: PhantomData }
     }
 
     /// Clears the tag of `self` and returns the same but untagged pointer.

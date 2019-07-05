@@ -10,7 +10,7 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
 use core::ptr::{self, NonNull};
-use core::sync::atomic::AtomicPtr;
+use core::sync::atomic::AtomicUsize;
 
 use typenum::Unsigned;
 
@@ -128,8 +128,8 @@ pub struct MarkedNonNull<T, N> {
 /// [atomic]: std::sync::atomic::AtomicPtr
 /// [marked]: MarkedPtr
 pub struct AtomicMarkedPtr<T, N> {
-    inner: AtomicPtr<T>,
-    _marker: PhantomData<N>,
+    inner: AtomicUsize,
+    _marker: PhantomData<(*mut T, N)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

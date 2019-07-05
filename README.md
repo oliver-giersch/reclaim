@@ -19,7 +19,7 @@ Add the following to your `Cargo.toml`
 
 ```
 [dependencies]
-reclaim = "0.1.0"
+reclaim = "0.2.0"
 ```
 
 ## Minimum Supported Rust Version (MSRV)
@@ -37,7 +37,7 @@ environment.
 The following list contains the currently available reclamation scheme
 implementations based on this crate's API and interface:
 
-- [debra (work in progress)](https://github.com/oliver-giersch/debra)
+- [debra](https://github.com/oliver-giersch/debra)
 - [hazptr](https://github.com/oliver-giersch/hazptr)
 
 ## Down the Road
@@ -52,6 +52,11 @@ types).
 Likewise, since `const generics` are currently not available in stable Rust, the
 crate's type safe pointer tagging mechanism has to rely on the `typenum` crate.
 This is also bound change in the future.
+
+In some cases, the implementation for `Record` has to rely on the `memoffset`
+crate and its `offset_of!` macro, which exhibits UB.
+Once a fully sound alternative becomes available, it will be adapted.
+Note, that the macro is only used for record types with an non-zero size header.
 
 ## License
 

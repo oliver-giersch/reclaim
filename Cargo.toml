@@ -1,7 +1,7 @@
 [package]
 name = "reclaim"
 description = "trait-based abstract interface for memory reclamation"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Oliver Giersch"]
 license = "MIT/Apache-2.0"
 readme = "README.md"
@@ -15,7 +15,7 @@ default = ["std"]
 std = []
 
 [dependencies]
-memoffset = "0.2.1"
+memoffset = "0.4.0"
 typenum = "1.10.0"
 
 [dev-dependencies]
