@@ -149,9 +149,7 @@ pub enum Marked<T: NonNullable> {
     Null(usize),
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// blanket implementations
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** blanket impls *************************************************************************/
 
 impl<U, T, N: Unsigned> MarkedPointer for Option<U>
 where
@@ -287,12 +285,16 @@ where
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub struct InvalidNullError;
 
+/********** impl Display **************************************************************************/
+
 impl fmt::Display for InvalidNullError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "failed conversion of null pointer to non-nullable type")
     }
 }
+
+/********** impl Error ****************************************************************************/
 
 #[cfg(feature = "std")]
 impl Error for InvalidNullError {}
@@ -341,9 +343,7 @@ impl<'a, T> NonNullable for &'a mut T {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl Internal
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl Internal *************************************************************************/
 
 impl<U, T, N: Unsigned> Internal for Option<U> where
     U: MarkedPointer<Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>
@@ -355,9 +355,7 @@ impl<U, T, N: Unsigned> Internal for Marked<U> where
 {
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// helper functions
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** helper functions **********************************************************************/
 
 /// Decomposes the integer representation of a marked pointer into a
 /// raw pointer and its tag.

@@ -13,9 +13,7 @@ use crate::pointer::{
     MarkedNonNull, MarkedPtr, NonNullable,
 };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl Copy & Clone
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl Clone ****************************************************************************/
 
 impl<T, N> Clone for MarkedNonNull<T, N> {
     #[inline]
@@ -24,11 +22,11 @@ impl<T, N> Clone for MarkedNonNull<T, N> {
     }
 }
 
+/********** impl Copy *****************************************************************************/
+
 impl<T, N> Copy for MarkedNonNull<T, N> {}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl inherent
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl inherent *************************************************************************/
 
 impl<T, N> MarkedNonNull<T, N> {
     /// Cast to a pointer of another type.
@@ -282,9 +280,7 @@ impl<T, N: Unsigned> MarkedNonNull<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl Debug & Pointer (fmt)
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl Debug ****************************************************************************/
 
 impl<T, N: Unsigned> fmt::Debug for MarkedNonNull<T, N> {
     #[inline]
@@ -294,6 +290,8 @@ impl<T, N: Unsigned> fmt::Debug for MarkedNonNull<T, N> {
     }
 }
 
+/********** impl Pointer **************************************************************************/
+
 impl<T, N: Unsigned> fmt::Pointer for MarkedNonNull<T, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -301,9 +299,7 @@ impl<T, N: Unsigned> fmt::Pointer for MarkedNonNull<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl From & TryFrom
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl From *****************************************************************************/
 
 impl<T, N> From<NonNull<T>> for MarkedNonNull<T, N> {
     #[inline]
@@ -326,6 +322,8 @@ impl<'a, T, N: Unsigned> From<&'a mut T> for MarkedNonNull<T, N> {
     }
 }
 
+/********** impl TryFrom **************************************************************************/
+
 impl<T, N: Unsigned> TryFrom<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
     type Error = InvalidNullError;
 
@@ -338,30 +336,12 @@ impl<T, N: Unsigned> TryFrom<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl Eq, Ord, PartialEq, PartialOrd
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl PartialEq ************************************************************************/
 
 impl<T, N> PartialEq for MarkedNonNull<T, N> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.inner == other.inner
-    }
-}
-
-impl<T, N> PartialOrd for MarkedNonNull<T, N> {
-    #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.inner.partial_cmp(&other.inner)
-    }
-}
-
-impl<T, N> Eq for MarkedNonNull<T, N> {}
-
-impl<T, N> Ord for MarkedNonNull<T, N> {
-    #[inline]
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        self.inner.cmp(&other.inner)
     }
 }
 
@@ -372,6 +352,15 @@ impl<T, N> PartialEq<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
     }
 }
 
+/********** impl PartialOrd ***********************************************************************/
+
+impl<T, N> PartialOrd for MarkedNonNull<T, N> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.inner.partial_cmp(&other.inner)
+    }
+}
+
 impl<T, N> PartialOrd<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
     #[inline]
     fn partial_cmp(&self, other: &MarkedPtr<T, N>) -> Option<cmp::Ordering> {
@@ -379,9 +368,20 @@ impl<T, N> PartialOrd<MarkedPtr<T, N>> for MarkedNonNull<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// NonNullable
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl Eq *******************************************************************************/
+
+impl<T, N> Eq for MarkedNonNull<T, N> {}
+
+/********** impl Ord ******************************************************************************/
+
+impl<T, N> Ord for MarkedNonNull<T, N> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.inner.cmp(&other.inner)
+    }
+}
+
+/********** impl NonNullable **********************************************************************/
 
 impl<T, N: Unsigned> NonNullable for MarkedNonNull<T, N> {
     type Item = T;
@@ -393,9 +393,7 @@ impl<T, N: Unsigned> NonNullable for MarkedNonNull<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Internal
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl Internal *************************************************************************/
 
 impl<T, N: Unsigned> Internal for MarkedNonNull<T, N> {}
 

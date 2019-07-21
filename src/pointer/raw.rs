@@ -7,9 +7,7 @@ use typenum::{IsGreaterOrEqual, True, Unsigned};
 
 use crate::pointer::{self, MarkedNonNull, MarkedPtr};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Copy & Clone
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl Clone ****************************************************************************/
 
 impl<T, N> Clone for MarkedPtr<T, N> {
     #[inline]
@@ -18,11 +16,11 @@ impl<T, N> Clone for MarkedPtr<T, N> {
     }
 }
 
+/********** impl Copy *****************************************************************************/
+
 impl<T, N> Copy for MarkedPtr<T, N> {}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// inherent (const)
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl inherent (const) *****************************************************************/
 
 impl<T, N> MarkedPtr<T, N> {
     /// Creates an unmarked pointer.
@@ -51,9 +49,7 @@ impl<T, N> MarkedPtr<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// inherent
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl inherent *************************************************************************/
 
 impl<T, N: Unsigned> MarkedPtr<T, N> {
     /// The number of available mark bits for this type.
@@ -196,9 +192,7 @@ impl<T, N: Unsigned> MarkedPtr<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Default
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl Default **************************************************************************/
 
 impl<T, N: Unsigned> Default for MarkedPtr<T, N> {
     #[inline]
@@ -207,9 +201,7 @@ impl<T, N: Unsigned> Default for MarkedPtr<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Debug & Pointer (fmt)
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl Debug ****************************************************************************/
 
 impl<T, N: Unsigned> fmt::Debug for MarkedPtr<T, N> {
     #[inline]
@@ -219,6 +211,8 @@ impl<T, N: Unsigned> fmt::Debug for MarkedPtr<T, N> {
     }
 }
 
+/********** impl Pointer **************************************************************************/
+
 impl<T, N: Unsigned> fmt::Pointer for MarkedPtr<T, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -226,9 +220,7 @@ impl<T, N: Unsigned> fmt::Pointer for MarkedPtr<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// From
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl From *****************************************************************************/
 
 impl<T, N: Unsigned> From<*const T> for MarkedPtr<T, N> {
     #[inline]
@@ -280,9 +272,7 @@ impl<T, N: Unsigned> From<(*const T, usize)> for MarkedPtr<T, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// PartialEq & PartialOrd
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl PartialEq ************************************************************************/
 
 impl<T, N> PartialEq for MarkedPtr<T, N> {
     #[inline]
@@ -291,17 +281,19 @@ impl<T, N> PartialEq for MarkedPtr<T, N> {
     }
 }
 
-impl<T, N> PartialOrd for MarkedPtr<T, N> {
-    #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.inner.partial_cmp(&other.inner)
-    }
-}
-
 impl<T, N> PartialEq<MarkedNonNull<T, N>> for MarkedPtr<T, N> {
     #[inline]
     fn eq(&self, other: &MarkedNonNull<T, N>) -> bool {
         self.inner.eq(&other.inner.as_ptr())
+    }
+}
+
+/********** impl PartialOrd ***********************************************************************/
+
+impl<T, N> PartialOrd for MarkedPtr<T, N> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.inner.partial_cmp(&other.inner)
     }
 }
 
