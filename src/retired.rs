@@ -16,6 +16,8 @@ use crate::{Reclaim, Record};
 /// A type-erased fat pointer to a retired record.
 pub struct Retired<R>(NonNull<dyn Any + 'static>, PhantomData<R>);
 
+/********** impl inherent *************************************************************************/
+
 impl<R: Reclaim + 'static> Retired<R> {
     /// Creates a new [`Retired`] record from a raw pointer.
     ///
@@ -68,9 +70,7 @@ impl<R: Reclaim + 'static> Retired<R> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// cmp
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl PartialEq ************************************************************************/
 
 impl<R: Reclaim + 'static> PartialEq for Retired<R> {
     #[inline]
@@ -79,12 +79,16 @@ impl<R: Reclaim + 'static> PartialEq for Retired<R> {
     }
 }
 
+/********** impl PartialOrd ***********************************************************************/
+
 impl<R: Reclaim + 'static> PartialOrd for Retired<R> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         self.as_ptr().partial_cmp(&other.as_ptr())
     }
 }
+
+/********** impl Ord ******************************************************************************/
 
 impl<R: Reclaim + 'static> Ord for Retired<R> {
     #[inline]
@@ -93,11 +97,11 @@ impl<R: Reclaim + 'static> Ord for Retired<R> {
     }
 }
 
+/********** impl Eq *******************************************************************************/
+
 impl<R: Reclaim + 'static> Eq for Retired<R> {}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// fmt
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl Debug ****************************************************************************/
 
 impl<R: Reclaim + 'static> fmt::Debug for Retired<R> {
     #[inline]
@@ -105,6 +109,8 @@ impl<R: Reclaim + 'static> fmt::Debug for Retired<R> {
         f.debug_struct("Retired").field("address", &self.as_ptr()).finish()
     }
 }
+
+/********** impl Display **************************************************************************/
 
 impl<R: Reclaim + 'static> fmt::Display for Retired<R> {
     #[inline]

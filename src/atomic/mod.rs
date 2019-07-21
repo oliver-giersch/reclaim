@@ -33,8 +33,12 @@ pub struct Atomic<T, R, N> {
     _marker: PhantomData<(T, R)>,
 }
 
+/********** impl Send + Sync **********************************************************************/
+
 unsafe impl<T, R: Reclaim, N: Unsigned> Send for Atomic<T, R, N> where T: Send + Sync {}
 unsafe impl<T, R: Reclaim, N: Unsigned> Sync for Atomic<T, R, N> where T: Send + Sync {}
+
+/********** impl inherent *************************************************************************/
 
 impl<T, R, N> Atomic<T, R, N> {
     /// Creates a new `null` pointer.
@@ -454,6 +458,8 @@ impl<T, R: Reclaim, N: Unsigned> Atomic<T, R, N> {
     }
 }
 
+/********** impl inherent (Leaking) ***************************************************************/
+
 impl<T, N: Unsigned> Atomic<T, Leaking, N> {
     /// Loads an optional [`Shared`] reference from the `Atomic`.
     ///
@@ -491,9 +497,7 @@ impl<T, N: Unsigned> Atomic<T, Leaking, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl Default
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl Default **************************************************************************/
 
 impl<T, R: Reclaim, N: Unsigned> Default for Atomic<T, R, N> {
     #[inline]
@@ -502,9 +506,7 @@ impl<T, R: Reclaim, N: Unsigned> Default for Atomic<T, R, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl From
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl From *************************************************************************/
 
 impl<T, R: Reclaim, N: Unsigned> From<T> for Atomic<T, R, N> {
     #[inline]
@@ -520,9 +522,7 @@ impl<T, R: Reclaim, N: Unsigned> From<Owned<T, R, N>> for Atomic<T, R, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl Debug & Pointer
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl Debug ****************************************************************************/
 
 impl<T, R: Reclaim, N: Unsigned> fmt::Debug for Atomic<T, R, N> {
     #[inline]
@@ -532,6 +532,8 @@ impl<T, R: Reclaim, N: Unsigned> fmt::Debug for Atomic<T, R, N> {
     }
 }
 
+/********** impl Pointer **************************************************************************/
+
 impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Atomic<T, R, N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -539,9 +541,7 @@ impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Atomic<T, R, N> {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl Internal
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl Internal *************************************************************************/
 
 impl<T, R: Reclaim, N: Unsigned> Internal for Atomic<T, R, N> {}
 

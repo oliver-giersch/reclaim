@@ -24,9 +24,15 @@ pub type Unlinked<T, N> = crate::Unlinked<T, Leaking, N>;
 /// "reclamation" scheme.
 pub type Unprotected<T, N> = crate::Unprotected<T, Leaking, N>;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Leaking
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// A no-op memory "reclamation" scheme that deliberately leaks all memory.
 #[derive(Debug, Default)]
 pub struct Leaking;
+
+/********** impl inherent *************************************************************************/
 
 impl Leaking {
     /// Leaks the given `unlinked`.
@@ -40,22 +46,34 @@ impl Leaking {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Guard
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// The [`Guard`][Reclaim::Guard] type for the [`Leaking`] "reclamation".
 #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Guard;
 
+/********** impl inherent *************************************************************************/
+
 impl Guard {
-    /// Creates a new empty `LeakingGuard`.
+    /// Creates a new empty [`LeakingGuard`].
     #[inline]
     pub fn new() -> Self {
         Self
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Header
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(test)]
 pub struct Header {
     pub checksum: usize,
 }
+
+/********** impl Default **************************************************************************/
 
 #[cfg(test)]
 impl Default for Header {
@@ -64,6 +82,8 @@ impl Default for Header {
         Self { checksum: 0xDEAD_BEEF }
     }
 }
+
+/********** impl GlobalReclaim ********************************************************************/
 
 unsafe impl GlobalReclaim for Leaking {
     type Guard = Guard;
@@ -77,6 +97,8 @@ unsafe impl GlobalReclaim for Leaking {
     #[inline]
     unsafe fn retire_unchecked<T, N: Unsigned>(_: Unlinked<T, N>) {}
 }
+
+/********** impl Reclaim **************************************************************************/
 
 unsafe impl Reclaim for Leaking {
     type Local = ();
@@ -104,6 +126,8 @@ unsafe impl Reclaim for Leaking {
     #[inline]
     unsafe fn retire_local_unchecked<T, N: Unsigned>(_: &(), _: Unlinked<T, N>) {}
 }
+
+/********** impl Protect **************************************************************************/
 
 unsafe impl Protect for Guard {
     type Reclaimer = Leaking;
@@ -136,5 +160,7 @@ unsafe impl Protect for Guard {
         }
     }
 }
+
+/********** impl ProtectRegion ********************************************************************/
 
 unsafe impl ProtectRegion for Guard {}

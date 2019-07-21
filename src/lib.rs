@@ -617,12 +617,16 @@ pub type AcquireResult<'g, T, R, N> = Result<Marked<Shared<'g, T, R, N>>, NotEqu
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct NotEqualError;
 
+/********** impl Display **************************************************************************/
+
 impl fmt::Display for NotEqualError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "acquired value does not match `expected`.")
     }
 }
+
+/********** impl Error ****************************************************************************/
 
 #[cfg(feature = "std")]
 impl Error for NotEqualError {}
@@ -644,6 +648,8 @@ pub struct Record<T, R: Reclaim> {
     /// The record's wrapped (inner) element
     elem: T,
 }
+
+/********** impl inherent *************************************************************************/
 
 impl<T, R: Reclaim> Record<T, R> {
     /// Creates a new record with the specified `elem` and a default header.
@@ -768,6 +774,8 @@ pub struct Guarded<T, G, N: Unsigned> {
     guard: G,
     ptr: MarkedNonNull<T, N>,
 }
+
+/********** impl inherent *************************************************************************/
 
 impl<T, G: Protect, N: Unsigned> Guarded<T, G, N> {
     /// Returns a [`Shared`] reference borrowed from the [`Guarded`].

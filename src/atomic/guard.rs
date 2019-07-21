@@ -11,9 +11,7 @@ use crate::internal::GuardRef;
 use crate::pointer::{Marked, MarkedPointer, MarkedPtr};
 use crate::{AcquireResult, Protect, ProtectRegion, Shared};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// impl Guard
-////////////////////////////////////////////////////////////////////////////////////////////////////
+/********** impl GuardRef *************************************************************************/
 
 impl<'g, G> GuardRef<'g> for &'g mut G
 where
