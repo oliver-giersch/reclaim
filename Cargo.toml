@@ -9,7 +9,7 @@ repository = "https://github.com/oliver-giersch/reclaim.git"
 documentation = "https://docs.rs/reclaim"
 keywords = ["concurrent", "lock-free", "memory", "reclamation", "dynamic"]
 edition = "2018"
-exclude = ["/.travis.yml"]
+exclude = ["/.travis.yml", "TODOS.md"]
 
 [features]
 default = ["std"]
