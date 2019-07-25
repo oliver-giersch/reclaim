@@ -83,6 +83,18 @@ impl<T, R: Reclaim, N: Unsigned> Owned<T, R, N> {
         Self { inner: MarkedNonNull::compose(Self::alloc_record(owned), tag), _marker: PhantomData }
     }
 
+    /// Consumes the [`Owned`], de-allocates its memory and extracts the
+    /// contained value.
+    #[inline]
+    pub fn into_inner(self) -> T {
+        unsafe {
+            let ptr = self.inner.decompose_ptr();
+            mem::forget(self);
+            let boxed = Box::from_raw(Record::<_, R>::from_raw(ptr).as_ptr());
+            (*boxed).elem
+        }
+    }
+
     impl_inherent!(owned);
 
     /// Decomposes the internal marked pointer, returning a reference and the
