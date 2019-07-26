@@ -25,7 +25,7 @@ use self::Marked::{Null, Value};
 /// Trait for nullable and non-nullable *markable* pointer types.
 pub trait MarkedPointer: Sized + Internal {
     /// The pointer type.
-    type Pointer: NonNullable<Item = Self::Item, MarkBits = Self::MarkBits>;
+    type Pointer: MarkedNonNullable<Item = Self::Item, MarkBits = Self::MarkBits>;
     /// The pointed-to type.
     type Item: Sized;
     /// Number of bits available for tagging.
@@ -133,7 +133,7 @@ pub struct AtomicMarkedPtr<T, N> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Marked
+// Marked (enum)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A value that represents the possible states of a nullable marked pointer.
@@ -141,7 +141,7 @@ pub struct AtomicMarkedPtr<T, N> {
 /// This type is similar to [`Option<T>`][Option] but can also express `null`
 /// pointers with mark bits.
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum Marked<T: NonNullable> {
+pub enum Marked<T: MarkedNonNullable> {
     /// A marked, non-nullable pointer or reference value.
     Value(T),
     /// A null pointer that may be marked, in which case the `usize` is
@@ -153,7 +153,8 @@ pub enum Marked<T: NonNullable> {
 
 impl<U, T, N: Unsigned> MarkedPointer for Option<U>
 where
-    U: MarkedPointer<Pointer = U, Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>,
+    U: MarkedPointer<Pointer = U, Item = T, MarkBits = N>
+        + MarkedNonNullable<Item = T, MarkBits = N>,
 {
     type Pointer = U;
     type Item = T;
@@ -216,7 +217,8 @@ where
 
 impl<U, T, N: Unsigned> MarkedPointer for Marked<U>
 where
-    U: MarkedPointer<Pointer = U, Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>,
+    U: MarkedPointer<Pointer = U, Item = T, MarkBits = N>
+        + MarkedNonNullable<Item = T, MarkBits = N>,
 {
     type Pointer = U;
     type Item = T;
@@ -300,11 +302,11 @@ impl fmt::Display for InvalidNullError {
 impl Error for InvalidNullError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// NonNullable (traits)
+// NonNullable (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// An sealed (internal) marker trait for non-nullable pointer types.
-pub trait NonNullable: Sized + Internal {
+/// A sealed (internal) trait for non-nullable marked pointer types.
+pub trait MarkedNonNullable: Sized + Internal {
     /// The pointed-to type.
     type Item: Sized;
     /// Number of bits available for tagging.
@@ -323,7 +325,9 @@ pub trait NonNullable: Sized + Internal {
     fn into_marked_non_null(self) -> MarkedNonNull<Self::Item, Self::MarkBits>;
 }
 
-impl<'a, T> NonNullable for &'a T {
+/********** blanket impls *************************************************************************/
+
+impl<'a, T> MarkedNonNullable for &'a T {
     type Item = T;
     type MarkBits = typenum::U0;
 
@@ -333,7 +337,17 @@ impl<'a, T> NonNullable for &'a T {
     }
 }
 
-impl<'a, T> NonNullable for &'a mut T {
+impl<'a, T> MarkedNonNullable for &'a mut T {
+    type Item = T;
+    type MarkBits = typenum::U0;
+
+    #[inline]
+    fn into_marked_non_null(self) -> MarkedNonNull<Self::Item, Self::MarkBits> {
+        MarkedNonNull::from(self)
+    }
+}
+
+impl<T> MarkedNonNullable for NonNull<T> {
     type Item = T;
     type MarkBits = typenum::U0;
 
@@ -346,12 +360,12 @@ impl<'a, T> NonNullable for &'a mut T {
 /********** impl Internal *************************************************************************/
 
 impl<U, T, N: Unsigned> Internal for Option<U> where
-    U: MarkedPointer<Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>
+    U: MarkedPointer<Item = T, MarkBits = N> + MarkedNonNullable<Item = T, MarkBits = N>
 {
 }
 
 impl<U, T, N: Unsigned> Internal for Marked<U> where
-    U: MarkedPointer<Item = T, MarkBits = N> + NonNullable<Item = T, MarkBits = N>
+    U: MarkedPointer<Item = T, MarkBits = N> + MarkedNonNullable<Item = T, MarkBits = N>
 {
 }
 

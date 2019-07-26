@@ -7,7 +7,7 @@ use core::ops::Deref;
 use typenum::Unsigned;
 
 use crate::internal::Internal;
-use crate::pointer::{Marked, MarkedNonNull, MarkedPointer, NonNullable};
+use crate::pointer::{Marked, MarkedNonNull, MarkedNonNullable, MarkedPointer};
 use crate::{GlobalReclaim, Reclaim, Unlinked, Unprotected};
 
 /********** impl MarkedPointer ********************************************************************/
@@ -175,7 +175,7 @@ impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Unlinked<T, R, N> {
 
 /********** impl NonNullable **********************************************************************/
 
-impl<T, R, N: Unsigned> NonNullable for Unlinked<T, R, N> {
+impl<T, R, N: Unsigned> MarkedNonNullable for Unlinked<T, R, N> {
     type Item = T;
     type MarkBits = N;
 

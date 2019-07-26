@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use typenum::Unsigned;
 
 use crate::internal::Internal;
-use crate::pointer::{Marked, MarkedNonNull, MarkedPointer, NonNullable};
+use crate::pointer::{Marked, MarkedNonNull, MarkedNonNullable, MarkedPointer};
 use crate::{Reclaim, Shared, Unprotected};
 
 /********** impl Clone ****************************************************************************/
@@ -104,7 +104,7 @@ impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Unprotected<T, R, N> {
 
 /********** impl NonNullable **********************************************************************/
 
-impl<T, R, N: Unsigned> NonNullable for Unprotected<T, R, N> {
+impl<T, R, N: Unsigned> MarkedNonNullable for Unprotected<T, R, N> {
     type Item = T;
     type MarkBits = N;
 

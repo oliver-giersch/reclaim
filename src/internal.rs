@@ -1,6 +1,7 @@
 //! Internal traits which may appear in public interfaces, but are not actually
 //! exported by the crate.
 
+use core::ptr::NonNull;
 use core::sync::atomic::Ordering;
 
 use typenum::Unsigned;
@@ -61,7 +62,9 @@ pub trait Store: MarkedPointer + Sized {
 // Internal (trait)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A general purpose sealed marker trait for all relevant types of this crate.
 pub trait Internal {}
 
 impl<'a, T> Internal for &'a T {}
 impl<'a, T> Internal for &'a mut T {}
+impl<T> Internal for NonNull<T> {}

@@ -13,7 +13,7 @@ use core::ptr::NonNull;
 use typenum::Unsigned;
 
 use crate::internal::Internal;
-use crate::pointer::{Marked, MarkedNonNull, MarkedPointer, NonNullable};
+use crate::pointer::{Marked, MarkedNonNull, MarkedNonNullable, MarkedPointer};
 use crate::{Owned, Reclaim, Record, Shared, Unprotected};
 
 /********** impl Clone ****************************************************************************/
@@ -85,6 +85,8 @@ impl<T, R: Reclaim, N: Unsigned> Owned<T, R, N> {
 
     /// Consumes the [`Owned`], de-allocates its memory and extracts the
     /// contained value.
+    ///
+    /// This has the same semantics as destructuring a [`Box`].
     #[inline]
     pub fn into_inner(self) -> T {
         unsafe {
@@ -347,7 +349,7 @@ impl<T, R: Reclaim, N: Unsigned> fmt::Pointer for Owned<T, R, N> {
 
 /********** impl NonNullable **********************************************************************/
 
-impl<T, R: Reclaim, N: Unsigned> NonNullable for Owned<T, R, N> {
+impl<T, R: Reclaim, N: Unsigned> MarkedNonNullable for Owned<T, R, N> {
     type Item = T;
     type MarkBits = N;
 

@@ -10,7 +10,7 @@ use crate::internal::Internal;
 use crate::pointer::{
     self, InvalidNullError,
     Marked::{self, Null, Value},
-    MarkedNonNull, MarkedPtr, NonNullable,
+    MarkedNonNull, MarkedNonNullable, MarkedPtr,
 };
 
 /********** impl Clone ****************************************************************************/
@@ -383,7 +383,7 @@ impl<T, N> Ord for MarkedNonNull<T, N> {
 
 /********** impl NonNullable **********************************************************************/
 
-impl<T, N: Unsigned> NonNullable for MarkedNonNull<T, N> {
+impl<T, N: Unsigned> MarkedNonNullable for MarkedNonNull<T, N> {
     type Item = T;
     type MarkBits = N;
 

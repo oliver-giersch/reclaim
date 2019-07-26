@@ -191,8 +191,10 @@ pub mod prelude {
 
     pub use crate::pointer::{
         Marked::{self, Null, Value},
-        MarkedPointer, NonNullable,
+        MarkedNonNullable, MarkedPointer,
     };
+
+    pub use crate::util::{UnwrapMutPtr, UnwrapPtr, UnwrapUnchecked};
 
     pub use crate::GlobalReclaim;
     pub use crate::Protect;
@@ -208,6 +210,7 @@ mod retired;
 mod shared;
 mod unlinked;
 mod unprotected;
+mod util;
 
 #[cfg(feature = "std")]
 use std::error::Error;
@@ -226,7 +229,8 @@ use typenum::Unsigned;
 
 pub use crate::atomic::{Atomic, CompareExchangeFailure};
 pub use crate::pointer::{
-    AtomicMarkedPtr, InvalidNullError, Marked, MarkedNonNull, MarkedPointer, MarkedPtr, NonNullable,
+    AtomicMarkedPtr, InvalidNullError, Marked, MarkedNonNull, MarkedNonNullable, MarkedPointer,
+    MarkedPtr,
 };
 pub use crate::retired::Retired;
 
@@ -278,14 +282,17 @@ where
         Self::Guard::default()
     }
 
-    /// Attempts to safely reclaim some retired records.
+    /// Attempts to reclaim some retired records.
     ///
-    /// Retired records are often cached locally by each thread to some
-    /// extent.
-    /// In cases, where opportunities for reclaiming these records (usually
-    /// actions requiring protection of shared values) materialize only rarely,
-    /// this function can be used to initiate the (safe) reclamation manually.
-    fn try_flush();
+    /// When records are retired, they usually have to be stashed away for some
+    /// time, before they can be safely reclaimed.
+    /// This function initiates a manual collection attempt and tries to reclaim
+    /// some of these records.
+    /// Whether this affects all retired records or only records retired by the
+    /// current thread depends on the implementation.
+    /// Whether the reclaim attempt is bounded in some way or could potentially
+    /// reclaim all retired records is likewise implementation dependent.
+    fn try_reclaim();
 
     /// Retires a record and caches it **at least** until it is safe to
     /// deallocate it.
@@ -812,7 +819,7 @@ pub struct Owned<T, R: Reclaim, N: Unsigned> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Shared
+// Shared (impl in shared.rs)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A shared reference to a value that is actively protected from reclamation by
@@ -830,7 +837,7 @@ pub struct Shared<'g, T, R, N> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Unlinked
+// Unlinked (impl in unlinked.rs)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A reference to a value that has been removed from its previous location in
@@ -853,7 +860,7 @@ pub struct Unlinked<T, R, N> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Unprotected
+// Unprotected (impl in unprotected.rs)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A reference to a value loaded from an [`Atomic`] that is not actively

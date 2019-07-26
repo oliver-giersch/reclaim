@@ -2,13 +2,13 @@ use core::mem;
 
 use crate::pointer::{
     Marked::{self, Null, Value},
-    NonNullable,
+    MarkedNonNullable,
 };
 use crate::MarkedPointer;
 
 /********** impl inherent *************************************************************************/
 
-impl<T: NonNullable> Marked<T> {
+impl<T: MarkedNonNullable> Marked<T> {
     /// Returns `true` if the marked value contains a [`Value`].
     #[inline]
     pub fn is_value(&self) -> bool {
@@ -75,7 +75,7 @@ impl<T: NonNullable> Marked<T> {
     /// Maps a `Marked<T>` to `Marked<U>` by applying a function to a contained
     /// value.
     #[inline]
-    pub fn map<U: NonNullable>(self, func: impl (FnOnce(T) -> U)) -> Marked<U> {
+    pub fn map<U: MarkedNonNullable>(self, func: impl (FnOnce(T) -> U)) -> Marked<U> {
         match self {
             Value(ptr) => Value(func(ptr)),
             Null(tag) => Null(tag),
@@ -85,7 +85,7 @@ impl<T: NonNullable> Marked<T> {
     /// Applies a function to the contained value (if any), or computes a
     /// default value using `func`, if no value is contained.
     #[inline]
-    pub fn map_or_else<U: NonNullable>(
+    pub fn map_or_else<U: MarkedNonNullable>(
         self,
         default: impl FnOnce(usize) -> U,
         func: impl FnOnce(T) -> U,
@@ -120,7 +120,7 @@ impl<T: NonNullable> Marked<T> {
     }
 }
 
-impl<T: NonNullable + MarkedPointer> Marked<T> {
+impl<T: MarkedNonNullable + MarkedPointer> Marked<T> {
     /// Decomposes the inner marked pointer, returning only the separated tag.
     #[inline]
     pub fn decompose_tag(&self) -> usize {
@@ -133,7 +133,7 @@ impl<T: NonNullable + MarkedPointer> Marked<T> {
 
 /********** impl Default **************************************************************************/
 
-impl<T: NonNullable> Default for Marked<T> {
+impl<T: MarkedNonNullable> Default for Marked<T> {
     #[inline]
     fn default() -> Self {
         Null(0)
@@ -142,7 +142,7 @@ impl<T: NonNullable> Default for Marked<T> {
 
 /********** impl From *****************************************************************************/
 
-impl<T: NonNullable> From<Option<T>> for Marked<T> {
+impl<T: MarkedNonNullable> From<Option<T>> for Marked<T> {
     #[inline]
     fn from(opt: Option<T>) -> Self {
         match opt {

@@ -7,7 +7,7 @@ use core::ops::Deref;
 use typenum::Unsigned;
 
 use crate::internal::Internal;
-use crate::pointer::{Marked, MarkedNonNull, MarkedPointer, NonNullable};
+use crate::pointer::{Marked, MarkedNonNull, MarkedNonNullable, MarkedPointer};
 use crate::{Reclaim, Shared, Unprotected};
 
 /********** impl Clone ****************************************************************************/
@@ -136,7 +136,7 @@ impl<'g, T, R: Reclaim, N: Unsigned> fmt::Pointer for Shared<'g, T, R, N> {
 
 /********** impl NonNullable **********************************************************************/
 
-impl<'g, T, R, N: Unsigned> NonNullable for Shared<'g, T, R, N> {
+impl<'g, T, R, N: Unsigned> MarkedNonNullable for Shared<'g, T, R, N> {
     type Item = T;
     type MarkBits = N;
 
