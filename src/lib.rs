@@ -304,6 +304,22 @@ where
     ///
     /// The same caveats as with [`retire_local`][`LocalReclaim::retire_local`]
     /// apply.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::atomic::Ordering;
+    ///
+    /// use reclaim::leak::Leaking;
+    /// use reclaim::{GlobalReclaim, Owned};
+    ///
+    /// type Atomic<T> = reclaim::leak::Atomic<T, reclaim::typenum::U0>;
+    ///
+    /// let atomic = Atomic::new(String::from("owned string"));
+    /// if let Some(unlinked) = atomic.swap(Owned::none(), Ordering::SeqCst) {
+    ///     unsafe { Leaking::retire(unlinked) };
+    /// }
+    /// ```
     unsafe fn retire<T: 'static, N: Unsigned>(unlinked: Unlinked<T, Self, N>);
 
     /// Retires a record and caches it **at least** until it is safe to
@@ -316,6 +332,41 @@ where
     ///
     /// The same caveats as with [`retire_local`][`Reclaim::retire_local`]
     /// apply.
+    ///
+    /// # Examples
+    ///
+    /// It is usually safe to call `retire_unchecked` on types wrapped by
+    /// e.g. [`ManuallyDrop`][core::mem::ManuallyDrop].
+    ///
+    /// ```
+    /// use std::mem::ManuallyDrop;
+    /// use std::sync::atomic::Ordering;
+    ///
+    /// use reclaim::leak::Leaking;
+    /// use reclaim::{GlobalReclaim, Owned};
+    ///
+    /// type Atomic<T> = reclaim::leak::Atomic<T, reclaim::typenum::U0>;
+    ///
+    /// struct PrintOnDrop<'a> {
+    ///     reference: &'a i32,
+    /// }
+    ///
+    /// impl<'a> Drop for PrintOnDrop<'a> {
+    ///     fn drop(&mut self) {
+    ///         println!("dropping reference to {}", self.reference);
+    ///     }
+    /// }
+    ///
+    /// let drop = ManuallyDrop::new(PrintOnDrop {
+    ///     reference: &1
+    /// });
+    ///
+    /// let atomic = Atomic::new(drop);
+    ///
+    /// if let Some(unlinked) = atomic.swap(Owned::none(), Ordering::SeqCst) {
+    ///     unsafe { Leaking::retire_unchecked(unlinked) };
+    /// }
+    /// ```
     unsafe fn retire_unchecked<T, N: Unsigned>(unlinked: Unlinked<T, Self, N>);
 
     /// Retires a raw marked pointer to a record.
@@ -537,6 +588,28 @@ where
     ///
     /// [release]: core::sync::atomic::Ordering::Release
     /// [acq_rel]: core::sync::atomic::Ordering::AcqRel
+    ///
+    /// # Examples
+    ///
+    /// Usually, this method will only be called indirectly by calling e.g.
+    /// [`load`][Atomic::load] with a mutable reference to the guard
+    /// implementing [`Protect`]
+    ///
+    /// ```
+    /// use std::sync::atomic::Ordering;
+    ///
+    /// use reclaim::leak::Guard;
+    /// use reclaim::Protect;
+    ///
+    /// type Atomic<T> = reclaim::leak::Atomic<T, reclaim::typenum::U0>;
+    ///
+    /// let atomic = Atomic::new(1);
+    ///
+    /// let mut guard = Guard::new();
+    /// if let Some(shared) = atomic.load(Ordering::SeqCst, &mut guard) {
+    ///     assert_eq!(*shared, 1);
+    /// }
+    /// ```
     fn protect<T, N: Unsigned>(
         &mut self,
         atomic: &Atomic<T, Self::Reclaimer, N>,
