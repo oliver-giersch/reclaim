@@ -208,6 +208,7 @@ mod owned;
 mod pointer;
 mod retired;
 mod shared;
+mod traits;
 mod unlinked;
 mod unprotected;
 mod util;
